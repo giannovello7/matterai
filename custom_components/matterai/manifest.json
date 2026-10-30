@@ -1,0 +1,29 @@
+{
+  "domain": "matterai",
+  "name": "MatterAI",
+  "after_dependencies": [
+    "assist_pipeline",
+    "lovelace",
+    "matterai_escenas",
+    "stt"
+  ],
+  "codeowners": [
+    "@giannovello7"
+  ],
+  "config_flow": true,
+  "dependencies": [
+    "frontend",
+    "http",
+    "panel_custom",
+    "websocket_api"
+  ],
+  "documentation": "https://github.com/giannovello7/matterai",
+  "integration_type": "service",
+  "iot_class": "calculated",
+  "issue_tracker": "https://github.com/giannovello7/matterai/issues",
+  "requirements": [
+    "anthropic"
+  ],
+  "single_config_entry": true,
+  "version": "1.6.0"
+}
