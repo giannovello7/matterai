@@ -17,19 +17,19 @@
           "wifi": "Wifi de la casa (nombres separados por coma)"
         },
         "data_description": {
-          "url": "Por ejemplo https://perez.matterai.com.ar",
+          "url": "Por ejemplo perez.matterai.com.ar",
           "central_key": "La que te da el script alta-cliente o el panel central. Vacío = sin panel central.",
           "ai_key": "Empieza con sk-ant-. Se consigue en console.anthropic.com. Vacío = sin voz.",
           "voice_mode": "Gratis: entiende los pedidos comunes sin internet ni costo. Con la clave de abajo, la IA resuelve lo que el modo gratis no entienda.",
-          "local_url": "Por ejemplo http://192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
+          "local_url": "Por ejemplo 192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
           "wifi": "Tal como aparece en el celular, por ejemplo: Casa Pérez, Casa Pérez 5G. Vacío = la app prueba la dirección local y si no responde usa la remota."
         }
       }
     },
     "error": {
-      "bad_url": "Tiene que ser una dirección completa, por ejemplo https://perez.matterai.com.ar",
+      "bad_url": "Tiene que ser una dirección completa, por ejemplo perez.matterai.com.ar",
       "bad_ai_key": "La clave tiene que empezar con sk-ant-",
-      "bad_local_url": "Tiene que ser una dirección como http://192.168.1.50:8123"
+      "bad_local_url": "Tiene que ser una dirección como 192.168.1.50:8123"
     },
     "abort": {
       "single_instance_allowed": "MatterAI ya está configurada en esta casa."
@@ -53,15 +53,15 @@
         "data_description": {
           "ai_key": "Empieza con sk-ant-. Se consigue en console.anthropic.com. Vacío = sin voz.",
           "voice_mode": "Gratis: entiende los pedidos comunes sin internet ni costo. Con la clave de abajo, la IA resuelve lo que el modo gratis no entienda.",
-          "local_url": "Por ejemplo http://192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
+          "local_url": "Por ejemplo 192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
           "wifi": "Tal como aparece en el celular, por ejemplo: Casa Pérez, Casa Pérez 5G. Vacío = la app prueba la dirección local y si no responde usa la remota."
         }
       }
     },
     "error": {
-      "bad_url": "Tiene que ser una dirección completa, por ejemplo https://perez.matterai.com.ar",
+      "bad_url": "Tiene que ser una dirección completa, por ejemplo perez.matterai.com.ar",
       "bad_ai_key": "La clave tiene que empezar con sk-ant-",
-      "bad_local_url": "Tiene que ser una dirección como http://192.168.1.50:8123"
+      "bad_local_url": "Tiene que ser una dirección como 192.168.1.50:8123"
     }
   },
   "selector": {

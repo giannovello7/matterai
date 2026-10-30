@@ -17,19 +17,19 @@
           "wifi": "Wifi de la casa (nombres separados por coma)"
         },
         "data_description": {
-          "url": "e.g. https://smith.matterai.com.ar",
+          "url": "e.g. smith.matterai.com.ar",
           "central_key": "Leave empty if you don't use the central panel.",
           "ai_key": "Starts with sk-ant-. Empty = no voice.",
           "voice_mode": "Free: common commands, no cost. With the key below, AI handles what the free mode can't.",
-          "local_url": "Por ejemplo http://192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
+          "local_url": "Por ejemplo 192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
           "wifi": "Tal como aparece en el celular, por ejemplo: Casa Pérez, Casa Pérez 5G. Vacío = la app prueba la dirección local y si no responde usa la remota."
         }
       }
     },
     "error": {
-      "bad_url": "Must be a full address, e.g. https://smith.matterai.com.ar",
+      "bad_url": "Must be a full address, e.g. smith.matterai.com.ar",
       "bad_ai_key": "The key must start with sk-ant-",
-      "bad_local_url": "Tiene que ser una dirección como http://192.168.1.50:8123"
+      "bad_local_url": "Tiene que ser una dirección como 192.168.1.50:8123"
     },
     "abort": {
       "single_instance_allowed": "MatterAI is already set up."
@@ -53,15 +53,15 @@
         "data_description": {
           "ai_key": "Starts with sk-ant-. Empty = no voice.",
           "voice_mode": "Free: common commands, no cost. With the key below, AI handles what the free mode can't.",
-          "local_url": "Por ejemplo http://192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
+          "local_url": "Por ejemplo 192.168.1.50:8123. Con el celular en el wifi de la casa, la app se conecta directo, sin internet.",
           "wifi": "Tal como aparece en el celular, por ejemplo: Casa Pérez, Casa Pérez 5G. Vacío = la app prueba la dirección local y si no responde usa la remota."
         }
       }
     },
     "error": {
-      "bad_url": "Must be a full address, e.g. https://smith.matterai.com.ar",
+      "bad_url": "Must be a full address, e.g. smith.matterai.com.ar",
       "bad_ai_key": "The key must start with sk-ant-",
-      "bad_local_url": "Tiene que ser una dirección como http://192.168.1.50:8123"
+      "bad_local_url": "Tiene que ser una dirección como 192.168.1.50:8123"
     }
   },
   "selector": {
