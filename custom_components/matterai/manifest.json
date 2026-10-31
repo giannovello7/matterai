@@ -6,6 +6,7 @@
     "calendar",
     "camera",
     "conversation",
+    "hassio",
     "lovelace",
     "media_source",
     "mqtt",
@@ -29,5 +30,5 @@
     "anthropic"
   ],
   "single_config_entry": true,
-  "version": "2.2.0"
+  "version": "2.2.1"
 }
