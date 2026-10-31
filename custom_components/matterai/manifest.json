@@ -3,8 +3,12 @@
   "name": "MatterAI",
   "after_dependencies": [
     "assist_pipeline",
+    "calendar",
+    "camera",
+    "conversation",
     "lovelace",
-    "matterai_escenas",
+    "media_source",
+    "mqtt",
     "stt"
   ],
   "codeowners": [
@@ -25,5 +29,5 @@
     "anthropic"
   ],
   "single_config_entry": true,
-  "version": "1.6.1"
+  "version": "2.0.0"
 }

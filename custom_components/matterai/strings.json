@@ -73,5 +73,15 @@
         "off": "Desactivado"
       }
     }
+  },
+  "services": {
+    "run": {
+      "name": "Ejecutar",
+      "description": "Ejecuta una escena o automatización, o arranca un temporizador."
+    },
+    "set_enabled": {
+      "name": "Activar / pausar",
+      "description": "Activa o pausa una automatización."
+    }
   }
 }

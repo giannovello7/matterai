@@ -120,7 +120,7 @@ async def ws_status(hass: HomeAssistant, connection: websocket_api.ActiveConnect
                 "ok": hb.last_ok if hb else None,
                 "error": hb.last_error if hb else None,
             },
-            "escenas": "matterai_escenas" in hass.config.components,
+            "escenas": bool(hass.data.get("matterai_escenas")),
             "voice": {"on": bool(rt.get("voice")), "mode": rt["voice"].mode if rt.get("voice") else "off", "ai": bool(rt.get("voice") and rt["voice"].uses_ai)},
             "health": collect(hass),
         },

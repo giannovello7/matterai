@@ -4,6 +4,8 @@
 - Guarda la configuración del dashboard (sin YAML) y la edita el instalador desde el panel MatterAI.
 - Crea el usuario de la app (sin admin) y arma el link/QR para vincular el celular del cliente.
 - Le avisa al panel central del instalador que la casa está viva y si hay algo para atender.
+- Automatizaciones (antes «MatterAI Escenas»): escenas, automáticas, inteligentes y los equipos
+  del instalador (portón inteligente, sensor de ocupación). Ver escenas/.
 """
 
 from __future__ import annotations
@@ -20,7 +22,6 @@ from homeassistant.helpers.typing import ConfigType
 
 from .const import (
     CARD_FILENAME,
-    CARD_URL,
     LOADER_FILENAME,
     CONF_AI_KEY,
     CONF_VOICE_MODE,
@@ -39,6 +40,7 @@ from .const import (
     VERSION,
 )
 from .dashboard import Dashboard
+from .escenas import PLATFORMS, async_setup_escenas, async_setup_escenas_entry, async_unload_escenas
 from .health import Heartbeat
 from .house import House
 from .websocket import COMMANDS
@@ -58,6 +60,7 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         hass.http.register_static_path(STATIC_URL, FRONTEND_DIR, False)
     for command in COMMANDS:
         websocket_api.async_register_command(hass, command)
+    await async_setup_escenas(hass)
     return True
 
 
@@ -126,6 +129,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.async_on_unload(async_at_started(hass, _start))
         entry.async_on_unload(hb.stop)
 
+    # automatizaciones: el motor primero, después sus entidades (portón, botones, sensores)
+    await async_setup_escenas_entry(hass, entry)
+    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
 
@@ -135,10 +142,16 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+        return False
+    await async_unload_escenas(hass)
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
     rt = hass.data.get(DOMAIN, {})
     if rt.get("card_url"):
-        frontend.remove_extra_js_url(hass, rt["card_url"])
+        try:
+            frontend.remove_extra_js_url(hass, rt["card_url"])
+        except (KeyError, ValueError):  # ya no estaba (frontend recién iniciado o quitado antes)
+            pass
     for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice"):
         rt.pop(key, None)
     return True

@@ -16,12 +16,10 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers.selector import SelectSelector, SelectSelectorConfig, SelectSelectorMode
-from homeassistant.loader import IntegrationNotFound, async_get_integration
 
 from .const import CONF_AI_KEY, CONF_LOCAL_URL, CONF_WIFI, CONF_VOICE_MODE, CONF_CENTRAL_KEY, CONF_CENTRAL_URL, CONF_NAME, CONF_SUPPORT, CONF_URL, DEFAULT_CENTRAL_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
-CONF_ESCENAS = "escenas"
 
 
 def _clean_url(url: str) -> str:
@@ -86,37 +84,14 @@ class MatterAIConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(self, user_input: dict[str, Any] | None = None):
         if self._async_current_entries():
             return self.async_abort(reason="single_instance_allowed")
-        escenas_available = await self._escenas_available()
         extra: dict = {}
-        if escenas_available:
-            extra[vol.Optional(CONF_ESCENAS, default=True)] = bool
         errors: dict[str, str] = {}
         if user_input is not None:
             data, errors = _validate(user_input)
             if not errors:
-                if data.pop(CONF_ESCENAS, False):
-                    await self._setup_escenas()
                 return self.async_create_entry(title=f"MatterAI · {data[CONF_NAME]}", data=data)
         defaults = {CONF_URL: self.hass.config.external_url or "", CONF_LOCAL_URL: _local_url(self.hass), **(user_input or {})}
         return self.async_show_form(step_id="user", data_schema=_schema(defaults, extra), errors=errors)
-
-    async def _escenas_available(self) -> bool:
-        if self.hass.config_entries.async_entries("matterai_escenas"):
-            return False  # ya está configurada
-        try:
-            await async_get_integration(self.hass, "matterai_escenas")
-        except IntegrationNotFound:
-            return False
-        return True
-
-    async def _setup_escenas(self) -> None:
-        """Alta de MatterAI Escenas sin que el instalador tenga que hacer otro paso."""
-        try:
-            res = await self.hass.config_entries.flow.async_init("matterai_escenas", context={"source": config_entries.SOURCE_USER})
-            if res.get("type") == "form":
-                await self.hass.config_entries.flow.async_configure(res["flow_id"], {})
-        except Exception:  # noqa: BLE001 - si falla, se puede agregar a mano después
-            _LOGGER.warning("No se pudo configurar MatterAI Escenas automáticamente", exc_info=True)
 
     @staticmethod
     @callback

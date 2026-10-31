@@ -138,7 +138,7 @@
       ]);
       if (this._tab !== 'auto') return;
       if (!ok) {
-        main.innerHTML = `<div class="box"><h2>Falta MatterAI Escenas</h2><p>Instalala desde HACS (repositorio <b>giannovello7/matterai-escenas</b>), reiniciá Home Assistant y agregala en Dispositivos y servicios.</p></div>`;
+        main.innerHTML = `<div class="box"><h2>No se pudieron cargar las automatizaciones</h2><p>Recargá la página (Ctrl+F5). Si sigue igual, reiniciá Home Assistant.</p></div>`;
         return;
       }
       main.innerHTML = `<div class="box" style="margin-bottom:12px"><p class="mut" style="margin:0">Acá ves todo: lo que arma el cliente y los <b>equipos del instalador</b> (portón inteligente, sensor de ocupación), que el cliente no ve. Con <b>⚙</b> elegís qué puede crear el cliente y qué equipos ve. A una automatización tuya le podés poner <b>🔒</b> para que el cliente sólo la active o la pause.</p></div><div id="auto"></div>`;
@@ -251,7 +251,7 @@
           <div class="kv"><span>Panel central</span>${central}</div>
           ${c.error ? `<p class="mut">${esc(c.error)}</p>` : ''}
           ${c.configured ? `<div class="row"><button class="b" id="hb">Probar ahora</button>${c.url ? `<a class="b" href="${esc(c.url)}" target="_blank" rel="noopener">Abrir panel central</a>` : ''}</div>` : '<p class="mut">Cargá la clave de la casa en «Cambiar datos» para verla en tu panel central.</p>'}
-          <div class="kv"><span>MatterAI Escenas</span>${yes(s.escenas, 'Activa', 'No instalada')}</div>
+          <div class="kv"><span>Automatizaciones</span>${yes(s.escenas, 'Activas', 'Iniciando…')}</div>
           <div class="kv"><span>Control por voz</span>${!s.voice.on ? '<b class="mut">Desactivado</b>' : s.voice.ai ? `<b class="ok">${s.voice.mode === 'ai' ? 'Con IA' : 'Gratis + IA'}</b>` : '<b class="ok">Gratis</b>'}</div>
           ${s.voice.on && !s.voice.ai ? '<p class="mut">Entiende los pedidos comunes sin costo. Para que entienda cualquier frase, cargá una clave de Anthropic en «Cambiar datos».</p>' : ''}</div>
         <div class="box"><h2>Avisos</h2>
