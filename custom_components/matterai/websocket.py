@@ -98,7 +98,7 @@ async def ws_pairing(hass: HomeAssistant, connection: websocket_api.ActiveConnec
 @websocket_api.async_response
 async def ws_status(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     from .cors import cors_status  # noqa: PLC0415
-    from .health import collect  # noqa: PLC0415
+    from .health import async_collect  # noqa: PLC0415
 
     rt = _rt(hass)
     entry = rt["entry"]
@@ -125,7 +125,8 @@ async def ws_status(hass: HomeAssistant, connection: websocket_api.ActiveConnect
             },
             "escenas": bool(hass.data.get("matterai_escenas")),
             "voice": {"on": bool(rt.get("voice")), "mode": rt["voice"].mode if rt.get("voice") else "off", "ai": bool(rt.get("voice") and rt["voice"].uses_ai)},
-            "health": collect(hass),
+            "health": await async_collect(hass),
+            "escenas_conflict": bool(rt.get("escenas_conflict")),
         },
     )
 

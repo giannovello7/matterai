@@ -185,6 +185,20 @@ Panel MatterAI → **Copias y plantillas**:
 
 Nunca viajan las claves de la casa ni el acceso de la app.
 
+## Monitoreo de la casa
+
+Con el panel central configurado, cada 5 minutos la casa informa qué hay para atender. Cada falla lleva una clave propia, así el panel central sabe cuándo es nueva, cuándo sigue y cuándo se resolvió:
+
+- equipos sin responder **más de 15 minutos** (uno por equipo; si son más de 8, agrupados);
+- **complementos** (add-ons) con error o detenidos que deberían arrancar solos;
+- **integraciones** que no arrancan, no se pueden conectar o quedaron sin cargar;
+- **reparaciones** de Home Assistant con error o críticas;
+- disco casi lleno, alarma disparada (crítica), pilas bajas y actualizaciones pendientes (estas dos sólo informan);
+- copias automáticas de Home Assistant de hace más de 7 días;
+- que la integración vieja «MatterAI Escenas» siga instalada.
+
+Si una casa tiene todavía **MatterAI Escenas**, MatterAI no arranca su propio motor de automatizaciones (si no, cada automatización se ejecutaría dos veces) y muestra un aviso para eliminarla.
+
 ## Panel central (gestión de todas las casas)
 
 Proyecto aparte (`matterai-panel-central`, en Cloudflare). Cada casa con la clave cargada:

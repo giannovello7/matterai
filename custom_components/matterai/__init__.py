@@ -60,8 +60,17 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         hass.http.register_static_path(STATIC_URL, FRONTEND_DIR, False)
     for command in COMMANDS:
         websocket_api.async_register_command(hass, command)
-    await async_setup_escenas(hass)
+    # Si en esta casa sigue instalada la integración aparte «MatterAI Escenas», las automatizaciones
+    # las maneja ella: correr las dos haría que cada automatización se ejecute dos veces.
+    if not _escenas_aparte(hass):
+        await async_setup_escenas(hass)
     return True
+
+
+@callback
+def _escenas_aparte(hass: HomeAssistant) -> bool:
+    """¿Está instalada todavía la integración vieja «MatterAI Escenas»?"""
+    return bool(hass.config_entries.async_entries("matterai_escenas"))
 
 
 async def _version_tag(hass: HomeAssistant, filename: str) -> str:
@@ -130,8 +139,22 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         entry.async_on_unload(hb.stop)
 
     # automatizaciones: el motor primero, después sus entidades (portón, botones, sensores)
-    await async_setup_escenas_entry(hass, entry)
-    await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+    if _escenas_aparte(hass):
+        rt["escenas_conflict"] = True
+        _LOGGER.warning("MatterAI Escenas sigue instalada: las automatizaciones las maneja ella hasta que la elimines")
+        from homeassistant.components import persistent_notification  # noqa: PLC0415
+
+        persistent_notification.async_create(
+            hass,
+            "Las automatizaciones ahora vienen dentro de MatterAI. Eliminá la integración «MatterAI Escenas» "
+            "(Ajustes → Dispositivos y servicios) y reiniciá: tus automatizaciones se mantienen.",
+            title="MatterAI: falta eliminar MatterAI Escenas",
+            notification_id="matterai_escenas_aparte",
+        )
+    else:
+        await async_setup_escenas_entry(hass, entry)
+        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
+        rt["escenas_on"] = True
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
@@ -142,9 +165,11 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
-    if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-        return False
-    await async_unload_escenas(hass)
+    rt0 = hass.data.get(DOMAIN, {})
+    if rt0.get("escenas_on"):
+        if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
+            return False
+        await async_unload_escenas(hass)
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
     rt = hass.data.get(DOMAIN, {})
     if rt.get("card_url"):
@@ -152,7 +177,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             frontend.remove_extra_js_url(hass, rt["card_url"])
         except (KeyError, ValueError):  # ya no estaba (frontend recién iniciado o quitado antes)
             pass
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict"):
         rt.pop(key, None)
     return True
 
