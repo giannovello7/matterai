@@ -2,6 +2,8 @@
  * Panel MatterAI (barra lateral de Home Assistant, sólo administradores = el instalador).
  *   Dashboard: editor visual + vista previa + Guardar (la app de los clientes cambia al momento).
  *   App del cliente: QR y link para vincular el celular; generar un acceso nuevo.
+ *   Automatizaciones: las de MatterAI (vista del instalador).
+ *   Copias y plantillas: copia de seguridad, restaurar y plantillas para usar en otras casas.
  *   Estado: versión, acceso de la app (CORS), panel central, alertas de la casa.
  */
 (() => {
@@ -68,6 +70,13 @@
   .ok{color:#3ecf8e}.bad{color:var(--error-color,#db4437)}.wn{color:#ffb547}
   .al{padding:9px 12px;border-radius:10px;margin:6px 0;font-size:14px;background:rgba(127,127,127,.12)}
   .al.critical{background:rgba(219,68,55,.18)}.al.warning{background:rgba(255,181,71,.16)}
+  .lst{display:flex;flex-direction:column;gap:6px;max-height:340px;overflow:auto;margin:8px 0}
+  .it{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:10px;background:rgba(127,127,127,.08)}
+  .it .tx{flex:1;min-width:0}.it .t2{opacity:.65;font-size:12.5px}
+  .it input{width:18px;height:18px}
+  .fld{width:100%;box-sizing:border-box;padding:9px 11px;border-radius:10px;border:1px solid var(--divider-color,rgba(255,255,255,.2));background:rgba(127,127,127,.08);color:inherit;font:inherit;margin:4px 0}
+  .res{padding:10px 12px;border-radius:10px;margin:8px 0;font-size:14px;background:rgba(62,207,142,.12)}
+  .res.bad{background:rgba(219,68,55,.14)}
   .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);background:#323232;color:#fff;padding:10px 18px;border-radius:10px;z-index:20;font-size:14px}
   `;
 
@@ -97,7 +106,7 @@
 
     async _init() {
       this.shadowRoot.innerHTML = `<style>${CSS}</style><header><button class="menu" id="menu" title="Menú">☰</button><h1>MatterAI <small id="hname"></small></h1><small id="ver"></small></header>
-        <nav>${[['dash', 'Dashboard'], ['auto', 'Automatizaciones'], ['app', 'App del cliente'], ['status', 'Estado']].map(([k, l]) => `<button data-tab="${k}" class="${k === this._tab ? 'on' : ''}">${l}</button>`).join('')}</nav><main id="main"><p class="mut">Cargando…</p></main>`;
+        <nav>${[['dash', 'Dashboard'], ['auto', 'Automatizaciones'], ['app', 'App del cliente'], ['copias', 'Copias y plantillas'], ['status', 'Estado']].map(([k, l]) => `<button data-tab="${k}" class="${k === this._tab ? 'on' : ''}">${l}</button>`).join('')}</nav><main id="main"><p class="mut">Cargando…</p></main>`;
       this.shadowRoot.getElementById('menu').onclick = () => this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
       this.shadowRoot.querySelector('nav').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (b) this._go(b.dataset.tab); };
       try {
@@ -119,7 +128,7 @@
       this._tab = tab;
       this.shadowRoot.querySelectorAll('nav button').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
       this._auto = null;
-      if (tab === 'dash') this._renderDash(); else if (tab === 'auto') this._renderAuto(); else if (tab === 'app') this._renderApp(); else this._renderStatus();
+      if (tab === 'dash') this._renderDash(); else if (tab === 'auto') this._renderAuto(); else if (tab === 'app') this._renderApp(); else if (tab === 'copias') this._renderCopias(); else this._renderStatus();
     }
     _toast(msg) {
       const t = document.createElement('div'); t.className = 'toast'; t.textContent = msg;
@@ -147,6 +156,131 @@
       card.hass = this._hass;
       this.shadowRoot.getElementById('auto').appendChild(card);
       this._auto = card;
+    }
+
+    /* ---------- Copias y plantillas ---------- */
+    _download(name, obj) {
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(new Blob([JSON.stringify(obj, null, 2)], { type: 'application/json' }));
+      a.download = name; a.click();
+    }
+    _pickFile() {
+      return new Promise((res) => {
+        const i = document.createElement('input'); i.type = 'file'; i.accept = '.json,application/json';
+        i.onchange = async () => { try { res(JSON.parse(await i.files[0].text())); } catch (_) { this._toast('Ese archivo no se puede leer'); res(null); } };
+        i.click();
+      });
+    }
+    async _renderCopias() {
+      const main = this.shadowRoot.getElementById('main');
+      main.innerHTML = '<div class="box"><p class="mut">Cargando…</p></div>';
+      let st, rules = [];
+      try {
+        st = await this._hass.callWS({ type: 'matterai/status' });
+        rules = (await this._hass.callWS({ type: 'matterai/backup/export' })).data.automations?.rules || [];
+      } catch (e) { main.innerHTML = `<div class="box"><p>${esc(e.message || e)}</p></div>`; return; }
+      if (this._tab !== 'copias') return;
+      const c = st.central;
+      const when = (iso) => { try { return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+      const KIND = { scene: 'Escena', auto: 'Automática', period: 'Horario', timer: 'Temporizador', loop: 'Ciclo', presence: 'Simular presencia', irrigation: 'Riego', circadian: 'Luz circadiana', room: 'Luz por presencia', watch: 'Avisar si quedó abierto', away: 'Me voy / Llego', night: 'Buenas noches', clima: 'Clima', wake: 'Despertador', reminder: 'Recordatorio', calalert: 'Calendario', doorbell: 'Portero', fdetect: 'Cámaras', fface: 'Caras y patentes', tv: 'Tele', guest: 'Invitados', gate: 'Portón inteligente' };
+      const noCentral = !c.configured ? '<p class="mut">Las plantillas y las copias automáticas usan el <b>panel central</b>: cargá la clave de la casa en Estado → «Cambiar datos».</p>' : '';
+      main.innerHTML = `<div class="st">
+        <div class="box"><h2>Copia de seguridad</h2>
+          <p class="mut">El dashboard de la app, las automatizaciones y sus ajustes. ${c.configured ? 'Se manda sola al panel central cada vez que cambia algo (revisa cada 15 minutos).' : ''}</p>
+          ${c.configured ? `<div class="kv"><span>Última copia en el panel central</span><b class="${c.last_backup ? 'ok' : 'mut'}">${c.last_backup ? esc(when(c.last_backup)) : 'Todavía no'}</b></div>${c.backup_error ? `<p class="bad">${esc(c.backup_error)}</p>` : ''}` : noCentral}
+          <div class="row">${c.configured ? '<button class="b pri" id="bsend">Mandar copia ahora</button>' : ''}<button class="b" id="bdl">Bajar copia (archivo)</button></div>
+          <h3>Restaurar</h3>
+          <p class="mut">Reemplaza el dashboard y las automatizaciones por los de una copia. Antes guarda cómo está ahora, así lo podés deshacer.${c.configured ? ' Las copias del panel central se restauran desde el panel central (botón «Copias» de la casa).' : ''}</p>
+          <div class="row"><button class="b" id="bup">Restaurar desde un archivo…</button><button class="b" id="bundo">Deshacer la última restauración</button></div>
+          <div id="bres"></div></div>
+
+        <div class="box"><h2>Plantillas de automatizaciones</h2>
+          <p class="mut">Guardá automatizaciones que armaste acá para usarlas en otras casas (por ejemplo «Baño con presencia y extractor»). En la otra casa llegan <b>pausadas</b>: elegís los equipos de esa casa y las activás.</p>
+          ${noCentral}
+          <h3>Guardar como plantilla</h3>
+          ${rules.length ? `<div class="lst">${rules.map((r) => `<label class="it"><input type="checkbox" value="${esc(r.id)}"><span class="tx"><b>${esc(r.name)}</b><div class="t2">${esc(KIND[r.kind] || r.kind)}${r.enabled === false ? ' · pausada' : ''}</div></span></label>`).join('')}</div>
+            <input class="fld" id="tname" placeholder="Nombre de la plantilla (ej: Baño con presencia)" maxlength="80">
+            <input class="fld" id="tdesc" placeholder="Descripción (opcional)" maxlength="500">
+            <div class="row">${c.configured ? '<button class="b pri" id="tsave">Guardar en el panel central</button>' : ''}<button class="b" id="tfile">Bajar como archivo</button></div>` : '<p class="mut">Todavía no hay automatizaciones en esta casa.</p>'}
+          <h3>Usar una plantilla</h3>
+          <div id="tlist">${c.configured ? '<p class="mut">Cargando plantillas…</p>' : ''}</div>
+          <div class="row"><button class="b" id="tup">Usar un archivo…</button></div>
+          <div id="tres"></div></div>
+
+        <div class="box"><h2>Plantillas de diseño (dashboard)</h2>
+          <p class="mut">Guardá el diseño de la app de esta casa para arrancar otra igual. Al usar una plantilla se carga en el editor del Dashboard: la revisás, ajustás los ambientes y recién ahí la guardás.</p>
+          ${noCentral}
+          <input class="fld" id="dname" placeholder="Nombre (ej: Casa con pileta y quincho)" maxlength="80">
+          <div class="row">${c.configured ? '<button class="b pri" id="dsave">Guardar diseño en el panel central</button>' : ''}<button class="b" id="dfile">Bajar como archivo</button></div>
+          <h3>Usar un diseño</h3>
+          <div id="dlist">${c.configured ? '<p class="mut">Cargando…</p>' : ''}</div>
+          <div class="row"><button class="b" id="dup">Usar un archivo…</button></div></div>
+      </div>`;
+      const $ = (id) => main.querySelector('#' + id);
+      const ws = (m) => this._hass.callWS(m);
+      const fail = (e) => this._toast(e.message || String(e));
+      const showRes = (box, r) => {
+        if (r.kind === 'dashboard') return this._useDashboard(r.config);
+        const lines = [`✓ Se sumaron ${r.created.length} automatización(es), <b>pausadas</b>: revisalas en la pestaña Automatizaciones y activalas.`];
+        if (r.missing.length) lines.push(`⚠ En esta casa no existen: ${r.missing.map(esc).join(', ')}. Elegí los equipos de esta casa en cada una.`);
+        if (r.failed.length) lines.push(`✗ No se pudieron sumar: ${r.failed.map((f) => `${esc(f.name)} (${esc(f.error)})`).join('; ')}`);
+        $(box).innerHTML = `<div class="res ${r.failed.length ? 'bad' : ''}">${lines.join('<br>')}</div>`;
+      };
+      const picked = () => [...main.querySelectorAll('.lst input:checked')].map((i) => i.value);
+      const fname = (n) => (n || 'matterai').toLowerCase().split(' ').join('-');
+
+      if ($('bsend')) $('bsend').onclick = () => ws({ type: 'matterai/backup/send' }).then(() => { this._toast('Copia mandada al panel central'); this._renderCopias(); }, fail);
+      $('bdl').onclick = () => ws({ type: 'matterai/backup/export' }).then((r) => this._download(`copia-${fname(st.name)}-${new Date().toISOString().slice(0, 10)}.json`, r.data), fail);
+      $('bup').onclick = async () => {
+        const data = await this._pickFile(); if (!data) return;
+        if (!confirm('¿Restaurar esta copia? Se reemplazan el dashboard y TODAS las automatizaciones de esta casa (lo actual queda guardado para deshacer).')) return;
+        ws({ type: 'matterai/backup/restore', data }).then((r) => { $('bres').innerHTML = `<div class="res">✓ Restaurada: ${r.automations ?? 0} automatizaciones${r.dashboard ? ' y el dashboard' : ''}.</div>`; this._reloadConfig(); }, fail);
+      };
+      $('bundo').onclick = () => { if (confirm('¿Volver a como estaba antes de la última restauración?')) ws({ type: 'matterai/backup/restore', undo: true }).then(() => { this._toast('Listo: volvió a como estaba'); this._reloadConfig(); }, fail); };
+      const tsave = (toFile) => {
+        const ids = picked(); const name = $('tname').value.trim();
+        if (!ids.length) return this._toast('Elegí las automatizaciones');
+        if (!name) return this._toast('Ponele un nombre');
+        ws({ type: 'matterai/templates/save', kind: 'automations', name, description: $('tdesc').value.trim(), rule_ids: ids, to_file: toFile })
+          .then((r) => { if (toFile) this._download(`plantilla-${fname(name)}.json`, r.file); else { this._toast('Plantilla guardada en el panel central'); this._renderCopias(); } }, fail);
+      };
+      if ($('tsave')) $('tsave').onclick = () => tsave(false);
+      if ($('tfile')) $('tfile').onclick = () => tsave(true);
+      $('tup').onclick = async () => { const f = await this._pickFile(); if (f) ws({ type: 'matterai/templates/use', file: f }).then((r) => showRes('tres', r), fail); };
+      const dsave = (toFile) => {
+        const name = $('dname').value.trim(); if (!name) return this._toast('Ponele un nombre');
+        ws({ type: 'matterai/templates/save', kind: 'dashboard', name, to_file: toFile })
+          .then((r) => { if (toFile) this._download(`diseno-${fname(name)}.json`, r.file); else { this._toast('Diseño guardado en el panel central'); this._renderCopias(); } }, fail);
+      };
+      if ($('dsave')) $('dsave').onclick = () => dsave(false);
+      $('dfile').onclick = () => dsave(true);
+      $('dup').onclick = async () => { const f = await this._pickFile(); if (f) ws({ type: 'matterai/templates/use', file: f }).then((r) => showRes('tres', r), fail); };
+
+      if (!c.configured) return;
+      const list = (box, kind) => ws({ type: 'matterai/templates/list', kind }).then((r) => {
+        if (this._tab !== 'copias') return;
+        $(box).innerHTML = r.templates.length ? `<div class="lst">${r.templates.map((t) => `<div class="it"><span class="tx"><b>${esc(t.name)}</b><div class="t2">${esc([t.description, t.summary && t.summary.count != null ? `${t.summary.count} automatizaciones` : '', t.source ? `de ${t.source}` : ''].filter(Boolean).join(' · '))}</div></span><button class="b" data-use="${esc(t.id)}">Usar</button></div>`).join('')}</div>`
+          : '<p class="mut">Todavía no hay plantillas en el panel central.</p>';
+        $(box).querySelectorAll('[data-use]').forEach((b) => {
+          b.onclick = () => {
+            if (kind === 'automations' && !confirm('¿Sumar estas automatizaciones a esta casa? Llegan pausadas.')) return;
+            b.disabled = true;
+            ws({ type: 'matterai/templates/use', id: b.dataset.use }).then((x) => showRes('tres', x), fail).finally(() => { b.disabled = false; });
+          };
+        });
+      }, (e) => { $(box).innerHTML = `<p class="bad">${esc(e.message || e)}</p>`; });
+      list('tlist', 'automations');
+      list('dlist', 'dashboard');
+    }
+    async _reloadConfig() {
+      // después de restaurar, el editor del Dashboard arranca de lo que quedó guardado
+      try { const r = await this._hass.callWS({ type: 'matterai/config' }); this._saved = JSON.stringify(r.config); this._draft = r.config; } catch (_) { /* se ve al recargar */ }
+    }
+    _useDashboard(config) {
+      if (this._dirty() && !confirm('Hay cambios sin guardar en el dashboard. ¿Reemplazarlos por la plantilla?')) return;
+      this._draft = config;
+      this._go('dash');
+      this._toast('Diseño cargado en el editor: revisalo y tocá Guardar');
     }
 
     /* ---------- Dashboard: editor + vista previa ---------- */

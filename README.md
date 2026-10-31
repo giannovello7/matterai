@@ -174,6 +174,25 @@ En la tarjeta, las automatizaciones prearmadas aparecen en la pestaña «Intelig
 
 Requiere Home Assistant 2024.11 o posterior.
 
+## Copias de seguridad y plantillas
+
+Panel MatterAI → **Copias y plantillas**:
+
+- **Copia de seguridad:** el dashboard de la app, las automatizaciones y sus ajustes. Si la casa está conectada al panel central, se manda sola cada vez que cambia algo (revisa cada 15 minutos y no manda dos iguales). También se puede bajar a un archivo.
+- **Restaurar:** desde un archivo, o desde el panel central (botón «Copias» de la casa). Antes de restaurar, la casa guarda cómo estaba: «Deshacer la última restauración» vuelve atrás.
+- **Plantillas de automatizaciones:** elegís automatizaciones de esta casa y las guardás en el panel central (o en un archivo). En otra casa, «Usar» las suma **pausadas** y te avisa qué equipos no existen ahí, para que elijas los de esa casa.
+- **Plantillas de diseño:** el dashboard de una casa para arrancar otra. Se carga en el editor para revisarlo antes de guardar.
+
+Nunca viajan las claves de la casa ni el acceso de la app.
+
+## Panel central (gestión de todas las casas)
+
+Proyecto aparte (`matterai-panel-central`, en Cloudflare). Cada casa con la clave cargada:
+
+- manda un latido cada 5 minutos (en línea, versión, avisos, cantidad de automatizaciones);
+- manda sus copias de seguridad;
+- recibe las órdenes del instalador en la respuesta del latido: **hacer una copia**, **restaurar una copia** y **actualizar** (instala la versión nueva de MatterAI por HACS, guarda una copia antes y reinicia Home Assistant). El resultado aparece en el panel central y, si falla, avisa por Telegram.
+
 ## Instalar con HACS
 
 1. **HACS → ⋮ → Repositorios personalizados**: pegá `https://github.com/giannovello7/matterai`, categoría **Integración**.

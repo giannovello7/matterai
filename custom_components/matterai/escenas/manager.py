@@ -121,6 +121,30 @@ def _is_admin(user) -> bool:
     return user is None or bool(getattr(user, "is_admin", False))
 
 
+# lo propio de cada casa: no viaja en las plantillas
+TEMPLATE_DROP = ("history", "invites", "learned_s", "runs", "last_run", "created", "created_by", "updated", "fire_at")
+_ENTITY_RE = re.compile(r"^[a-z_]+\.[a-z0-9_]+$")
+_ENTITY_DOMAINS = {
+    "light", "switch", "binary_sensor", "sensor", "cover", "climate", "fan", "lock", "media_player", "camera", "alarm_control_panel",
+    "input_boolean", "input_button", "input_number", "input_select", "button", "scene", "script", "valve", "vacuum", "siren",
+    "humidifier", "water_heater", "remote", "event", "calendar", "weather", "person", "device_tracker", "number", "select", "update",
+}
+
+
+def _entity_refs(node: Any) -> set[str]:
+    """Entidades que nombra una regla (para avisar cuáles no existen en otra casa)."""
+    out: set[str] = set()
+    if isinstance(node, dict):
+        for value in node.values():
+            out |= _entity_refs(value)
+    elif isinstance(node, list):
+        for value in node:
+            out |= _entity_refs(value)
+    elif isinstance(node, str) and _ENTITY_RE.match(node) and node.split(".")[0] in _ENTITY_DOMAINS:
+        out.add(node)
+    return out
+
+
 def build_sequence(rule: dict[str, Any]) -> list[dict[str, Any]]:
     """Condiciones + acciones como una única secuencia de script.
 
@@ -501,6 +525,55 @@ class RuleManager:
             self.settings["client_off"] = sorted({str(k) for k in off if k in KINDS})
         self._save()
         self._changed()
+
+    # ---------- copias y plantillas ----------
+
+    def export_rules(self, rule_ids: list[str] | None = None, template: bool = False) -> list[dict[str, Any]]:
+        """Reglas tal como se guardan. Como plantilla, sin lo propio de esta casa (historial, invitaciones, usos)."""
+        out = []
+        for rule in self.rules.values():
+            if rule_ids is not None and rule["id"] not in rule_ids:
+                continue
+            item = copy.deepcopy(rule)
+            if template:
+                for key in TEMPLATE_DROP:
+                    item.pop(key, None)
+            out.append(item)
+        return out
+
+    async def async_restore(self, rules: list[dict[str, Any]], settings: dict[str, Any] | None) -> int:
+        """Reemplaza todas las reglas por las de una copia (las arranca de nuevo)."""
+        clean = [r for r in rules if isinstance(r, dict) and r.get("id") and r.get("kind") in KINDS]
+        await self.async_stop_all()
+        self.rules = {r["id"]: r for r in clean}
+        if isinstance(settings, dict):
+            self.settings.update({k: v for k, v in settings.items() if k in ("hidden", "client_off")})
+        self._save()
+        await self.async_start_all()
+        return len(clean)
+
+    async def async_import(self, rules: list[dict[str, Any]]) -> dict[str, Any]:
+        """Suma reglas de una plantilla: ids nuevos y pausadas hasta revisar los equipos de esta casa."""
+        created, failed = [], []
+        known = set(self.hass.states.async_entity_ids())
+        missing: set[str] = set()
+        for raw in rules:
+            if not isinstance(raw, dict):
+                continue
+            item = copy.deepcopy(raw)
+            for key in TEMPLATE_DROP:
+                item.pop(key, None)
+            item["id"] = uuid.uuid4().hex[:12]
+            item["enabled"] = False
+            for eid in _entity_refs(item.get("ui")):
+                if eid not in known:
+                    missing.add(eid)
+            try:
+                saved = await self.async_save(item, None)
+                created.append({"id": saved["id"], "name": saved["name"]})
+            except (InvalidRule, HomeAssistantError, vol.Invalid) as err:
+                failed.append({"name": str(item.get("name") or "?"), "error": str(err)})
+        return {"created": created, "failed": failed, "missing": sorted(missing)}
 
     async def async_stop_all(self) -> None:
         if getattr(self, "frigate", None):

@@ -119,6 +119,9 @@ async def ws_status(hass: HomeAssistant, connection: websocket_api.ActiveConnect
                 "url": opts.get(CONF_CENTRAL_URL, ""),
                 "ok": hb.last_ok if hb else None,
                 "error": hb.last_error if hb else None,
+                "latest": hb.latest if hb else None,
+                "last_backup": hb.central.last_backup if hb else None,
+                "backup_error": hb.central.last_error if hb else None,
             },
             "escenas": bool(hass.data.get("matterai_escenas")),
             "voice": {"on": bool(rt.get("voice")), "mode": rt["voice"].mode if rt.get("voice") else "off", "ai": bool(rt.get("voice") and rt["voice"].uses_ai)},
@@ -193,4 +196,136 @@ async def ws_voice_log(hass: HomeAssistant, connection: websocket_api.ActiveConn
     connection.send_result(msg["id"], {"items": list(reversed(log.items)), "on": True})
 
 
-COMMANDS = (ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
+# ------------------------------------------------------------------ copias y plantillas (instalador)
+
+
+def _central(hass: HomeAssistant):
+    hb = _rt(hass).get("heartbeat")
+    if hb is None:
+        raise HomeAssistantError("Para esto hace falta el panel central: cargá la clave de la casa en «Cambiar datos»")
+    return hb.central
+
+
+async def _guard(connection, msg: dict, factory) -> None:
+    from .backup import BackupError  # noqa: PLC0415
+
+    try:
+        connection.send_result(msg["id"], await factory())
+    except (BackupError, HomeAssistantError) as err:
+        connection.send_error(msg["id"], "matterai_error", str(err))
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/backup/export"})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_backup_export(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Copia completa para bajar a un archivo."""
+    from .backup import collect  # noqa: PLC0415
+
+    async def run():
+        data, summary = collect(hass)
+        return {"data": data, "summary": summary}
+
+    await _guard(connection, msg, run)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/backup/restore", vol.Optional("data"): dict, vol.Optional("undo"): bool})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_backup_restore(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Restaura una copia (de un archivo) o deshace la última restauración."""
+    from .backup import BackupError, async_apply, async_undo  # noqa: PLC0415
+
+    async def run():
+        if msg.get("undo"):
+            return await async_undo(hass)
+        if "data" not in msg:
+            raise BackupError("Falta la copia")
+        return await async_apply(hass, msg["data"])
+
+    await _guard(connection, msg, run)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/backup/send"})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_backup_send(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    async def run():
+        central = _central(hass)
+        await central.async_backup("pedida desde la casa", force=True)
+        return {"ok": True, "at": central.last_backup}
+
+    await _guard(connection, msg, run)
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/templates/list", vol.Optional("kind"): vol.In(["automations", "dashboard"])})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_templates_list(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    async def run():
+        return {"templates": await _central(hass).async_templates(msg.get("kind"))}
+
+    await _guard(connection, msg, run)
+
+
+@websocket_api.websocket_command(
+    {
+        vol.Required("type"): f"{DOMAIN}/templates/save",
+        vol.Required("kind"): vol.In(["automations", "dashboard"]),
+        vol.Required("name"): vol.All(str, vol.Length(min=1, max=80)),
+        vol.Optional("description", default=""): vol.All(str, vol.Length(max=500)),
+        vol.Optional("rule_ids", default=[]): [str],
+        vol.Optional("to_file", default=False): bool,
+    }
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_templates_save(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Guarda una plantilla en el panel central (o la devuelve para bajarla a un archivo)."""
+    from .backup import template_automations, template_dashboard  # noqa: PLC0415
+
+    async def run():
+        if msg["kind"] == "automations":
+            data, summary = template_automations(hass, msg["rule_ids"])
+        else:
+            data, summary = template_dashboard(hass)
+        if msg["to_file"]:
+            return {"file": {"matterai_template": msg["kind"], "name": msg["name"], "description": msg["description"], "summary": summary, "data": data}}
+        tid = await _central(hass).async_save_template(msg["kind"], msg["name"], msg["description"], data, summary)
+        return {"id": tid}
+
+    await _guard(connection, msg, run)
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/templates/use", vol.Optional("id"): str, vol.Optional("file"): dict}
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_templates_use(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Usa una plantilla del panel central o de un archivo.
+
+    Automatizaciones: se suman pausadas. Dashboard: se devuelve para cargarlo en el editor (no se guarda solo).
+    """
+    from .backup import BackupError, async_use_automations  # noqa: PLC0415
+
+    async def run():
+        if msg.get("id"):
+            tpl = await _central(hass).async_template(msg["id"])
+            kind, data = tpl.get("kind"), tpl.get("data") or {}
+        elif msg.get("file"):
+            kind, data = msg["file"].get("matterai_template"), msg["file"].get("data") or {}
+        else:
+            raise BackupError("Elegí una plantilla")
+        if kind == "automations":
+            return {"kind": kind, **await async_use_automations(hass, data)}
+        if kind == "dashboard":
+            if not isinstance(data.get("config"), dict):
+                raise BackupError("Esa plantilla no trae un dashboard")
+            return {"kind": kind, "config": data["config"]}
+        raise BackupError("Ese archivo no es una plantilla de MatterAI")
+
+    await _guard(connection, msg, run)
+
+
+COMMANDS = (ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
