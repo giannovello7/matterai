@@ -372,7 +372,7 @@
           <div class="kv"><span>Cliente</span><b>${esc(s.name)}</b></div>
           <div class="kv"><span>Dirección remota</span><b>${esc(s.url)}</b></div>
           <div class="kv"><span>WhatsApp de soporte</span><b>${esc(s.support_phone || '—')}</b></div>
-          <div class="kv"><span>Versión MatterAI</span><b>${esc(s.version)}</b></div>
+          <div class="kv"><span>Versión MatterAI</span><b>${esc(s.version)}${c.latest && c.latest !== s.version ? ` <span class="wn">(hay ${esc(c.latest)}: actualizala desde el panel central o HACS)</span>` : c.latest ? ' <span class="ok">· la última</span>' : ''}</b></div>
           <div class="kv"><span>Home Assistant</span><b>${esc(s.health.ha_version)}</b></div>
           <div class="kv"><span>Id de la casa</span><b>${esc(s.house_id)}</b></div>
           ${s.imported_from ? `<p class="mut">El dashboard se trajo del panel «${esc(s.imported_from)}». Ya podés borrar ese panel si querés.</p>` : ''}
@@ -383,6 +383,7 @@
             <div class="row"><a class="b pri" style="text-decoration:none" href="${esc(s.cors.page)}">Abrir Ajustes de red</a></div>` : ''}
           ${s.cors.needs_restart ? '<p class="mut">Se aplica al reiniciar Home Assistant.</p>' : ''}
           <div class="kv"><span>Panel central</span>${central}</div>
+          ${c.configured ? `<div class="kv"><span>Última copia de seguridad</span><b class="${c.last_backup ? 'ok' : 'mut'}">${c.last_backup ? esc(new Date(c.last_backup).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })) : 'Todavía no'}</b></div>` : ''}
           ${c.error ? `<p class="mut">${esc(c.error)}</p>` : ''}
           ${c.configured ? `<div class="row"><button class="b" id="hb">Probar ahora</button>${c.url ? `<a class="b" href="${esc(c.url)}" target="_blank" rel="noopener">Abrir panel central</a>` : ''}</div>` : '<p class="mut">Cargá la clave de la casa en «Cambiar datos» para verla en tu panel central.</p>'}
           <div class="kv"><span>Automatizaciones</span>${yes(s.escenas, 'Activas', 'Iniciando…')}</div>
