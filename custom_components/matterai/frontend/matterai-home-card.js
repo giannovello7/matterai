@@ -1506,6 +1506,8 @@
       const c = this._config, h = this._hass || {}, sv = h.services || {}, S = h.states || {};
       const ws = typeof h.callWS === 'function';
       const cals = Object.keys(S).some((id) => id.startsWith('calendar.'));
+      // automatizaciones: MatterAI 2.0+ (matterai.run) o la integración vieja MatterAI Escenas
+      const hasAuto = !!((sv.matterai && sv.matterai.run) || sv.matterai_escenas);
       const auto = {
         lights: [x.lightsAll > 0, x.lightsAll ? `${x.lightsAll} luces` : 'no hay luces'],
         openings: [x.openAll.length > 0, x.openAll.length ? `${x.openAll.length} aberturas` : 'no hay sensores de puertas/ventanas'],
@@ -1514,7 +1516,7 @@
         cameras: [!!(x.cams.length || c.camera_card), x.cams.length ? `${x.cams.length} cámaras` : c.camera_card ? 'camera_card configurada' : 'no hay cámaras'],
         music: [ws && this._musPlayers().length > 0, this._musPlayers().length ? `${this._musPlayers().length} parlantes` : 'no hay parlantes'],
         weather: [!!x.weather, x.weather ? x.weather : 'no hay weather.*'],
-        agenda: [ws && (cals || !!sv.matterai_escenas), cals ? 'hay calendarios' : sv.matterai_escenas ? 'recordatorios de Escenas' : 'sin calendarios ni MatterAI Escenas'],
+        agenda: [ws && (cals || hasAuto), cals ? 'hay calendarios' : hasAuto ? 'recordatorios de las automatizaciones' : 'sin calendarios ni automatizaciones MatterAI'],
         activity: [ws, ws ? 'historial de HA' : 'sin conexión WebSocket'],
         automations: [!!c.automations, c.automations ? 'MatterAI Escenas' : 'sin MatterAI Escenas en la app'],
         energy: [!!x.power, x.power ? c.power : 'sin power:'],
@@ -3772,7 +3774,7 @@
       const auto = (kind) => `${kind}${n ? ` «${n}»` : ''}${trig ? ` · ${trig}` : ''}`;
       if (/^automation\./.test(ce) || e.context_domain === 'automation') return auto('Automatización');
       if (/^script\./.test(ce) || e.context_domain === 'script') return auto('Rutina');
-      if (e.context_domain === 'matterai_escenas' || /matterai/.test(ce)) return auto('Automatización');
+      if (e.context_domain === 'matterai_escenas' || e.context_domain === 'matterai' || /matterai/.test(ce)) return auto('Automatización');
       if (e.context_user_id) return 'Desde la app';
       if (e.context_event_type === 'call_service') return 'Orden del sistema';
       if (['luces', 'equipos', 'aberturas', 'clima', 'multimedia'].includes(cat) && e.state != null && e.state !== 'unavailable' && e.state !== 'unknown') return 'Desde el equipo (tecla o control)';
