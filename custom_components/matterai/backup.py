@@ -130,7 +130,37 @@ def template_dashboard(hass: HomeAssistant) -> tuple[dict[str, Any], dict[str, A
 async def async_use_automations(hass: HomeAssistant, data: dict[str, Any]) -> dict[str, Any]:
     if not isinstance(data, dict) or not isinstance(data.get("rules"), list):
         raise BackupError("Esa plantilla no trae automatizaciones")
-    return await _manager(hass).async_import(data["rules"])
+    res = await _manager(hass).async_import(data["rules"])
+    res["candidates"] = candidates(hass, res["missing"])
+    return res
+
+
+def candidates(hass: HomeAssistant, missing: list[str]) -> dict[str, list[dict[str, str]]]:
+    """Para cada equipo que falta, los de esta casa del mismo tipo (para emparejarlos)."""
+    out: dict[str, list[dict[str, str]]] = {}
+    for eid in missing:
+        domain = eid.split(".")[0]
+        out[eid] = sorted(
+            ({"id": s.entity_id, "name": s.name or s.entity_id} for s in hass.states.async_all(domain)),
+            key=lambda x: x["name"].lower(),
+        )[:300]
+    return out
+
+
+async def async_remap(hass: HomeAssistant, rule_ids: list[str], mapping: dict[str, str]) -> dict[str, Any]:
+    known = set(hass.states.async_entity_ids())
+    bad = [v for v in mapping.values() if v and v not in known]
+    if bad:
+        raise BackupError(f"Esos equipos no existen en esta casa: {', '.join(bad)}")
+    return await _manager(hass).async_remap(rule_ids, mapping)
+
+
+async def async_restore_some(hass: HomeAssistant, data: dict[str, Any], rule_ids: list[str]) -> int:
+    data = validate(data)
+    rules = [r for r in (data.get("automations") or {}).get("rules", []) if isinstance(r, dict) and r.get("id") in set(rule_ids)]
+    if not rules:
+        raise BackupError("Elegí al menos una automatización de la copia")
+    return await _manager(hass).async_restore_some(rules)
 
 
 # ------------------------------------------------------------------ panel central

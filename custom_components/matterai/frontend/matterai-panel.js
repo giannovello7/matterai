@@ -191,14 +191,14 @@
           <div class="row">${c.configured ? '<button class="b pri" id="bsend">Mandar copia ahora</button>' : ''}<button class="b" id="bdl">Bajar copia (archivo)</button></div>
           <h3>Restaurar</h3>
           <p class="mut">Reemplaza el dashboard y las automatizaciones por los de una copia. Antes guarda cómo está ahora, así lo podés deshacer.${c.configured ? ' Las copias del panel central se restauran desde el panel central (botón «Copias» de la casa).' : ''}</p>
-          <div class="row"><button class="b" id="bup">Restaurar desde un archivo…</button><button class="b" id="bundo">Deshacer la última restauración</button></div>
+          <div class="row"><button class="b" id="bup">Restaurar todo desde un archivo…</button><button class="b" id="bsome">Restaurar algunas automatizaciones…</button><button class="b" id="bundo">Deshacer la última restauración</button></div>
           <div id="bres"></div></div>
 
         <div class="box"><h2>Plantillas de automatizaciones</h2>
           <p class="mut">Guardá automatizaciones que armaste acá para usarlas en otras casas (por ejemplo «Baño con presencia y extractor»). En la otra casa llegan <b>pausadas</b>: elegís los equipos de esa casa y las activás.</p>
           ${noCentral}
           <h3>Guardar como plantilla</h3>
-          ${rules.length ? `<div class="lst">${rules.map((r) => `<label class="it"><input type="checkbox" value="${esc(r.id)}"><span class="tx"><b>${esc(r.name)}</b><div class="t2">${esc(KIND[r.kind] || r.kind)}${r.enabled === false ? ' · pausada' : ''}</div></span></label>`).join('')}</div>
+          ${rules.length ? `<div class="lst" id="trules">${rules.map((r) => `<label class="it"><input type="checkbox" value="${esc(r.id)}"><span class="tx"><b>${esc(r.name)}</b><div class="t2">${esc(KIND[r.kind] || r.kind)}${r.enabled === false ? ' · pausada' : ''}</div></span></label>`).join('')}</div>
             <input class="fld" id="tname" placeholder="Nombre de la plantilla (ej: Baño con presencia)" maxlength="80">
             <input class="fld" id="tdesc" placeholder="Descripción (opcional)" maxlength="500">
             <div class="row">${c.configured ? '<button class="b pri" id="tsave">Guardar en el panel central</button>' : ''}<button class="b" id="tfile">Bajar como archivo</button></div>` : '<p class="mut">Todavía no hay automatizaciones en esta casa.</p>'}
@@ -222,11 +222,24 @@
       const showRes = (box, r) => {
         if (r.kind === 'dashboard') return this._useDashboard(r.config);
         const lines = [`✓ Se sumaron ${r.created.length} automatización(es), <b>pausadas</b>: revisalas en la pestaña Automatizaciones y activalas.`];
-        if (r.missing.length) lines.push(`⚠ En esta casa no existen: ${r.missing.map(esc).join(', ')}. Elegí los equipos de esta casa en cada una.`);
         if (r.failed.length) lines.push(`✗ No se pudieron sumar: ${r.failed.map((f) => `${esc(f.name)} (${esc(f.error)})`).join('; ')}`);
-        $(box).innerHTML = `<div class="res ${r.failed.length ? 'bad' : ''}">${lines.join('<br>')}</div>`;
+        const cand = r.candidates || {};
+        const map = r.missing.length && r.created.length ? `<h3>Emparejar equipos</h3>
+          <p class="mut">La plantilla usa equipos que en esta casa no existen. Elegí el equivalente de esta casa para cada uno (se cambia en todas las automatizaciones que se sumaron):</p>
+          <div class="lst">${r.missing.map((m) => `<div class="it"><span class="tx"><b>${esc(m)}</b></span><select class="fld" style="width:auto;max-width:60%" data-from="${esc(m)}"><option value="">(dejarlo así)</option>${(cand[m] || []).map((o) => `<option value="${esc(o.id)}">${esc(o.name)} · ${esc(o.id)}</option>`).join('')}</select></div>`).join('')}</div>
+          <div class="row"><button class="b pri" id="${box}_map">Usar estos equipos</button></div>` : '';
+        $(box).innerHTML = `<div class="res ${r.failed.length ? 'bad' : ''}">${lines.join('<br>')}</div>${map}`;
+        const mb = $(`${box}_map`);
+        if (mb) mb.onclick = () => {
+          const mapping = {};
+          $(box).querySelectorAll('select[data-from]').forEach((sel) => { if (sel.value) mapping[sel.dataset.from] = sel.value; });
+          if (!Object.keys(mapping).length) return this._toast('Elegí al menos un equipo');
+          ws({ type: 'matterai/templates/remap', rule_ids: r.created.map((x) => x.id), mapping }).then((x) => {
+            $(box).innerHTML = `<div class="res">✓ Equipos cambiados en ${x.changed} automatización(es).${x.missing.length ? ` Todavía faltan: ${x.missing.map(esc).join(', ')} (cambialos en cada automatización).` : ' Revisalas en Automatizaciones y activalas.'}</div>`;
+          }, fail);
+        };
       };
-      const picked = () => [...main.querySelectorAll('.lst input:checked')].map((i) => i.value);
+      const picked = () => [...main.querySelectorAll('#trules input:checked')].map((i) => i.value);
       const fname = (n) => (n || 'matterai').toLowerCase().split(' ').join('-');
 
       if ($('bsend')) $('bsend').onclick = () => ws({ type: 'matterai/backup/send' }).then(() => { this._toast('Copia mandada al panel central'); this._renderCopias(); }, fail);
@@ -235,6 +248,20 @@
         const data = await this._pickFile(); if (!data) return;
         if (!confirm('¿Restaurar esta copia? Se reemplazan el dashboard y TODAS las automatizaciones de esta casa (lo actual queda guardado para deshacer).')) return;
         ws({ type: 'matterai/backup/restore', data }).then((r) => { $('bres').innerHTML = `<div class="res">✓ Restaurada: ${r.automations ?? 0} automatizaciones${r.dashboard ? ' y el dashboard' : ''}.</div>`; this._reloadConfig(); }, fail);
+      };
+      $('bsome').onclick = async () => {
+        const data = await this._pickFile(); if (!data) return;
+        const list = (data.automations && data.automations.rules) || [];
+        if (!list.length) return this._toast('Ese archivo no trae automatizaciones');
+        const here = new Set(rules.map((r) => r.id));
+        $('bres').innerHTML = `<h3>¿Cuáles restaurar?</h3><p class="mut">Las que ya existen se reemplazan por la versión de la copia; las que no, se suman. El resto queda como está.</p>
+          <div class="lst" id="srules">${list.map((r) => `<label class="it"><input type="checkbox" value="${esc(r.id)}"><span class="tx"><b>${esc(r.name)}</b><div class="t2">${esc(KIND[r.kind] || r.kind)} · ${here.has(r.id) ? 'reemplaza la actual' : 'se suma'}</div></span></label>`).join('')}</div>
+          <div class="row"><button class="b pri" id="sdo">Restaurar las elegidas</button></div>`;
+        $('sdo').onclick = () => {
+          const ids = [...main.querySelectorAll('#srules input:checked')].map((i) => i.value);
+          if (!ids.length) return this._toast('Elegí al menos una');
+          ws({ type: 'matterai/backup/restore_some', data, rule_ids: ids }).then((x) => { $('bres').innerHTML = `<div class="res">✓ Restauradas ${x.restored} automatización(es).</div>`; }, fail);
+        };
       };
       $('bundo').onclick = () => { if (confirm('¿Volver a como estaba antes de la última restauración?')) ws({ type: 'matterai/backup/restore', undo: true }).then(() => { this._toast('Listo: volvió a como estaba'); this._reloadConfig(); }, fail); };
       const tsave = (toFile) => {

@@ -131,6 +131,18 @@ _ENTITY_DOMAINS = {
 }
 
 
+def _replace_entities(node: Any, mapping: dict[str, str]) -> Any:
+    """Reemplaza ids de entidades en toda la regla, también como clave «dominio__objeto» (la usa la tarjeta)."""
+    keyed = {k.replace(".", "__"): v.replace(".", "__") for k, v in mapping.items()}
+    if isinstance(node, dict):
+        return {keyed.get(k, mapping.get(k, k)) if isinstance(k, str) else k: _replace_entities(v, mapping) for k, v in node.items()}
+    if isinstance(node, list):
+        return [_replace_entities(v, mapping) for v in node]
+    if isinstance(node, str):
+        return mapping.get(node, node)
+    return node
+
+
 def _entity_refs(node: Any) -> set[str]:
     """Entidades que nombra una regla (para avisar cuáles no existen en otra casa)."""
     out: set[str] = set()
@@ -574,6 +586,37 @@ class RuleManager:
             except (InvalidRule, HomeAssistantError, vol.Invalid) as err:
                 failed.append({"name": str(item.get("name") or "?"), "error": str(err)})
         return {"created": created, "failed": failed, "missing": sorted(missing)}
+
+    async def async_remap(self, rule_ids: list[str], mapping: dict[str, str]) -> dict[str, Any]:
+        """Cambia equipos en reglas importadas (plantilla de otra casa → equipos de esta casa)."""
+        mapping = {str(k): str(v) for k, v in (mapping or {}).items() if k and v and k != v}
+        if not mapping:
+            return {"changed": 0, "missing": []}
+        changed = 0
+        for rid in rule_ids:
+            rule = self.rules.get(rid)
+            if rule is None:
+                continue
+            raw = _replace_entities(copy.deepcopy(rule), mapping)
+            if raw != rule:
+                await self.async_save(raw, None)
+                changed += 1
+        known = set(self.hass.states.async_entity_ids())
+        missing = sorted({e for rid in rule_ids if rid in self.rules for e in _entity_refs(self.rules[rid].get("ui")) if e not in known})
+        return {"changed": changed, "missing": missing}
+
+    async def async_restore_some(self, rules: list[dict[str, Any]]) -> int:
+        """Restaura sólo algunas reglas de una copia: reemplaza las que tengan el mismo id y suma las que no estén."""
+        n = 0
+        for raw in rules:
+            if not isinstance(raw, dict) or not raw.get("id") or raw.get("kind") not in KINDS:
+                continue
+            self.rules[raw["id"]] = copy.deepcopy(raw)
+            await self._async_restart(raw["id"])
+            n += 1
+        self._save()
+        self._changed()
+        return n
 
     async def async_stop_all(self) -> None:
         if getattr(self, "frigate", None):

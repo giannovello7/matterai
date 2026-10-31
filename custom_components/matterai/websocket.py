@@ -329,4 +329,31 @@ async def ws_templates_use(hass: HomeAssistant, connection: websocket_api.Active
     await _guard(connection, msg, run)
 
 
-COMMANDS = (ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/templates/remap", vol.Required("rule_ids"): [str], vol.Required("mapping"): {str: str}}
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_templates_remap(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Empareja los equipos de una plantilla con los de esta casa."""
+    from .backup import async_remap  # noqa: PLC0415
+
+    await _guard(connection, msg, lambda: async_remap(hass, msg["rule_ids"], msg["mapping"]))
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/backup/restore_some", vol.Required("data"): dict, vol.Required("rule_ids"): [str]}
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_backup_restore_some(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Restaura sólo las automatizaciones elegidas de una copia (el resto queda como está)."""
+    from .backup import async_restore_some  # noqa: PLC0415
+
+    async def run():
+        return {"restored": await async_restore_some(hass, msg["data"], msg["rule_ids"])}
+
+    await _guard(connection, msg, run)
+
+
+COMMANDS = (ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)

@@ -179,8 +179,8 @@ Requiere Home Assistant 2024.11 o posterior.
 Panel MatterAI → **Copias y plantillas**:
 
 - **Copia de seguridad:** el dashboard de la app, las automatizaciones y sus ajustes. Si la casa está conectada al panel central, se manda sola cada vez que cambia algo (revisa cada 15 minutos y no manda dos iguales). También se puede bajar a un archivo.
-- **Restaurar:** desde un archivo, o desde el panel central (botón «Copias» de la casa). Antes de restaurar, la casa guarda cómo estaba: «Deshacer la última restauración» vuelve atrás.
-- **Plantillas de automatizaciones:** elegís automatizaciones de esta casa y las guardás en el panel central (o en un archivo). En otra casa, «Usar» las suma **pausadas** y te avisa qué equipos no existen ahí, para que elijas los de esa casa.
+- **Restaurar:** todo desde un archivo o desde el panel central (botón «Copias» de la casa), o **sólo algunas automatizaciones** de un archivo (las demás no se tocan). Antes de restaurar todo, la casa guarda cómo estaba: «Deshacer la última restauración» vuelve atrás.
+- **Plantillas de automatizaciones:** elegís automatizaciones de esta casa y las guardás en el panel central (o en un archivo). En otra casa, «Usar» las suma **pausadas** y, si nombran equipos que ahí no existen, te deja **emparejarlos** con los de esa casa (uno por uno, se cambian en todas juntas).
 - **Plantillas de diseño:** el dashboard de una casa para arrancar otra. Se carga en el editor para revisarlo antes de guardar.
 
 Nunca viajan las claves de la casa ni el acceso de la app.
