@@ -269,6 +269,18 @@ Las versiones nuevas aparecen en **Ajustes → Actualizaciones**.
 
 La app lee la configuración con `matterai/config` y queda escuchando `matterai/config/subscribe`. En casas viejas sin la integración, sigue buscando la tarjeta en los paneles como antes.
 
+### Celulares y tablets en la casa
+
+Cada equipo con la app MatterAI de Android se registra solo en la casa, como la app oficial de Home Assistant (integración **mobile_app**). Queda como un dispositivo con:
+
+- **Batería** (`sensor.<equipo>_bateria`) y su estado.
+- **Ubicación** (`device_tracker.<equipo>`), si en la app se activa «Compartir la ubicación». Usa las zonas de la casa (geocercas) y avisa al llegar o salir aunque la app esté cerrada. Para «Me voy / Llego» y las automatizaciones por presencia, asignalo a la persona en Ajustes → Personas.
+- **Notificaciones** (`notify.mobile_app_<equipo>`), con el mismo formato que la app oficial: botones, responder escribiendo, imagen, `tag`, `clear_notification` y el canal `alarm_stream`. Las automatizaciones de MatterAI ya las usan.
+
+**Avisos sin celulares elegidos:** si una automatización (portero, «quedó abierto», alarma, recordatorios…) no tiene a quién avisar, el aviso llega a **todos los equipos con la app MatterAI** de la casa. Antes iba a una notificación dentro de Home Assistant, que el cliente no ve.
+
+Las notificaciones con la app cerrada pasan por el panel central y Firebase: ver `matterai-android/LEEME.md` → «Activar las notificaciones».
+
 ## Comandos (WebSocket)
 
 | Comando | Quién | Para qué |
