@@ -203,7 +203,7 @@ async def ws_voice_log(hass: HomeAssistant, connection: websocket_api.ActiveConn
 def _central(hass: HomeAssistant):
     hb = _rt(hass).get("heartbeat")
     if hb is None:
-        raise HomeAssistantError("Para esto hace falta el panel central: cargá la clave de la casa en «Cambiar datos»")
+        raise HomeAssistantError("Para esto hace falta el panel central: cargá la clave de la casa en Ficha de la casa → Cambiar datos")
     return hb.central
 
 

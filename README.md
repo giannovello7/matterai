@@ -13,7 +13,7 @@ Todo lo que una casa necesita para la app MatterAI, en **una sola integración**
 |---|---|
 | **Tarjeta del dashboard** | La sirve la integración y la registra sola. No hay que copiar archivos a `www` ni cambiar `?v=`. Si había una copia vieja en Recursos, la reemplaza. |
 | **Configuración del dashboard** | La guarda la integración, sin YAML ni panel aparte. La primera vez se trae sola la que hubiera en algún panel. |
-| **Panel «MatterAI»** (barra lateral, sólo administradores) | **Dashboard**: editor visual + vista previa en vivo + Guardar. Al guardar, la app de los clientes cambia en el momento. **App del cliente**: QR y link para vincular el celular, imprimir o mandar por WhatsApp, y generar un acceso nuevo si pierde el celular. **Estado**: dirección, versiones, permiso de la app (CORS), panel central y avisos de la casa. |
+| **Panel «MatterAI»** (barra lateral, sólo administradores: es tuyo, el cliente nunca entra) | El sistema de gestión de MatterAI en cada casa. **Resumen**: cómo está la casa de un vistazo. **App del cliente** (lo que configurás para la app MatterAI): *Diseño de la app* (editor visual + vista previa + Guardar; la app cambia en el momento), *Automatizaciones* y *Vincular celulares* (QR y link, imprimir o mandar por WhatsApp, acceso nuevo si pierde el celular). **Sistema MatterAI** (control interno): *Salud y avisos*, *Mantenimiento*, *Copias de seguridad*, *Plantillas*, *Conexiones* (CORS, acceso remoto, panel central), *Voz* y *Ficha de la casa*. |
 | **Usuario de la app** | Crea «App MatterAI» sin permisos de administrador, con un acceso de larga duración. |
 | **Panel central** | Si cargás la clave de la casa, cada 5 minutos le cuenta al panel que está viva, qué versión tiene y si hay algo para atender: equipos sin responder, pilas bajas, alarma disparada, disco lleno o actualizaciones. |
 | **Automatizaciones** | Escenas, automáticas, temporizadores, recordatorios, rutinas, invitados por link y automatizaciones inteligentes. El instalador además arma los **equipos** (portón inteligente, sensor de ocupación). |
@@ -176,7 +176,7 @@ Requiere Home Assistant 2024.11 o posterior.
 
 ## Copias de seguridad y plantillas
 
-Panel MatterAI → **Copias y plantillas**:
+Panel MatterAI → **Copias de seguridad** y **Plantillas**:
 
 - **Copia de seguridad:** el dashboard de la app, las automatizaciones y sus ajustes. Si la casa está conectada al panel central, se manda sola cada vez que cambia algo (revisa cada 15 minutos y no manda dos iguales). También se puede bajar a un archivo.
 - **Restaurar:** todo desde un archivo o desde el panel central (botón «Copias» de la casa), o **sólo algunas automatizaciones** de un archivo (las demás no se tocan). Antes de restaurar todo, la casa guarda cómo estaba: «Deshacer la última restauración» vuelve atrás.
@@ -204,14 +204,14 @@ MatterAI vigila los servicios críticos de la casa y **los recupera solo**. No h
 - **Actualizaciones:** si un complemento falla justo después de actualizarse, el aviso lo dice («posible falla por la actualización de X a Y»).
 - **Avisos:** van al panel central (Telegram) como el resto, y si sigue caído más de 20 minutos aparece en **Reparaciones** de Home Assistant (se borra solo cuando se recupera).
 - **Entidades** (dispositivo «Sistema MatterAI»): el interruptor **Mantenimiento del sistema** y, por servicio, «con problemas», «estado» (ok, recuperando, esperando el coordinador, caído, atención manual, mantenimiento) y «Revisar».
-- En el panel MatterAI → **Estado** → «Mantenimiento del sistema» se ve todo y se activa el mantenimiento. También desde el panel central (botón ⋯ de la casa).
+- En el panel MatterAI → **Mantenimiento** se ve todo y se activa el mantenimiento. También desde el panel central (botón ⋯ de la casa).
 
 ### Modo mantenimiento
 
 Pausa el watchdog: no reinicia nada ni avisa. Se apaga solo a la hora y hace un chequeo.
 
 **Actualizar el firmware del SLZB-06:**
-1. Activá **Mantenimiento del sistema** (panel MatterAI → Estado, o el interruptor).
+1. Activá **Mantenimiento del sistema** (panel MatterAI → Mantenimiento, o el interruptor).
 2. Detené el complemento Zigbee2MQTT.
 3. Actualizá el firmware: primero el *core*, después el *Zigbee*.
 4. Esperá a que el SLZB-06 vuelva a la red (la integración SMLIGHT lo muestra conectado).
@@ -262,7 +262,7 @@ Las versiones nuevas aparecen en **Ajustes → Actualizaciones**.
 
 1. Instalar MatterAI desde HACS (ver arriba) y reiniciar HA.
 2. **Ajustes → Dispositivos y servicios → Agregar integración → MatterAI**. Es una sola pantalla: nombre del cliente, dirección remota (la de Cloudflare), WhatsApp de soporte y clave del panel central (opcional).
-3. En **Ajustes → Sistema → Red**, en «Orígenes permitidos por CORS», agregar `https://app.matterai.com.ar`. El panel MatterAI → Estado te avisa si falta: la integración lo revisa, pero no lo escribe sola, porque un error ahí deja a HA sin acceso web.
+3. En **Ajustes → Sistema → Red**, en «Orígenes permitidos por CORS», agregar `https://app.matterai.com.ar`. El panel MatterAI → Conexiones te avisa si falta: la integración lo revisa, pero no lo escribe sola, porque un error ahí deja a HA sin acceso web.
 4. Barra lateral → **MatterAI** → Dashboard (ajustar y Guardar) → App del cliente (QR).
 
 ## La app
