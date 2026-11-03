@@ -23,3 +23,32 @@ set_enabled:
       required: true
       selector:
         boolean:
+app_command:
+  fields:
+    command:
+      required: true
+      example: "camera"
+      selector:
+        select:
+          options: ["screen_on", "screen_off", "brightness", "open", "camera", "tts", "reload", "saver"]
+    target:
+      example: "Tablet living"
+      selector:
+        text:
+          multiple: true
+    entity_id:
+      selector:
+        entity:
+    path:
+      example: "/automatizaciones"
+      selector:
+        text:
+    value:
+      selector:
+        number:
+          min: 0
+          max: 1
+          step: 0.05
+    message:
+      selector:
+        text:

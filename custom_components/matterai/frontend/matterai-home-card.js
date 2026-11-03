@@ -3730,6 +3730,7 @@
       const ids = Object.keys(a.meta);
       try {
         const evs = await this._fetchLog(ids, a.range.start, a.range.end);
+        await this._appWho(evs, a.range.start);
         if (this._act !== a || a.req !== req) return;
         a.events = evs; a.error = null;
       } catch (e) {
@@ -3805,6 +3806,24 @@
       }
     }
 
+    /** Qué celular o tablet dio cada orden desde la app (MatterAI 2.9+: la app lo avisa a la casa). */
+    async _appWho(evs, start) {
+      const h = this._hass;
+      if (!evs.length || !h.services || !h.services.matterai || !h.services.matterai.app_command) return;
+      let acts;
+      try { acts = await h.callWS({ type: 'matterai/app/actions', since: start.getTime() / 1000 - 10 }); } catch (_) { return; }
+      if (!Array.isArray(acts) || !acts.length) return;
+      for (const e of evs) {
+        if (!e.context_user_id) continue;
+        let best = null, gap = 6000;
+        for (const x of acts) {
+          const d = Math.abs(x.t * 1000 - e.t);
+          if (d < gap && (x.entity_ids || []).includes(e.entity_id)) { gap = d; best = x; }
+        }
+        if (best && best.device) e.appDev = best.device;
+      }
+    }
+
     /** Quién lo hizo: una automatización, una rutina, alguien desde la app o a mano (tecla, sensor). */
     /** Quién lo hizo (como "triggered by" de Home Assistant): automatización y qué la disparó, rutina, app, sistema o el propio equipo. */
     _actWho(e, cat) {
@@ -3822,7 +3841,7 @@
       if (/^automation\./.test(ce) || e.context_domain === 'automation') return auto('Automatización');
       if (/^script\./.test(ce) || e.context_domain === 'script') return auto('Rutina');
       if (e.context_domain === 'matterai_escenas' || e.context_domain === 'matterai' || /matterai/.test(ce)) return auto('Automatización');
-      if (e.context_user_id) return 'Desde la app';
+      if (e.context_user_id) return e.appDev ? `Desde la app · ${e.appDev}` : 'Desde la app';
       if (e.context_event_type === 'call_service') return 'Orden del sistema';
       if (['luces', 'equipos', 'aberturas', 'clima', 'multimedia'].includes(cat) && e.state != null && e.state !== 'unavailable' && e.state !== 'unknown') return 'Desde el equipo (tecla o control)';
       return '';

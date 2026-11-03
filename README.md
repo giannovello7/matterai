@@ -281,6 +281,44 @@ Cada equipo con la app MatterAI de Android se registra solo en la casa, como la 
 
 Las notificaciones con la app cerrada pasan por el panel central y Firebase: ver `matterai-android/LEEME.md` → «Activar las notificaciones».
 
+Si en la app se activa **«Datos del celular para automatizaciones»**, el equipo suma estos sensores (se actualizan cuando cambian, y cada 15 minutos por las dudas):
+
+| Sensor | Para qué |
+|---|---|
+| `sensor.<equipo>_wi_fi_conectado` | llegar a casa antes que el GPS (se conectó al wifi de la casa) |
+| `sensor.<equipo>_bluetooth_conectados` (atributo `dispositivos`) | «se conectó al Bluetooth del auto»: abrir el portón al llegar |
+| `sensor.<equipo>_proxima_alarma` (fecha) | «10 minutos antes de mi alarma, subir las persianas» |
+| `binary_sensor.<equipo>_cargando` · `sensor.<equipo>_no_molestar` | «de noche, cargando y en No molestar: modo noche» |
+
+**Perfil de cada equipo** (panel MatterAI → Vincular celulares → *Celulares y tablets*): lo elige el instalador y el equipo lo toma al instante.
+
+| Perfil | Qué ve |
+|---|---|
+| Completo | todo |
+| Sin seguridad | sin alarma, cerraduras, portón ni cámaras (ni el portero ni las automatizaciones): para los chicos |
+| Sólo luces y clima | luces, clima, persianas y música |
+
+**Pedir huella:** en ese equipo, desarmar la alarma, abrir cerraduras y el portón piden la huella (o el PIN). Lo puede activar el instalador desde el panel o el cliente desde Opciones de la app.
+
+**Qué equipo lo hizo:** la app avisa cada orden a la casa (evento `matterai_app_action`) y la pantalla Actividad muestra «Desde la app · Tablet living».
+
+**Portero:** cuando tocan el timbre, los celulares con la app cerrada muestran una **llamada entrante** a pantalla completa (cámara en vivo, Abrir puerta / portón, Atender, Rechazar), y las apps abiertas (tablets de pared) muestran el portero en pantalla completa. Si alguien atiende, se cierra en todos.
+
+### Órdenes a las tablets (`matterai.app_command`)
+
+Para automatizaciones con tablets de pared (la app abierta escucha las órdenes de la casa):
+
+```yaml
+action: matterai.app_command
+data:
+  command: camera          # screen_on · screen_off · brightness · open · camera · tts · reload · saver
+  target: ["Tablet living"] # nombre del equipo (o «all», o sin poner: todos)
+  entity_id: camera.portero
+```
+
+`brightness` usa `value` (0 a 1), `open` usa `path` (`/automatizaciones`, `/actividad`, `/musica`, `/opciones`, `/ayuda`) y `tts` usa `message`.
+Con la app cerrada también entiende las notificaciones de la app oficial: `message: TTS` (con `data.tts_text`), `command_screen_on` y `command_webview`.
+
 ## Comandos (WebSocket)
 
 | Comando | Quién | Para qué |
@@ -291,6 +329,11 @@ Las notificaciones con la app cerrada pasan por el panel central y Firebase: ver
 | `matterai/pairing` (`regenerate`) | admin | link/QR de vinculación (o acceso nuevo) |
 | `matterai/status` | admin | estado de la casa |
 | `matterai/heartbeat` | admin | mandar un latido ya al panel central |
+| `matterai/app/me` (`device_id`) | cualquier usuario (la app) | perfil y huella de ese equipo |
+| `matterai/app/subscribe` (`device_id`, `name`) | cualquier usuario | órdenes de la casa para ese equipo (portero, `app_command`) |
+| `matterai/app/actions` (`since`) | cualquier usuario | qué equipo dio cada orden (Actividad) |
+| `matterai/app/notify_action` (`action`) | cualquier usuario | botón del portero desde la pantalla de la app |
+| `matterai/app/devices` · `matterai/app/device_set` | admin | listar equipos y cambiar su perfil / huella |
 
 ## Pruebas
 

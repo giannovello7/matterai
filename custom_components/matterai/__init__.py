@@ -87,7 +87,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await house.async_load()
     dashboard = Dashboard(hass)
     await dashboard.async_load()
-    rt.update(entry=entry, house=house, dashboard=dashboard)
+    from .app_devices import AppDevices, async_register_service  # noqa: PLC0415
+
+    app_devices = AppDevices(hass)
+    await app_devices.async_load()
+    rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices)
+    async_register_service(hass)
 
     # el usuario y el acceso de la app quedan listos desde el primer momento
     await house.async_token()
@@ -185,12 +190,15 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         await async_unload_escenas(hass)
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
     rt = hass.data.get(DOMAIN, {})
+    if rt.get("app_devices"):
+        rt["app_devices"].stop()
+    hass.services.async_remove(DOMAIN, "app_command")
     if rt.get("card_url"):
         try:
             frontend.remove_extra_js_url(hass, rt["card_url"])
         except (KeyError, ValueError):  # ya no estaba (frontend recién iniciado o quitado antes)
             pass
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices"):
         rt.pop(key, None)
     return True
 

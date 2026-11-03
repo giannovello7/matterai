@@ -132,6 +132,7 @@
   .vli small{grid-column:2;opacity:.65}.vlw{font-size:12px;font-weight:600;white-space:nowrap}
   .st{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:16px;align-items:start}
   .wide{grid-column:1/-1}
+  .tb{width:100%;border-collapse:collapse;font-size:14px;margin-top:8px}.tb th{text-align:left;font-weight:600;opacity:.7;font-size:12px;padding:6px 8px}.tb td{padding:8px;border-top:1px solid var(--divider-color,rgba(255,255,255,.08));vertical-align:top}.tb select{background:var(--card-background-color,#1c1c1c);color:inherit;border:1px solid var(--divider-color,#444);border-radius:8px;padding:4px 6px}
   .kv{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--divider-color,rgba(255,255,255,.08));font-size:14px}
   .kv:last-of-type{border-bottom:0}
   .kv b{font-weight:600;text-align:right;word-break:break-word}
@@ -613,8 +614,10 @@
         <div class="row"><button class="b pri" id="copy">Copiar link</button><a class="b" href="${esc(wa)}" target="_blank" rel="noopener">Mandar por WhatsApp</a><button class="b" id="print">Imprimir</button></div>
         <h3>¿Perdió el celular o querés cortar el acceso?</h3>
         <p class="mut">Un acceso nuevo deja sin conexión a todos los celulares vinculados hasta ahora: hay que volver a escanear.</p>
-        <div class="row"><button class="b warn" id="regen">Generar acceso nuevo</button></div></div></div>`);
+        <div class="row"><button class="b warn" id="regen">Generar acceso nuevo</button></div></div></div>
+        <div class="box" id="devs"><h2>Celulares y tablets</h2><p class="mut">Cargando…</p></div>`);
       if (!main) return;
+      this._renderDevs(main.querySelector('#devs'));
       const $ = (id) => main.querySelector(`#${id}`);
       $('copy').onclick = async () => { try { await navigator.clipboard.writeText(p.link); this._toast('Link copiado'); } catch (_) { this._toast('No se pudo copiar: seleccionalo a mano'); } };
       $('print').onclick = () => {
@@ -623,6 +626,30 @@
         w.document.close(); w.focus(); w.print();
       };
       $('regen').onclick = () => { if (confirm('¿Generar un acceso nuevo? Los celulares vinculados tendrán que volver a escanear.')) this._renderApp(true); };
+    }
+
+    /** Equipos con la app: perfil (qué ve cada uno) y si pide huella para la seguridad. */
+    async _renderDevs(box) {
+      let r;
+      try { r = await this._hass.callWS({ type: 'matterai/app/devices' }); } catch (e) { box.innerHTML = `<h2>Celulares y tablets</h2><p class="mut">${esc(e.message || e)}</p>`; return; }
+      const P = r.profiles || {};
+      const HELP = { full: 'Ve y maneja todo', kids: 'Sin alarma, cerraduras, portón ni cámaras', basic: 'Sólo luces, clima, persianas y música' };
+      box.innerHTML = `<h2>Celulares y tablets</h2>
+        <p class="mut">Cada equipo con la app aparece acá solo, la primera vez que se conecta. El perfil decide qué ve (por ejemplo, el de los chicos sin la alarma ni las cámaras) y «Pedir huella» protege la alarma, las cerraduras y el portón en ese equipo.</p>
+        ${r.devices.length ? `<table class="tb"><thead><tr><th>Equipo</th><th>Perfil</th><th>Pedir huella</th><th>Avisos</th></tr></thead><tbody>
+          ${r.devices.map((d) => `<tr data-dev="${esc(d.device_id)}"><td><b>${esc(d.name)}</b><br><small class="mut">${esc(d.model)}${d.app_version ? ` · app ${esc(d.app_version)}` : ''}</small></td>
+            <td><select data-k="profile">${Object.keys(P).map((k) => `<option value="${k}" ${d.profile === k ? 'selected' : ''}>${esc(P[k])}</option>`).join('')}</select><br><small class="mut">${esc(HELP[d.profile] || '')}</small></td>
+            <td><input type="checkbox" data-k="secure" ${d.secure ? 'checked' : ''}></td>
+            <td>${d.notify ? `<b class="ok">${esc(d.notify)}</b>` : d.push ? '<b class="wn">Reiniciar HA</b>' : '<span class="mut">Sin notificaciones</span>'}</td></tr>`).join('')}
+        </tbody></table>` : '<p class="mut">Todavía no hay equipos: aparecen cuando el cliente abre la app vinculada.</p>'}`;
+      box.querySelectorAll('[data-dev] [data-k]').forEach((el) => {
+        el.onchange = async () => {
+          const id = el.closest('[data-dev]').dataset.dev;
+          const msg = { type: 'matterai/app/device_set', device_id: id };
+          msg[el.dataset.k] = el.type === 'checkbox' ? el.checked : el.value;
+          try { await this._hass.callWS(msg); this._toast('Guardado: el equipo lo toma al instante'); this._renderDevs(box); } catch (e) { this._toast(`No se pudo guardar: ${e.message || e}`); }
+        };
+      });
     }
 
     /* ---------- Conexiones ---------- */

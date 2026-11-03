@@ -82,6 +82,18 @@
     "set_enabled": {
       "name": "Activar / pausar",
       "description": "Activa o pausa una automatización."
+    },
+    "app_command": {
+      "name": "Orden a la app",
+      "description": "Le da una orden a los celulares y tablets con la app MatterAI abierta (por nombre del equipo, o todos): prender o apagar la pantalla, brillo (0 a 1), mostrar una cámara, abrir una pantalla, decir un mensaje en voz alta, recargar o mostrar el protector de pantalla.",
+      "fields": {
+        "command": {"name": "Orden", "description": "screen_on · screen_off · brightness · open · camera · tts · reload · saver"},
+        "target": {"name": "Equipos", "description": "Nombres de los equipos (como aparecen en la casa) o «all» para todos."},
+        "entity_id": {"name": "Cámara", "description": "Para «camera»."},
+        "path": {"name": "Pantalla", "description": "Para «open»: /automatizaciones, /actividad…"},
+        "value": {"name": "Valor", "description": "Para «brightness»: de 0 a 1."},
+        "message": {"name": "Mensaje", "description": "Para «tts»."}
+      }
     }
   },
   "issues": {
