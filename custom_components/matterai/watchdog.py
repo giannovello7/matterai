@@ -4,6 +4,9 @@ Viene incluido en MatterAI y se configura solo: al arrancar detecta qué complem
 casa (Zigbee2MQTT, Mosquitto, …) y los vigila. No hace falta copiar automatizaciones YAML.
 
 Cómo decide (cada minuto, y al momento si Zigbee2MQTT avisa que se desconectó):
+- Cloudflared: además de que el complemento ande, la casa prueba su propia dirección externa
+  pasando por Cloudflare. Si Cloudflare contesta que el túnel no está conectado (5xx, como el
+  error 1033) durante 3 minutos, se reinicia. Si la casa no tiene internet, no se toca: esperar.
 - La fuente de verdad es el Supervisor: el estado real del complemento (started / stopped / error).
 - Zigbee2MQTT además tiene que estar «online» en MQTT (<base_topic>/bridge/state). El base_topic
   se descubre solo escuchando MQTT. Si está andando pero offline más de 3 minutos, se reinicia.
@@ -40,7 +43,7 @@ from homeassistant.helpers.event import async_call_later, async_track_time_inter
 from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
-from .const import DOMAIN
+from .const import CONF_URL, DOMAIN
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -74,13 +77,16 @@ class ServiceDef:
     match: Callable[[str], bool]  # ¿este slug de complemento es de este servicio?
     depends: tuple[str, ...] = ()
     mqtt_bridge: bool = False  # Zigbee2MQTT: <base>/bridge/state
+    remote_probe: bool = False  # Cloudflared: la dirección externa de la casa tiene que responder
     coordinator: bool = False  # depende del coordinador Zigbee de red (SLZB-06 / SMLIGHT)
 
 
 SERVICES: tuple[ServiceDef, ...] = (
     ServiceDef("mosquitto", "Mosquitto (MQTT)", lambda s: s == "core_mosquitto" or s.endswith("_mosquitto")),
     ServiceDef("zigbee2mqtt", "Zigbee2MQTT", lambda s: "zigbee2mqtt" in s, depends=("mosquitto",), mqtt_bridge=True, coordinator=True),
+    ServiceDef("cloudflared", "Cloudflared (acceso remoto)", lambda s: s.endswith("cloudflared"), remote_probe=True),
 )
+REMOTE_TIMEOUT = 12  # segundos
 
 
 @dataclass
@@ -115,6 +121,8 @@ class Watchdog:
         self.tracked: dict[str, Tracked] = {}
         self.available = False  # hay Supervisor
         self.bridges: dict[str, dict[str, Any]] = {}  # base_topic → {state, since}
+        self.remote: dict[str, Any] | None = None  # {kind: ok | tunnel | internet, since, detail}
+        self.probe_url: str | None = None  # para pruebas: si no, la dirección remota cargada en MatterAI
         self.started_at = dt_util.utcnow()
         self.last_check: datetime | None = None
         self._unsubs: list[Callable[[], None]] = []
@@ -287,6 +295,8 @@ class Watchdog:
         self._sync_tracked(addons)
         now = dt_util.utcnow()
         z2m_count = sum(1 for t in self.tracked.values() if t.sdef.mqtt_bridge)
+        if any(t.sdef.remote_probe for t in self.tracked.values()):
+            await self._async_probe_remote(now)
         # dependencias primero
         order = sorted(self.tracked.values(), key=lambda t: len(t.sdef.depends))
         for t in order:
@@ -311,6 +321,42 @@ class Watchdog:
                     break
         self.tracked = seen
 
+    # ------------------------------------------------------------ acceso remoto (Cloudflared)
+    def external_url(self) -> str | None:
+        if self.probe_url:
+            return self.probe_url
+        entry = self.hass.data.get(DOMAIN, {}).get("entry")
+        if entry is None:
+            return None
+        url = str({**entry.data, **entry.options}.get(CONF_URL) or "").strip().rstrip("/")
+        return url if url.startswith("http") else None
+
+    async def _async_probe_remote(self, now: datetime) -> None:
+        """La casa entra a su propia dirección por internet: así se sabe si el túnel está conectado."""
+        url = self.external_url()
+        if not url:
+            self.remote = None
+            return
+        import aiohttp  # noqa: PLC0415
+
+        from homeassistant.helpers.aiohttp_client import async_get_clientsession  # noqa: PLC0415
+
+        kind, detail = "ok", ""
+        try:
+            async with asyncio.timeout(REMOTE_TIMEOUT):
+                resp = await async_get_clientsession(self.hass).get(f"{url}/manifest.json", allow_redirects=False)
+                if resp.status >= 500:
+                    kind, detail = "tunnel", f"Cloudflare responde {resp.status} (túnel desconectado)"
+        except (aiohttp.ClientConnectorError, aiohttp.ClientConnectionError, OSError) as err:
+            kind, detail = "internet", f"sin conexión a internet o DNS ({type(err).__name__})"
+        except TimeoutError:
+            kind, detail = "internet", "no responde (internet lenta o caída)"
+        except Exception as err:  # noqa: BLE001
+            kind, detail = "internet", str(err)[:120]
+        if self.remote is None or self.remote["kind"] != kind:
+            self.remote = {"kind": kind, "since": now, "detail": detail}
+            _LOGGER.info("Acceso remoto (%s): %s %s", url, kind, detail)
+
     def _healthy(self, t: Tracked, now: datetime, z2m_count: int) -> tuple[bool | None, str, str]:
         """(sano, motivo, acción) — sano None = todavía no se sabe."""
         if t.addon_state in ("stopped", "error"):
@@ -319,6 +365,14 @@ class Watchdog:
             return None, f"estado desconocido ({t.addon_state})", ""
         if t.addon_state == "startup":
             return None, "arrancando", ""
+        if t.sdef.remote_probe and self.remote is not None:
+            r = self.remote
+            if r["kind"] == "internet":
+                return None, "la casa no tiene internet: no se puede comprobar el acceso remoto (no lo reinicio)", ""
+            if r["kind"] == "tunnel":
+                if now - r["since"] >= OFFLINE_FOR:
+                    return False, f"anda pero la dirección remota no responde: {r['detail']}", "restart"
+                return None, "acceso remoto sin respuesta hace poco", ""
         if t.sdef.mqtt_bridge and ("mqtt" in self.hass.config.components or self.bridges):
             b = self._bridge_for(t, z2m_count)
             if b is None:
@@ -399,7 +453,9 @@ class Watchdog:
             wait = BACKOFF[min(attempts - 1, len(BACKOFF) - 1)] if attempts < MANUAL_AFTER else 3600
             s.update(attempts=attempts, last_action=f"{action} ({result})", last_action_at=now.isoformat(),
                      next_try=(now + timedelta(seconds=wait)).isoformat(), restarts=s.get("restarts", 0) + 1)
-            # el próximo «sin publicar estado» se cuenta desde esta acción
+            # después de actuar, se le da tiempo antes de volver a contar la falla
+            if t.sdef.remote_probe and self.remote and self.remote["kind"] == "tunnel":
+                self.remote["since"] = now
             if t.sdef.mqtt_bridge:
                 for b in self.bridges.values():
                     if b["state"] == "offline":
@@ -469,5 +525,6 @@ class Watchdog:
             "last_check": _ts(self.last_check),
             "bridges": {k: {"state": v["state"], "since": _ts(v["since"])} for k, v in self.bridges.items()},
             "coordinator": dict(zip(("ok", "detail"), self.coordinator_ok())),
+            "remote": {"kind": self.remote["kind"], "since": _ts(self.remote["since"]), "detail": self.remote["detail"], "url": self.external_url()} if self.remote else None,
             "services": out,
         }

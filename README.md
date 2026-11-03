@@ -193,6 +193,7 @@ MatterAI vigila los servicios críticos de la casa y **los recupera solo**. No h
 |---|---|
 | **Mosquitto** (MQTT) | Si está detenido o con error: lo arranca. |
 | **Zigbee2MQTT** | Si está detenido o con error: lo arranca. Si anda pero queda **offline** en MQTT más de 3 minutos (por ejemplo, perdió el coordinador después de una actualización), lo reinicia. El `base_topic` se descubre solo. |
+| **Cloudflared** (acceso remoto) | Si está detenido o con error: lo arranca. Si anda pero **el túnel no está conectado** (la casa entra a su propia dirección externa pasando por Cloudflare y recibe un error 5xx, como el 1033, durante 3 minutos), lo reinicia. Si la casa **no tiene internet**, no lo reinicia (no serviría). La dirección es la que cargaste en MatterAI. |
 
 - **Primero las dependencias:** si Mosquitto está caído, lo recupera antes de tocar Zigbee2MQTT.
 - **Coordinador de red (SLZB-06 / SMLIGHT):** si no responde, no reinicia Zigbee2MQTT (no serviría). Espera y avisa.
@@ -219,7 +220,7 @@ Pausa el watchdog: no reinicia nada ni avisa. Se apaga solo a la hora y hace un 
 
 - Complemento Zigbee2MQTT: **actualización automática desactivada**, **copia antes de actualizar** activada y la opción **Watchdog** del complemento activada.
 - SLZB-06: **actualización automática de firmware desactivada**.
-- Al migrar una casa vieja, borrá estas automatizaciones YAML (MatterAI ya hace lo mismo y mejor): «Reset zigbee2mqtt», «Zigbee2MQTT - recuperación automática», «Zigbee2MQTT - alertas».
+- Al migrar una casa vieja, borrá estas automatizaciones YAML (MatterAI ya hace lo mismo y mejor): «Reset zigbee2mqtt», «Zigbee2MQTT - recuperación automática», «Zigbee2MQTT - alertas», «Cloudflared - mantener activo» y «Reinicio cloudflare al iniciar».
 
 Requiere Home Assistant OS o Supervised (con Supervisor). En Home Assistant Core/Container no hay complementos que vigilar.
 

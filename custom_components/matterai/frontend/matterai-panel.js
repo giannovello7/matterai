@@ -176,6 +176,7 @@
         ${svc}
         ${bridges.length ? `<p class="mut">Zigbee2MQTT por MQTT: ${bridges.map(([b, v]) => `${esc(b)} ${v.state === 'online' ? '🟢 online' : '🔴 offline'}`).join(' · ')}</p>` : ''}
         ${wd.coordinator && !wd.coordinator.ok ? `<div class="al warning">${esc(wd.coordinator.detail)}</div>` : ''}
+        ${wd.remote ? `<p class="mut">Acceso remoto (${esc(wd.remote.url || '')}): ${wd.remote.kind === 'ok' ? '🟢 responde' : wd.remote.kind === 'tunnel' ? `🔴 ${esc(wd.remote.detail)}` : `⚪ ${esc(wd.remote.detail)}`}</p>` : ''}
         ${wd.maintenance_until ? `<div class="al warning">🔧 En mantenimiento hasta las ${esc(when(wd.maintenance_until))}: no reinicia nada ni avisa.</div>` : ''}
         <div class="row">${wd.maintenance_until ? '<button class="b pri" id="wdoff">Terminar mantenimiento</button>' : '<button class="b" id="wdmaint">Mantenimiento 1 hora</button>'}<button class="b" id="wdcheck">Revisar ahora</button></div>
         <p class="mut">Usá «Mantenimiento» antes de actualizar el firmware del coordinador o un complemento a mano, así no interviene.</p></div>`;
