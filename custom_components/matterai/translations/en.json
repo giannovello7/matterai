@@ -83,5 +83,11 @@
       "name": "Activar / pausar",
       "description": "Activa o pausa una automatización."
     }
+  },
+  "issues": {
+    "service_down": {
+      "title": "{service} is not working",
+      "description": "{detail}\n\nMatterAI is trying to recover it automatically. If you are doing maintenance (for example updating the coordinator firmware), turn on **System maintenance** so it does not interfere."
+    }
   }
 }

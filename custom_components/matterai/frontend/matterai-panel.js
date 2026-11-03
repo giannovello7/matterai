@@ -158,6 +158,29 @@
       this._auto = card;
     }
 
+    /* ---------- Mantenimiento del sistema (watchdog) ---------- */
+    _wdBox(wd) {
+      if (!wd) return '<div class="box"><h2>Mantenimiento del sistema</h2><p class="mut">Iniciando…</p></div>';
+      const when = (iso) => { try { return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
+      const dur = (secs) => (secs < 120 ? `${secs} s` : secs < 7200 ? `${Math.round(secs / 60)} min` : `${Math.round(secs / 3600)} h`);
+      const CLS = { ok: 'ok', recuperando: 'wn', esperando_hardware: 'wn', esperando_dependencia: 'wn', caido: 'bad', atencion_manual: 'bad', mantenimiento: 'mut', sin_datos: 'mut' };
+      if (!wd.available) {
+        return `<div class="box"><h2>Mantenimiento del sistema</h2><p class="mut">Esta casa no tiene Supervisor (Home Assistant Core o Container): no se pueden vigilar ni recuperar complementos.</p></div>`;
+      }
+      const svc = wd.services.length ? wd.services.map((x) => `<div class="kv" style="flex-wrap:wrap"><span>${esc(x.name)}${x.version ? ` <span class="mut">${esc(x.version)}</span>` : ''}</span><b class="${CLS[x.status] || ''}">${esc(x.status_text)}</b>
+          ${x.detail || x.restarts || x.last_down_secs ? `<div class="mut" style="flex-basis:100%;font-size:12.5px">${esc([x.detail, x.down_since ? `caído desde ${when(x.down_since)}` : '', x.attempts ? `${x.attempts} intento(s)` : '', x.restarts ? `${x.restarts} recuperación(es) automática(s) en total` : '', !x.down_since && x.last_down_secs ? `última caída: ${dur(x.last_down_secs)}${x.recovered_at ? `, volvió el ${when(x.recovered_at)}` : ''}` : '', x.update_note].filter(Boolean).join(' · '))}</div>` : ''}</div>`).join('')
+        : '<p class="mut">No hay servicios para vigilar en esta casa (Zigbee2MQTT, Mosquitto…).</p>';
+      const bridges = Object.entries(wd.bridges || {});
+      return `<div class="box"><h2>Mantenimiento del sistema</h2>
+        <p class="mut">MatterAI vigila los servicios críticos y los recupera solo (primero las dependencias, con esperas crecientes entre intentos). Si alguno sigue caído, te avisa por el panel central y en Reparaciones.</p>
+        ${svc}
+        ${bridges.length ? `<p class="mut">Zigbee2MQTT por MQTT: ${bridges.map(([b, v]) => `${esc(b)} ${v.state === 'online' ? '🟢 online' : '🔴 offline'}`).join(' · ')}</p>` : ''}
+        ${wd.coordinator && !wd.coordinator.ok ? `<div class="al warning">${esc(wd.coordinator.detail)}</div>` : ''}
+        ${wd.maintenance_until ? `<div class="al warning">🔧 En mantenimiento hasta las ${esc(when(wd.maintenance_until))}: no reinicia nada ni avisa.</div>` : ''}
+        <div class="row">${wd.maintenance_until ? '<button class="b pri" id="wdoff">Terminar mantenimiento</button>' : '<button class="b" id="wdmaint">Mantenimiento 1 hora</button>'}<button class="b" id="wdcheck">Revisar ahora</button></div>
+        <p class="mut">Usá «Mantenimiento» antes de actualizar el firmware del coordinador o un complemento a mano, así no interviene.</p></div>`;
+    }
+
     /* ---------- Copias y plantillas ---------- */
     _download(name, obj) {
       const a = document.createElement('a');
@@ -390,6 +413,8 @@
       const c = s.central;
       const central = !c.configured ? '<b class="mut">No configurado</b>' : c.ok === true ? '<b class="ok">Conectado</b>' : c.ok === false ? `<b class="bad">Sin conexión</b>` : '<b class="wn">Esperando…</b>';
       const al = s.health.alerts;
+      let wd = null;
+      try { wd = await this._hass.callWS({ type: 'matterai/watchdog' }); } catch (_) { /* iniciando */ }
       let vl = { items: [], on: false };
       try { vl = await this._hass.callWS({ type: 'matterai/voice_log' }); } catch (_) { /* integración vieja */ }
       const WHY = { no: ['bad', 'No entendió'], duda: ['wn', 'Preguntó de vuelta'], ia: ['mut', 'Lo resolvió la IA'] };
@@ -420,6 +445,7 @@
           <div class="kv"><span>Entidades</span><b>${s.health.stats.entities}</b></div>
           <div class="kv"><span>Equipos sin responder</span><b class="${s.health.stats.unavailable ? 'wn' : 'ok'}">${s.health.stats.unavailable}</b></div>
           ${al.length ? al.map((a) => `<div class="al ${esc(a.level)}">${esc(a.text)}</div>`).join('') : '<p class="ok">Todo en orden</p>'}</div>
+        ${this._wdBox(wd)}
         ${vl.on ? `<div class="box vlog"><h2>Frases que la voz no entendió</h2>
           <p class="mut">Lo que el modo gratis no supo resolver. Pasale esta lista a quien mantiene MatterAI para sumar esas formas de hablar.</p>
           ${vl.items.length ? `<div class="vl">${vl.items.map((x) => `<div class="vli"><span class="vlw ${WHY[x.why] ? WHY[x.why][0] : ''}">${esc(WHY[x.why] ? WHY[x.why][1] : x.why)}</span><b>“${esc(x.text)}”</b><small>${esc(when(x.at))}${x.say ? ` · ${esc(x.say)}` : ''}</small></div>`).join('')}</div>
@@ -428,6 +454,10 @@
       if (vc) vc.onclick = async () => { if (!confirm('¿Borrar la lista de frases?')) return; await this._hass.callWS({ type: 'matterai/voice_log', clear: true }); this._renderStatus(); };
       const vy = main.querySelector('#vlcopy');
       if (vy) vy.onclick = async () => { try { await navigator.clipboard.writeText(vl.items.map((x) => `${x.why}: ${x.text}`).join(String.fromCharCode(10))); this._toast('Lista copiada'); } catch (_) { this._toast('No se pudo copiar'); } };
+      const wdAct = (m, ok) => this._hass.callWS({ type: 'matterai/watchdog', ...m }).then(() => { if (ok) this._toast(ok); this._renderStatus(); }, (e) => this._toast(e.message || String(e)));
+      const wm = main.querySelector('#wdmaint'); if (wm) wm.onclick = () => wdAct({ maintenance_minutes: 60 }, 'Mantenimiento activado por 1 hora');
+      const wo = main.querySelector('#wdoff'); if (wo) wo.onclick = () => wdAct({ maintenance_minutes: 0 }, 'Mantenimiento desactivado: vuelve a vigilar');
+      const wc = main.querySelector('#wdcheck'); if (wc) wc.onclick = () => wdAct({ check: true }, 'Revisado');
       const hbBtn = main.querySelector('#hb');
       if (hbBtn) hbBtn.onclick = async () => { const r = await this._hass.callWS({ type: 'matterai/heartbeat' }); this._toast(r.ok ? 'Panel central: conectado' : `Panel central: ${r.error || 'sin conexión'}`); this._renderStatus(); };
     }

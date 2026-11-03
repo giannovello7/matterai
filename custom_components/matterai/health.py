@@ -37,7 +37,7 @@ from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
 
 from .backup import Central, async_run_command
-from .const import HEARTBEAT_MINUTES, VERSION
+from .const import DOMAIN, HEARTBEAT_MINUTES, VERSION
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -153,10 +153,17 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
 async def async_collect(hass: HomeAssistant) -> dict[str, Any]:
     """Todo lo de collect() más lo que hay que preguntarle al Supervisor (complementos, disco)."""
     data = collect(hass)
+    wd = hass.data.get(DOMAIN, {}).get("watchdog")
     try:
-        data["alerts"] += await _async_supervisor_alerts(hass)
+        managed = wd.managed_slugs() if wd else set()
+        # los complementos que cuida el watchdog avisan por él (con los intentos y el motivo), no dos veces
+        data["alerts"] += [a for a in await _async_supervisor_alerts(hass) if a["key"].split(":", 1)[-1] not in managed]
     except Exception:  # noqa: BLE001 - sin Supervisor (HA Core/Container) o API distinta: se saltea
         _LOGGER.debug("No se pudo consultar al Supervisor", exc_info=True)
+    if wd:
+        data["alerts"] += wd.alerts()
+        if wd.maintenance:
+            data["stats"]["maintenance"] = True
     return data
 
 

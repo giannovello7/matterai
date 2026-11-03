@@ -356,4 +356,33 @@ async def ws_backup_restore_some(hass: HomeAssistant, connection: websocket_api.
     await _guard(connection, msg, run)
 
 
-COMMANDS = (ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
+# ------------------------------------------------------------------ mantenimiento del sistema
+
+
+def _watchdog(hass: HomeAssistant):
+    wd = _rt(hass).get("watchdog")
+    if wd is None:
+        raise HomeAssistantError("El mantenimiento del sistema todavía está iniciando")
+    return wd
+
+
+@websocket_api.websocket_command(
+    {vol.Required("type"): f"{DOMAIN}/watchdog", vol.Optional("check"): bool, vol.Optional("maintenance_minutes"): vol.All(int, vol.Range(min=0, max=1440))}
+)
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_watchdog(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Estado del mantenimiento del sistema; también fuerza un chequeo o activa/desactiva el modo mantenimiento."""
+
+    async def run():
+        wd = _watchdog(hass)
+        if "maintenance_minutes" in msg:
+            await wd.async_set_maintenance(msg["maintenance_minutes"] or None)
+        elif msg.get("check"):
+            await wd.async_check(force=True)
+        return wd.as_dict()
+
+    await _guard(connection, msg, run)
+
+
+COMMANDS = (ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)

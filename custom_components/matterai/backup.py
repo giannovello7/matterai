@@ -251,6 +251,13 @@ async def async_run_command(hass: HomeAssistant, central: Central, cmd: dict[str
             return {"command": name, "ok": True, "message": f"Restaurada: {res['automations'] or 0} automatizaciones{' y el dashboard' if res['dashboard'] else ''}"}
         if name == "update":
             return await _async_update(hass, central)
+        if name == "maintenance":
+            wd = hass.data.get(DOMAIN, {}).get("watchdog")
+            if wd is None:
+                return {"command": name, "ok": False, "message": "El mantenimiento del sistema no está disponible"}
+            minutes = int(cmd.get("minutes") or 0)
+            await wd.async_set_maintenance(minutes or None)
+            return {"command": name, "ok": True, "message": f"Mantenimiento por {minutes} min" if minutes else "Mantenimiento terminado"}
         return {"command": name, "ok": False, "message": "Orden desconocida"}
     except Exception as err:  # noqa: BLE001 - se informa al panel central
         _LOGGER.warning("Orden «%s» del panel central: %s", name, err)

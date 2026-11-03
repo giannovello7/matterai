@@ -46,6 +46,8 @@ from .house import House
 from .websocket import COMMANDS
 
 _LOGGER = logging.getLogger(__name__)
+# automatizaciones (switch, button, binary_sensor, cover) + mantenimiento del sistema (sensor)
+ALL_PLATFORMS = [*PLATFORMS, "sensor"]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 FRONTEND_DIR = os.path.join(os.path.dirname(__file__), "frontend")
 
@@ -153,8 +155,19 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         )
     else:
         await async_setup_escenas_entry(hass, entry)
-        await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
         rt["escenas_on"] = True
+
+    # mantenimiento del sistema: vigila Zigbee2MQTT, Mosquitto… y los recupera solo
+    from .watchdog import Watchdog  # noqa: PLC0415
+
+    rt["watchdog"] = Watchdog(hass)
+
+    async def _start_watchdog(_hass: HomeAssistant) -> None:
+        await rt["watchdog"].async_start()
+
+    entry.async_on_unload(async_at_started(hass, _start_watchdog))
+    entry.async_on_unload(rt["watchdog"].stop)
+    await hass.config_entries.async_forward_entry_setups(entry, ALL_PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
@@ -166,9 +179,9 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     rt0 = hass.data.get(DOMAIN, {})
+    if not await hass.config_entries.async_unload_platforms(entry, ALL_PLATFORMS):
+        return False
     if rt0.get("escenas_on"):
-        if not await hass.config_entries.async_unload_platforms(entry, PLATFORMS):
-            return False
         await async_unload_escenas(hass)
     frontend.async_remove_panel(hass, PANEL_URL_PATH)
     rt = hass.data.get(DOMAIN, {})
@@ -177,7 +190,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             frontend.remove_extra_js_url(hass, rt["card_url"])
         except (KeyError, ValueError):  # ya no estaba (frontend recién iniciado o quitado antes)
             pass
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog"):
         rt.pop(key, None)
     return True
 

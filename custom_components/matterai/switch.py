@@ -11,6 +11,7 @@ from homeassistant.helpers.event import async_call_later
 
 from .escenas.const import KIND_GATE, KIND_SCENE, KIND_TIMER, KIND_TV
 from .escenas.entity import RuleEntity, setup_rule_platform
+from .watchdog_entities import async_setup_watchdog_platform
 
 
 class RuleSwitch(RuleEntity, SwitchEntity):
@@ -83,6 +84,9 @@ class CineSwitch(RuleEntity, SwitchEntity):
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities) -> None:
+    async_setup_watchdog_platform(hass, entry, async_add_entities, "switch")
+    if not hass.data.get("matterai_escenas"):
+        return  # sin motor de automatizaciones (por ejemplo, MatterAI Escenas sigue instalada)
     setup_rule_platform(
         hass,
         entry,

@@ -83,5 +83,11 @@
       "name": "Activar / pausar",
       "description": "Activa o pausa una automatización."
     }
+  },
+  "issues": {
+    "service_down": {
+      "title": "{service} no está funcionando",
+      "description": "{detail}\n\nMatterAI intenta recuperarlo solo. Si estás haciendo un mantenimiento (por ejemplo, actualizando el firmware del coordinador), activá **Mantenimiento del sistema** para que no intervenga."
+    }
   }
 }

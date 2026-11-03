@@ -185,6 +185,44 @@ Panel MatterAI → **Copias y plantillas**:
 
 Nunca viajan las claves de la casa ni el acceso de la app.
 
+## Mantenimiento del sistema (viene incluido)
+
+MatterAI vigila los servicios críticos de la casa y **los recupera solo**. No hay que configurar nada ni copiar automatizaciones YAML: al instalar MatterAI detecta qué complementos tiene la casa.
+
+| Servicio | Cuándo actúa |
+|---|---|
+| **Mosquitto** (MQTT) | Si está detenido o con error: lo arranca. |
+| **Zigbee2MQTT** | Si está detenido o con error: lo arranca. Si anda pero queda **offline** en MQTT más de 3 minutos (por ejemplo, perdió el coordinador después de una actualización), lo reinicia. El `base_topic` se descubre solo. |
+
+- **Primero las dependencias:** si Mosquitto está caído, lo recupera antes de tocar Zigbee2MQTT.
+- **Coordinador de red (SLZB-06 / SMLIGHT):** si no responde, no reinicia Zigbee2MQTT (no serviría). Espera y avisa.
+- **Sin tormentas de reinicios:** espera cada vez más entre intentos (1, 2, 5, 15, 30, 60 min) y nunca hace dos cosas a la vez sobre el mismo servicio. Después de 6 intentos queda en «atención manual» y reintenta una vez por hora.
+- **No olvida:** si Home Assistant se reinicia con un servicio caído, sigue desde donde estaba.
+- **Actualizaciones:** si un complemento falla justo después de actualizarse, el aviso lo dice («posible falla por la actualización de X a Y»).
+- **Avisos:** van al panel central (Telegram) como el resto, y si sigue caído más de 20 minutos aparece en **Reparaciones** de Home Assistant (se borra solo cuando se recupera).
+- **Entidades** (dispositivo «Sistema MatterAI»): el interruptor **Mantenimiento del sistema** y, por servicio, «con problemas», «estado» (ok, recuperando, esperando el coordinador, caído, atención manual, mantenimiento) y «Revisar».
+- En el panel MatterAI → **Estado** → «Mantenimiento del sistema» se ve todo y se activa el mantenimiento. También desde el panel central (botón ⋯ de la casa).
+
+### Modo mantenimiento
+
+Pausa el watchdog: no reinicia nada ni avisa. Se apaga solo a la hora y hace un chequeo.
+
+**Actualizar el firmware del SLZB-06:**
+1. Activá **Mantenimiento del sistema** (panel MatterAI → Estado, o el interruptor).
+2. Detené el complemento Zigbee2MQTT.
+3. Actualizá el firmware: primero el *core*, después el *Zigbee*.
+4. Esperá a que el SLZB-06 vuelva a la red (la integración SMLIGHT lo muestra conectado).
+5. Iniciá Zigbee2MQTT y revisá que la red ande.
+6. Desactivá **Mantenimiento** (o esperá a que se apague solo).
+
+### Recomendaciones para cada casa
+
+- Complemento Zigbee2MQTT: **actualización automática desactivada**, **copia antes de actualizar** activada y la opción **Watchdog** del complemento activada.
+- SLZB-06: **actualización automática de firmware desactivada**.
+- Al migrar una casa vieja, borrá estas automatizaciones YAML (MatterAI ya hace lo mismo y mejor): «Reset zigbee2mqtt», «Zigbee2MQTT - recuperación automática», «Zigbee2MQTT - alertas».
+
+Requiere Home Assistant OS o Supervised (con Supervisor). En Home Assistant Core/Container no hay complementos que vigilar.
+
 ## Monitoreo de la casa
 
 Con el panel central configurado, cada 5 minutos la casa informa qué hay para atender. Cada falla lleva una clave propia, así el panel central sabe cuándo es nueva, cuándo sigue y cuándo se resolvió:
