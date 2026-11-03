@@ -161,7 +161,18 @@ async def async_collect(hass: HomeAssistant) -> dict[str, Any]:
     except Exception:  # noqa: BLE001 - sin Supervisor (HA Core/Container) o API distinta: se saltea
         _LOGGER.debug("No se pudo consultar al Supervisor", exc_info=True)
     if wd:
-        data["alerts"] += wd.alerts()
+        # las integraciones que vigila el watchdog avisan por él; a las demás se les suma lo que ya intentó
+        managed, recs = wd.managed_entries(), wd.data.get("integrations", {})
+        alerts = []
+        for a in data["alerts"]:
+            kind, _, entry_id = a["key"].partition(":")
+            if kind == "integration" and entry_id in managed:
+                continue
+            if kind == "integration" and recs.get(entry_id, {}).get("attempts"):
+                n = recs[entry_id]["attempts"]
+                a = {**a, "text": f"{a['text']} (MatterAI la recargó {n} {'vez' if n == 1 else 'veces'} sin éxito)"}
+            alerts.append(a)
+        data["alerts"] = alerts + wd.alerts()
         if wd.maintenance:
             data["stats"]["maintenance"] = True
     return data

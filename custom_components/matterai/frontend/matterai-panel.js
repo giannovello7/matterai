@@ -164,16 +164,16 @@
       const when = (iso) => { try { return new Date(iso).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }); } catch (_) { return ''; } };
       const dur = (secs) => (secs < 120 ? `${secs} s` : secs < 7200 ? `${Math.round(secs / 60)} min` : `${Math.round(secs / 3600)} h`);
       const CLS = { ok: 'ok', recuperando: 'wn', esperando_hardware: 'wn', esperando_dependencia: 'wn', caido: 'bad', atencion_manual: 'bad', mantenimiento: 'mut', sin_datos: 'mut' };
-      if (!wd.available) {
-        return `<div class="box"><h2>Mantenimiento del sistema</h2><p class="mut">Esta casa no tiene Supervisor (Home Assistant Core o Container): no se pueden vigilar ni recuperar complementos.</p></div>`;
-      }
+      const noSup = wd.available ? '' : '<p class="mut">Esta casa no tiene Supervisor (Home Assistant Core o Container): no se pueden vigilar complementos, sólo integraciones.</p>';
+      const ints = (wd.integrations || []).map((x) => `<div class="kv" style="flex-wrap:wrap"><span>${esc(x.title)} <span class="mut">${esc(x.domain)}</span></span><b class="${x.attempts >= 6 ? 'bad' : 'wn'}">${x.attempts ? `recargada ${x.attempts} vez/veces` : 'sin arrancar'}</b><div class="mut" style="flex-basis:100%;font-size:12.5px">${esc(`no arrancó (${x.state || ''}) desde ${when(x.since)}`)}</div></div>`).join('');
       const svc = wd.services.length ? wd.services.map((x) => `<div class="kv" style="flex-wrap:wrap"><span>${esc(x.name)}${x.version ? ` <span class="mut">${esc(x.version)}</span>` : ''}</span><b class="${CLS[x.status] || ''}">${esc(x.status_text)}</b>
           ${x.detail || x.restarts || x.last_down_secs ? `<div class="mut" style="flex-basis:100%;font-size:12.5px">${esc([x.detail, x.down_since ? `caído desde ${when(x.down_since)}` : '', x.attempts ? `${x.attempts} intento(s)` : '', x.restarts ? `${x.restarts} recuperación(es) automática(s) en total` : '', !x.down_since && x.last_down_secs ? `última caída: ${dur(x.last_down_secs)}${x.recovered_at ? `, volvió el ${when(x.recovered_at)}` : ''}` : '', x.update_note].filter(Boolean).join(' · '))}</div>` : ''}</div>`).join('')
-        : '<p class="mut">No hay servicios para vigilar en esta casa (Zigbee2MQTT, Mosquitto…).</p>';
+        : '<p class="mut">No hay servicios para vigilar en esta casa (Zigbee2MQTT, Mosquitto, TTLock…).</p>';
       const bridges = Object.entries(wd.bridges || {});
       return `<div class="box"><h2>Mantenimiento del sistema</h2>
         <p class="mut">MatterAI vigila los servicios críticos y los recupera solo (primero las dependencias, con esperas crecientes entre intentos). Si alguno sigue caído, te avisa por el panel central y en Reparaciones.</p>
-        ${svc}
+        ${noSup}${svc}
+        ${ints ? `<p class="mut" style="margin-bottom:4px">Integraciones que no arrancaron (se recargan solas):</p>${ints}` : ''}
         ${bridges.length ? `<p class="mut">Zigbee2MQTT por MQTT: ${bridges.map(([b, v]) => `${esc(b)} ${v.state === 'online' ? '🟢 online' : '🔴 offline'}`).join(' · ')}</p>` : ''}
         ${wd.coordinator && !wd.coordinator.ok ? `<div class="al warning">${esc(wd.coordinator.detail)}</div>` : ''}
         ${wd.remote ? `<p class="mut">Acceso remoto (${esc(wd.remote.url || '')}): ${wd.remote.kind === 'ok' ? '🟢 responde' : wd.remote.kind === 'tunnel' ? `🔴 ${esc(wd.remote.detail)}` : `⚪ ${esc(wd.remote.detail)}`}</p>` : ''}

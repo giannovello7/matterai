@@ -20,6 +20,15 @@ Cómo decide (cada minuto, y al momento si Zigbee2MQTT avisa que se desconectó)
 - Modo mantenimiento: pausa todo (por ejemplo para actualizar el firmware del SLZB-06); se apaga
   solo a la hora y hace un chequeo.
 
+Integraciones (no son complementos: se recargan, no se reinician; andan también sin Supervisor):
+- Cualquier integración que quedó sin arrancar (error al iniciar, «no cargada», o reintentando
+  más de 3 minutos) se recarga sola pasados los 2 minutos de iniciado HA, con el mismo backoff.
+  Es el caso típico de TTLock: HA arranca antes que la red/DNS, la integración falla una vez y
+  queda así hasta que alguien la recarga. Las que piden volver a iniciar sesión no se tocan.
+- Las integraciones de nube que se «cuelgan» (TTLock, Tuya, Smart Life, eWeLink) además se
+  recargan si TODOS sus equipos quedan no disponibles 3 minutos. Esto no se hace con cualquier
+  integración a propósito: una tele apagada también figura «no disponible».
+
 Los avisos salen por el mismo camino que el resto (health.py → panel central → Telegram) y además
 se crea un aviso en Reparaciones si un servicio sigue caído más de 20 minutos.
 """
@@ -34,7 +43,7 @@ import json
 import logging
 from typing import Any
 
-from homeassistant.config_entries import ConfigEntryState
+from homeassistant.config_entries import SOURCE_IGNORE, SOURCE_REAUTH, ConfigEntry, ConfigEntryState
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
@@ -68,17 +77,22 @@ STATE_TEXT = {
 }
 
 
+def _never(_slug: str) -> bool:
+    return False
+
+
 @dataclass
 class ServiceDef:
     """Un tipo de servicio que MatterAI sabe cuidar."""
 
     key: str
     name: str
-    match: Callable[[str], bool]  # ¿este slug de complemento es de este servicio?
+    match: Callable[[str], bool] = _never  # ¿este slug de complemento es de este servicio?
     depends: tuple[str, ...] = ()
     mqtt_bridge: bool = False  # Zigbee2MQTT: <base>/bridge/state
     remote_probe: bool = False  # Cloudflared: la dirección externa de la casa tiene que responder
     coordinator: bool = False  # depende del coordinador Zigbee de red (SLZB-06 / SMLIGHT)
+    integration: str | None = None  # dominio de la integración (no es un complemento)
 
 
 SERVICES: tuple[ServiceDef, ...] = (
@@ -86,22 +100,43 @@ SERVICES: tuple[ServiceDef, ...] = (
     ServiceDef("zigbee2mqtt", "Zigbee2MQTT", lambda s: "zigbee2mqtt" in s, depends=("mosquitto",), mqtt_bridge=True, coordinator=True),
     ServiceDef("cloudflared", "Cloudflared (acceso remoto)", lambda s: s.endswith("cloudflared"), remote_probe=True),
 )
+# integraciones de nube que se cuelgan: además de que arranquen, sus equipos tienen que responder
+INTEGRATIONS: tuple[ServiceDef, ...] = (
+    ServiceDef("ttlock", "TTLock", integration="ttlock"),
+    ServiceDef("tuya", "Tuya", integration="tuya"),
+    ServiceDef("smartlife", "Smart Life", integration="smartlife"),
+    ServiceDef("sonoff", "eWeLink (Sonoff)", integration="sonoff"),
+)
 REMOTE_TIMEOUT = 12  # segundos
+BAD_ENTRY_STATES = (ConfigEntryState.SETUP_ERROR, ConfigEntryState.SETUP_RETRY, ConfigEntryState.NOT_LOADED)
+BUSY_ENTRY_STATES = {s for s in ConfigEntryState if s.name.endswith("_IN_PROGRESS")}  # UNLOAD_… existe desde HA 2025
 
 
 @dataclass
 class Tracked:
-    """Un complemento vigilado (puede haber más de un Zigbee2MQTT)."""
+    """Un complemento o integración vigilado (puede haber más de un Zigbee2MQTT)."""
 
     sdef: ServiceDef
-    slug: str
+    slug: str  # slug del complemento, o dominio de la integración
     name: str
-    key: str  # zigbee2mqtt, zigbee2mqtt_2…
-    addon_state: str = "unknown"
+    key: str  # zigbee2mqtt, zigbee2mqtt_2, ttlock…
+    addon_state: str = "unknown"  # en integraciones: el estado de la entrada (loaded, setup_error…)
     version: str | None = None
     status: str = UNKNOWN
     detail: str = ""
+    entry_id: str | None = None
+    unavail_since: datetime | None = None  # integraciones: desde cuándo todos sus equipos no responden
     lock: asyncio.Lock = field(default_factory=asyncio.Lock)
+
+
+def _needs_login(hass: HomeAssistant, entry: ConfigEntry) -> bool:
+    """Pide volver a iniciar sesión (o falló la migración): recargarla no sirve, la tiene que ver una persona."""
+    if entry.state == ConfigEntryState.MIGRATION_ERROR:
+        return True
+    try:
+        return any(entry.async_get_active_flows(hass, {SOURCE_REAUTH}))
+    except Exception:  # noqa: BLE001
+        return False
 
 
 def _ts(d: datetime | None) -> str | None:
@@ -117,7 +152,7 @@ class Watchdog:
         self.hass = hass
         self._client_factory = client_factory
         self._store: Store[dict[str, Any]] = Store(hass, 1, STORE_KEY)
-        self.data: dict[str, Any] = {"services": {}, "maintenance_until": None}
+        self.data: dict[str, Any] = {"services": {}, "integrations": {}, "maintenance_until": None}
         self.tracked: dict[str, Tracked] = {}
         self.available = False  # hay Supervisor
         self.bridges: dict[str, dict[str, Any]] = {}  # base_topic → {state, since}
@@ -133,6 +168,7 @@ class Watchdog:
     async def async_start(self) -> None:
         self.data = (await self._store.async_load()) or self.data
         self.data.setdefault("services", {})
+        self.data.setdefault("integrations", {})
         self._unsubs.append(async_track_time_interval(self.hass, self._tick, CHECK_EVERY))
         await self._async_subscribe_mqtt()
         self.hass.async_create_background_task(self.async_check(), "matterai_watchdog_first")
@@ -289,11 +325,11 @@ class Watchdog:
     async def _async_check(self, force: bool) -> None:
         client = self._client()
         self.available = client is not None
-        if client is None:
-            return
-        addons = await client.addons.list()
+        # sin Supervisor (HA Core/Container) no hay complementos, pero las integraciones se cuidan igual
+        addons = await client.addons.list() if client is not None else []
         self._sync_tracked(addons)
         now = dt_util.utcnow()
+        self._async_other_integrations(now, force)
         z2m_count = sum(1 for t in self.tracked.values() if t.sdef.mqtt_bridge)
         if any(t.sdef.remote_probe for t in self.tracked.values()):
             await self._async_probe_remote(now)
@@ -319,7 +355,72 @@ class Watchdog:
                     t.version = addon.version
                     seen[key] = t
                     break
+        for sdef in INTEGRATIONS:
+            entries = [e for e in self.hass.config_entries.async_entries(sdef.integration)
+                       if not e.disabled_by and e.source != SOURCE_IGNORE]
+            for n, entry in enumerate(sorted(entries, key=lambda e: e.entry_id), 1):
+                key = sdef.key if n == 1 else f"{sdef.key}_{n}"
+                t = self.tracked.get(key)
+                if t is None or t.entry_id != entry.entry_id:
+                    t = Tracked(sdef, sdef.integration, sdef.name, key, entry_id=entry.entry_id)
+                t.name = sdef.name if len(entries) == 1 else f"{sdef.name} ({entry.title})"
+                t.addon_state = entry.state.value
+                seen[key] = t
         self.tracked = seen
+
+    # ------------------------------------------------------------ integraciones que no arrancaron
+    def managed_entries(self) -> set[str]:
+        return {t.entry_id for t in self.tracked.values() if t.entry_id}
+
+    @callback
+    def _async_other_integrations(self, now: datetime, force: bool) -> None:
+        """Cualquier integración que quedó sin arrancar se recarga (las de nube vigiladas van por su servicio)."""
+        recs: dict[str, dict[str, Any]] = self.data.setdefault("integrations", {})
+        managed = self.managed_entries()
+        bad: dict[str, ConfigEntry] = {}
+        for entry in self.hass.config_entries.async_entries():
+            if (entry.domain == DOMAIN or entry.entry_id in managed or entry.disabled_by or entry.source == SOURCE_IGNORE
+                    or entry.state not in BAD_ENTRY_STATES or _needs_login(self.hass, entry)):
+                continue
+            bad[entry.entry_id] = entry
+        for entry_id in [k for k in recs if k not in bad]:
+            rec = recs.pop(entry_id)
+            if rec.get("attempts"):
+                _LOGGER.info("La integración «%s» volvió a funcionar", rec.get("title"))
+        if self.maintenance or (now - self.started_at < START_GRACE and not force):
+            return
+        for entry_id, entry in bad.items():
+            rec = recs.setdefault(entry_id, {"title": entry.title or entry.domain, "domain": entry.domain, "since": now.isoformat(),
+                                             "attempts": 0, "next_try": None, "last_action_at": None})
+            rec["state"] = entry.state.value
+            # «reintentando»: HA lo reintenta solo; se interviene si sigue así 3 minutos
+            if entry.state == ConfigEntryState.SETUP_RETRY and now - (_dt(rec["since"]) or now) < OFFLINE_FOR:
+                continue
+            nxt = _dt(rec.get("next_try"))
+            if nxt and now < nxt and not force:
+                continue
+            attempts = rec["attempts"] + 1
+            wait = BACKOFF[min(attempts - 1, len(BACKOFF) - 1)] if attempts < MANUAL_AFTER else 3600
+            rec.update(attempts=attempts, last_action_at=now.isoformat(), next_try=(now + timedelta(seconds=wait)).isoformat())
+            _LOGGER.info("La integración «%s» no arrancó (%s): se recarga (intento %s)", rec["title"], entry.state.value, attempts)
+            self.hass.async_create_background_task(self._async_reload(entry_id, rec["title"]), f"matterai_watchdog_reload_{entry_id}")
+
+    async def _async_reload(self, entry_id: str, title: str, lock: asyncio.Lock | None = None) -> None:
+        """Recarga en segundo plano: una integración lenta no traba el resto del chequeo."""
+        async with lock or asyncio.Lock():
+            entry = self.hass.config_entries.async_get_entry(entry_id)
+            if entry is None:
+                return
+            try:
+                if entry.state == ConfigEntryState.NOT_LOADED:
+                    ok = await self.hass.config_entries.async_setup(entry_id)
+                else:
+                    ok = await self.hass.config_entries.async_reload(entry_id)
+            except Exception as err:  # noqa: BLE001 - se reintenta con backoff
+                _LOGGER.warning("No se pudo recargar «%s»: %s", title, err)
+                return
+            _LOGGER.info("«%s» recargada: %s", title, "arrancó bien" if ok else f"sigue sin arrancar ({entry.state.value})")
+        async_dispatcher_send(self.hass, SIGNAL_WATCHDOG)
 
     # ------------------------------------------------------------ acceso remoto (Cloudflared)
     def external_url(self) -> str | None:
@@ -359,6 +460,8 @@ class Watchdog:
 
     def _healthy(self, t: Tracked, now: datetime, z2m_count: int) -> tuple[bool | None, str, str]:
         """(sano, motivo, acción) — sano None = todavía no se sabe."""
+        if t.entry_id:
+            return self._integration_healthy(t, now)
         if t.addon_state in ("stopped", "error"):
             return False, "falló y no está andando" if t.addon_state == "error" else "está detenido", "start"
         if t.addon_state not in ("started", "startup"):
@@ -385,6 +488,35 @@ class Watchdog:
                 if now - b["since"] >= OFFLINE_FOR:
                     return False, "anda pero está desconectado de la red Zigbee (offline)", "restart"
                 return None, "offline hace poco", ""
+        return True, "", ""
+
+    def _integration_healthy(self, t: Tracked, now: datetime) -> tuple[bool | None, str, str]:
+        entry = self.hass.config_entries.async_get_entry(t.entry_id)
+        if entry is None:
+            return None, "estado desconocido (la integración ya no está)", ""
+        if _needs_login(self.hass, entry):
+            return False, "pide volver a iniciar sesión (Ajustes → Integraciones): recargarla no alcanza", "manual"
+        st = entry.state
+        if st in BUSY_ENTRY_STATES:
+            return None, "arrancando", ""
+        if st == ConfigEntryState.SETUP_RETRY:
+            # HA la reintenta sola; si sigue así 3 minutos, se recarga
+            t.unavail_since = t.unavail_since or now
+            if now - t.unavail_since >= OFFLINE_FOR:
+                return False, "no puede conectarse desde que arrancó (sigue reintentando)", "reload"
+            return None, "conectándose", ""
+        if st in (ConfigEntryState.SETUP_ERROR, ConfigEntryState.NOT_LOADED, ConfigEntryState.FAILED_UNLOAD):
+            return False, "no arrancó" + (f": {entry.reason}" if getattr(entry, "reason", None) else ""), "reload"
+        # cargada: ¿responden sus equipos?
+        reg = er.async_get(self.hass)
+        states = [self.hass.states.get(e.entity_id) for e in er.async_entries_for_config_entry(reg, entry.entry_id) if not e.disabled_by]
+        if states and all(s is None or s.state in ("unavailable", "unknown") for s in states):
+            t.unavail_since = t.unavail_since or now
+            mins = int((now - t.unavail_since).total_seconds() // 60)
+            if now - t.unavail_since >= OFFLINE_FOR:
+                return False, f"ninguno de sus equipos responde (hace {mins} min)", "reload"
+            return None, "sus equipos no responden hace poco", ""
+        t.unavail_since = None
         return True, "", ""
 
     async def _async_service(self, client, t: Tracked, now: datetime, z2m_count: int, force: bool) -> None:
@@ -433,6 +565,9 @@ class Watchdog:
         if not action:
             t.status = RECOVERING
             return
+        if action == "manual":
+            t.status = MANUAL
+            return
         nxt = _dt(s.get("next_try"))
         if nxt and now < nxt and not force:
             t.status = MANUAL if s.get("attempts", 0) >= MANUAL_AFTER else RECOVERING
@@ -442,7 +577,10 @@ class Watchdog:
         async with t.lock:
             attempts = s.get("attempts", 0) + 1
             try:
-                if action == "start":
+                if action == "reload":
+                    # en segundo plano y con el mismo candado: no se superpone con el próximo chequeo
+                    self.hass.async_create_background_task(self._async_reload(t.entry_id, t.name, t.lock), f"matterai_watchdog_reload_{t.key}")
+                elif action == "start":
                     await client.addons.start_addon(t.slug)
                 else:
                     await client.addons.restart_addon(t.slug)
@@ -450,6 +588,8 @@ class Watchdog:
             except Exception as err:  # noqa: BLE001 - se informa y se reintenta con backoff
                 result = f"error: {err}"
                 _LOGGER.warning("No se pudo %s %s: %s", "arrancar" if action == "start" else "reiniciar", t.name, err)
+            if t.entry_id:
+                t.unavail_since = now  # se le da tiempo a que sus equipos vuelvan antes de volver a contar
             wait = BACKOFF[min(attempts - 1, len(BACKOFF) - 1)] if attempts < MANUAL_AFTER else 3600
             s.update(attempts=attempts, last_action=f"{action} ({result})", last_action_at=now.isoformat(),
                      next_try=(now + timedelta(seconds=wait)).isoformat(), restarts=s.get("restarts", 0) + 1)
@@ -462,7 +602,7 @@ class Watchdog:
                         b["since"] = now
             t.status = MANUAL if attempts >= MANUAL_AFTER else RECOVERING
             _LOGGER.info("%s: %s (intento %s, motivo: %s). Próximo intento en %s s", t.name,
-                         "arrancado" if action == "start" else "reiniciado", attempts, why, wait)
+                         {"start": "arrancado", "reload": "recargando"}.get(action, "reiniciado"), attempts, why, wait)
 
     # ------------------------------------------------------------ avisos
     def update_note(self, t: Tracked) -> str:
@@ -513,6 +653,7 @@ class Watchdog:
             s = self._svc(t.key)
             out.append({
                 "key": t.key, "name": t.name, "slug": t.slug, "addon_state": t.addon_state, "version": t.version,
+                "kind": "integration" if t.entry_id else "addon",
                 "status": t.status, "status_text": STATE_TEXT.get(t.status, t.status), "detail": t.detail,
                 "down_since": s.get("down_since"), "attempts": s.get("attempts", 0), "restarts": s.get("restarts", 0),
                 "last_action": s.get("last_action"), "last_action_at": s.get("last_action_at"),
@@ -527,4 +668,5 @@ class Watchdog:
             "coordinator": dict(zip(("ok", "detail"), self.coordinator_ok())),
             "remote": {"kind": self.remote["kind"], "since": _ts(self.remote["since"]), "detail": self.remote["detail"], "url": self.external_url()} if self.remote else None,
             "services": out,
+            "integrations": [{"entry_id": k, **v} for k, v in self.data.get("integrations", {}).items()],
         }
