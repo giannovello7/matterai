@@ -251,6 +251,8 @@
   .stale{opacity:.45;pointer-events:none;transition:opacity .2s}
   `;
 
+  const SCROLL_IDLE = 180; // ms sin eventos de scroll = el dedo paró
+  const SCROLL_MAX_WAIT = 1500; // un cambio de estado nunca espera más que esto
   const CSS = `
   :host{display:block;--accent:#7c9cff;--txt:#eef1f8;--mut:rgba(238,241,248,.58);--line:rgba(255,255,255,.08);--glass:rgba(255,255,255,.045);--glass2:rgba(255,255,255,.075)}
   *{box-sizing:border-box}
@@ -267,6 +269,26 @@
   .app.lite *,.app.lite *::before,.app.lite *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
   .app.lite .orb i,.app.lite .orb::before,.app.lite .eq i,.app.lite .pill.on.k-fan .pi .ic{animation:none!important}
   .app.lite .sheet,.app.lite .actv,.app.lite .vo{background:rgba(14,16,28,.98)}
+  /* modo fluido (celulares y tablets): el mismo diseño sin lo que el teléfono recalcula en cada cuadro al deslizar.
+     - Fondo: manchas de borde suave (máscara) en vez de un desenfoque de 90px; sólo se mueven, eso lo hace la GPU sin redibujar.
+     - Vidrio: sin desenfoque en vivo de lo que hay detrás (sobre un fondo ya difuso casi no se nota); un tono un poco más denso. */
+  .app.fluid .aurora i,.app.lite .aurora i{filter:none;-webkit-mask-image:radial-gradient(closest-side,#000 35%,transparent);mask-image:radial-gradient(closest-side,#000 35%,transparent)}
+  .app.fluid .aurora i{will-change:transform}
+  .app.lite .aurora i{opacity:.32}
+  .app.fluid *,.app.fluid *::before,.app.fluid *::after{-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  .app.fluid .glass{background:linear-gradient(180deg,rgba(255,255,255,.075),rgba(255,255,255,.035)),rgba(10,12,24,.42)}
+  .app.fluid .pz-l,.app.fluid .plan-tag,.app.fluid .pdev:not(.on),.app.fluid .ppin{background-color:rgba(8,10,20,.82)}
+  .app.fluid .plan-hint{background:rgba(8,10,20,.88)}
+  .app.fluid .cam-l{background:rgba(0,0,0,.62)}
+  .app.fluid .orb-core{background:rgba(6,8,18,.72)}
+  .app.fluid .orb i{animation-name:spin}
+  .app.fluid .orb i:nth-child(3){filter:none;opacity:.2}
+  .app.fluid .backdrop{background:rgba(3,4,10,.72)}
+  .app.fluid .vo-wrap .backdrop{background:rgba(3,4,10,.9)}
+  .app.fluid .sheet{background:rgba(14,16,28,.985)}
+  .app.fluid .actv{background:rgba(8,10,20,.99)}
+  .app.fluid .mf{background:linear-gradient(180deg,rgba(var(--mc),.78) 0%,rgba(var(--mc),.42) 50%,rgba(7,9,18,.62) 100%),#080a14}
+  .app.fluid .toast{background:rgba(20,23,38,.97)}
   .aurora i{position:absolute;width:60vmax;height:60vmax;border-radius:50%;filter:blur(90px);opacity:.5;animation:drift 28s ease-in-out infinite alternate;transition:background 3s}
   .aurora .a1{background:var(--au1);top:-28vmax;left:-18vmax}
   .aurora .a2{background:var(--au2);top:8vmax;right:-28vmax;animation-duration:36s}
@@ -1056,7 +1078,7 @@
       this._fpPos = {};
       if (fp && fp.rooms) Object.entries(fp.rooms).forEach(([k, v]) => { if (v && v.x != null && v.y != null) this._fpPos[String(k).toLowerCase()] = { x: +v.x, y: +v.y, r: v.r != null ? +v.r : 14 }; });
       if (fp && fp.devices) Object.entries(fp.devices).forEach(([k, v]) => { if (v && v.x != null && v.y != null) this._fpPos[`dev:${k}`] = { x: +v.x, y: +v.y, fixed: true }; });
-      if (this._root) { this._applyBrand(); this._applyLayout(); this._schedule(); }
+      if (this._root) { this._applyBrand(); this._applyLayout(); this._applyPerf(); this._schedule(); }
     }
 
     _fp() { const f = this._config && this._config.floorplan; return f && f.image ? f : null; }
@@ -1135,6 +1157,8 @@
       this._keyH = (e) => { if (e.key === 'Escape' && this._vo) { this._voiceStop(true); return; } if (e.key === 'Escape') { if (this._pin) { this._pin = null; this._renderPin(); } else if (this._mus) this._closeMusic(); else if (this._act) this._closeAct(); else this._closeRoom(); } };
       window.addEventListener('keydown', this._keyH);
       this._visH = () => this._pauseCams(document.hidden);
+      this._scrollH = () => this._onScroll();
+      window.addEventListener('scroll', this._scrollH, { capture: true, passive: true });
       document.addEventListener('visibilitychange', this._visH);
       if (this._root) { this._tick(); this._pauseCams(false); }
     }
@@ -1142,25 +1166,43 @@
       clearInterval(this._clockT); clearInterval(this._camT);
       window.removeEventListener('keydown', this._keyH);
       document.removeEventListener('visibilitychange', this._visH);
+      window.removeEventListener('scroll', this._scrollH, { capture: true });
       this._pauseCams(true);
     }
 
-    /** Modo liviano para tablets y celulares con poca memoria: sin vidrio esmerilado ni fondos animados
-     *  (es lo que traba al deslizar). `performance: lite | full` lo fuerza; si no, se decide por el equipo. */
-    _lite() {
+    /** Cómo se dibuja, según el equipo (`performance: lite | fluid | full` lo fuerza):
+     *  - full: vidrio esmerilado y fondos con desenfoque en vivo (computadoras).
+     *  - fluid: el mismo diseño sin desenfoques en vivo, que son lo que traba al deslizar (celulares y tablets).
+     *  - lite: además sin animaciones de fondo (equipos muy chicos o «reducir movimiento»). */
+    _perf() {
       const p = this._config && this._config.performance;
-      if (p === 'lite') return true;
-      if (p === 'full' || typeof navigator === 'undefined') return false;
+      if (p === 'lite' || p === 'fluid' || p === 'full') return p;
+      if (typeof navigator === 'undefined') return 'full';
       const mem = navigator.deviceMemory, cores = navigator.hardwareConcurrency;
-      const reduce = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-      return reduce || (mem != null && mem <= 4) || (cores != null && cores <= 4);
+      const mq = (q) => typeof matchMedia === 'function' && matchMedia(q).matches;
+      if (mq('(prefers-reduced-motion: reduce)') || (mem != null && mem <= 2) || (cores != null && cores <= 2)) return 'lite';
+      if (mq('(pointer: coarse)') || (mem != null && mem <= 4) || (cores != null && cores <= 4)) return 'fluid';
+      return 'full';
     }
+    _applyPerf() {
+      const app = this._els && this._els.app; if (!app) return;
+      const p = this._perf();
+      app.classList.toggle('lite', p === 'lite');
+      app.classList.toggle('fluid', p === 'fluid');
+    }
+
+    /* Mientras se desliza no se redibuja nada (los cambios de estado esperan a que el dedo pare, máx. 1,5 s):
+     * cambiar el contenido en pleno scroll obliga a recalcular la página y es lo que se siente como "trabado". */
+    _onScroll() { this._scrollAt = Date.now(); }
+    _scrolling() { return Date.now() - (this._scrollAt || 0) < SCROLL_IDLE; }
 
     /* ---------- estructura fija ---------- */
     _build() {
       const root = this.attachShadow({ mode: 'open' });
+      // las hojas que se abren adentro de la tarjeta también cuentan como «deslizando»
+      root.addEventListener('scroll', () => this._onScroll(), { capture: true, passive: true });
       root.innerHTML = `<style>${CSS}</style>
-      <div class="app intro${this._lite() ? ' lite' : ''}" id="app" data-phase="night">
+      <div class="app intro ${this._perf()}" id="app" data-phase="night">
         <div class="aurora"><i class="a1"></i><i class="a2"></i><i class="a3"></i></div><div class="dots"></div>
         <div class="wrap">
           <header class="top">
@@ -1312,6 +1354,11 @@
 
     _schedule() {
       if (this._raf || !this._root) return;
+      if (this._scrolling() && Date.now() - (this._deferSince || (this._deferSince = Date.now())) < SCROLL_MAX_WAIT) {
+        if (!this._deferT) this._deferT = setTimeout(() => { this._deferT = null; this._schedule(); }, SCROLL_IDLE);
+        return;
+      }
+      this._deferSince = 0;
       this._raf = requestAnimationFrame(() => { this._raf = null; try { this._update(); } catch (err) { console.error('[matterai-home-card]', err); } });
     }
 
@@ -2488,7 +2535,7 @@
     }
 
     _refreshCams() {
-      if (!this._root || document.hidden) return;
+      if (!this._root || document.hidden || this._scrolling()) return;
       this._root.querySelectorAll('.cam img[data-src]').forEach((img) => {
         const s = img.dataset.src;
         if (!img.dataset.live && s.startsWith('/api/camera_proxy/')) img.src = this._url(s) + (s.includes('?') ? '&' : '?') + '_t=' + Date.now();
@@ -4632,8 +4679,8 @@
         <h3>Pestaña "Seguridad" junto al plano</h3>
         <div class="seg"><button data-a="sectab" data-v="1" class="${c.security_tab === false ? '' : 'on'}">Sí</button><button data-a="sectab" data-v="0" class="${c.security_tab === false ? 'on' : ''}">No</button></div>
         <h3>Rendimiento</h3>
-        <p class="h">Liviano saca el vidrio esmerilado y los fondos animados: para tablets o celulares que se traban al deslizar. Automático lo decide según el equipo.</p>
-        <div class="seg">${[['', 'Automático'], ['lite', 'Liviano'], ['full', 'Completo']].map(([v, l]) => `<button data-a="perf" data-v="${v}" class="${(c.performance || '') === v ? 'on' : ''}">${l}</button>`).join('')}</div>
+        <p class="h">Automático (recomendado): Completo en computadoras y Fluido en celulares y tablets, el mismo diseño sin los desenfoques en vivo que traban al deslizar. Liviano además frena los fondos animados, para equipos muy chicos.</p>
+        <div class="seg">${[['', 'Automático'], ['fluid', 'Fluido'], ['lite', 'Liviano'], ['full', 'Completo']].map(([v, l]) => `<button data-a="perf" data-v="${v}" class="${(c.performance || '') === v ? 'on' : ''}">${l}</button>`).join('')}</div>
         <h3>Música por voz</h3>
         ${this._txt('music_default', 'Qué poner cuando dicen sólo «poné música»', 'Vacío: una lista favorita al azar de Music Assistant', 'Por ejemplo el nombre de una lista: <code>Asado</code>, <code>Rock nacional</code>.')}
         <h3>Android Auto</h3>
