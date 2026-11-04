@@ -23,6 +23,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
+from .view_schema import BLOCK, PLAN, check_size
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,6 +31,7 @@ STORAGE_KEY = f"{DOMAIN}.views"
 KINDS = ("phone", "tablet")
 MAX_VIEWS = 50
 MAX_PINNED = 20
+MAX_BLOCKS = 30
 
 VIEW_SCHEMA = vol.Schema({
     vol.Optional("id"): vol.All(str, vol.Length(max=32)),
@@ -42,7 +44,12 @@ VIEW_SCHEMA = vol.Schema({
         vol.Optional("gate"): vol.Any(None, cv.entity_id),
     }),
     vol.Optional("scenes"): vol.Any(None, vol.All([cv.entity_id], vol.Length(max=12))),
+    # editor de tarjetas (desde la 2.13): si hay «blocks», la app dibuja eso; si no, el prearmado
+    vol.Optional("orientation"): vol.Any(None, vol.In(["landscape", "portrait", "auto"])),
+    vol.Optional("blocks"): vol.Any(None, vol.All([BLOCK], vol.Length(max=MAX_BLOCKS))),
+    vol.Optional("plan"): vol.Any(None, PLAN),
 }, extra=vol.REMOVE_EXTRA)
+VIEW_SCHEMA = vol.All(VIEW_SCHEMA, check_size)
 
 
 def _rt(hass: HomeAssistant) -> dict[str, Any]:
@@ -238,7 +245,18 @@ def ws_app_view_pin(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         name = msg["name"] or (house.devices.get(uid) or {}).get("name") or "Mi inicio"
         base = {"name": name[:40], "kind": (gen or {}).get("kind", "phone"), "featured": dict((gen or {}).get("featured") or {}), "scenes": (gen or {}).get("scenes")}
     who = (house.devices.get(uid) or {}).get("name") or "app"
-    view = v.put({**base, "pinned": msg["pinned"]}, by=f"app · {who}")
+    new = {**base, "pinned": msg["pinned"]}
+    blocks = [dict(b) for b in (base.get("blocks") or [])]
+    rb = next((b for b in blocks if b.get("type") == "rooms"), None)
+    if rb is not None:  # con el editor de tarjetas: lo fijado es la tarjeta de ambientes
+        rb["cfg"] = {**(rb.get("cfg") or {}), "rooms": msg["pinned"], "auto": False}
+        new["blocks"] = blocks
+    try:
+        clean = VIEW_SCHEMA({k: val for k, val in new.items() if k not in ("updated", "by")})
+    except vol.Invalid as err:
+        connection.send_error(msg["id"], "invalid", str(err))
+        return
+    view = v.put(clean, by=f"app · {who}")
     if not vid:
         v.set_assign(msg["device_id"], view["id"])
     others = [d for d in v.devices_of(view["id"]) if d != msg["device_id"]]

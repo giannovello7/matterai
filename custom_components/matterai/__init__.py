@@ -69,6 +69,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     from .privacy import async_register_view as async_register_consent_view  # noqa: PLC0415
 
     async_register_consent_view(hass)
+    from .media import async_register_views as async_register_media_views  # noqa: PLC0415
+
+    async_register_media_views(hass)
     # Si en esta casa sigue instalada la integración aparte «MatterAI Escenas», las automatizaciones
     # las maneja ella: correr las dos haría que cada automatización se ejecute dos veces.
     if not _escenas_aparte(hass):

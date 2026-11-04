@@ -125,3 +125,116 @@ async def test_validation_and_cleanup(hass, hass_ws_client, hass_client_no_auth)
     assert "dev-g" not in hass.data[DOMAIN]["views"].assign, "al desvincular un equipo se le saca el dashboard"
     await ws.send_json({"id": 13, "type": "matterai/views/delete", "view_id": v["id"]})
     assert (await ws.receive_json())["success"] and not hass.data[DOMAIN]["views"].views
+
+
+# ---------------------------------------------------------------- editor de tarjetas (2.13)
+BLOCKS = [
+    {"id": "k1", "type": "kpis", "cfg": {"items": [{"kind": "alarm"}, {"kind": "entity", "entity": "cover.porton"}, {"kind": "lights"}]}},
+    {"id": "f1", "type": "featured", "title": "Garage", "cfg": {"entity": "camera.garage", "gate": "cover.porton"}},
+    {"id": "r1", "type": "rooms", "title": "Lo tuyo", "cfg": {"rooms": ["Garage", "Dormitorio"]}},
+    {"id": "b1", "type": "buttons", "title": "Accesos", "cfg": {"items": [
+        {"name": "Portón quincho", "icon": "gate", "entity": "cover.porton_quincho", "tap": {"type": "toggle"}},
+        {"name": "Agenda", "icon": "cal", "tap": {"type": "screen", "screen": "agenda"}},
+        {"name": "Riego", "icon": "tree", "tap": {"type": "service", "service": "script.turn_on", "data": {"entity_id": "script.riego"}}, "hold": {"type": "more_info", "entity": "switch.riego"}},
+    ]}},
+    {"id": "p1", "type": "plan", "col": 0},
+]
+PLAN = {"image": "/api/matterai/media/0123456789abcdef.jpg", "image_on": "/api/matterai/media/fedcba9876543210.png",
+        "zones": [{"name": "Estar", "room": "Living", "lights": ["light.estar"], "poly": [[0.1, 0.1], [0.4, 0.1], [0.4, 0.3]]}]}
+
+
+async def test_blocks_and_plan_saved(hass, hass_ws_client) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Tablet living", "kind": "tablet", "orientation": "landscape", "blocks": BLOCKS, "plan": PLAN}})
+    msg = await ws.receive_json()
+    assert msg["success"], msg
+    v = msg["result"]
+    assert [b["type"] for b in v["blocks"]] == ["kpis", "featured", "rooms", "buttons", "plan"] and v["orientation"] == "landscape"
+    assert v["blocks"][3]["cfg"]["items"][2]["hold"]["entity"] == "switch.riego" and v["plan"]["zones"][0]["poly"][2] == [0.4, 0.3]
+
+
+@pytest.mark.parametrize("bad", [
+    {"blocks": [{"id": "x", "type": "inventada"}]},                                                # tipo desconocido
+    {"blocks": [{"id": "x", "type": "buttons", "cfg": {"items": [{"tap": {"type": "borrar_todo"}}]}}]},  # acción desconocida
+    {"blocks": [{"id": "x", "type": "buttons", "cfg": {"items": [{"tap": {"type": "service", "service": "rm -rf"}}]}}]},
+    {"blocks": [{"id": "x", "type": "buttons", "cfg": {"items": [{"tap": {"type": "screen", "screen": "http://malo"}}]}}]},
+    {"blocks": [{"id": "x", "type": "kpis"}, {"id": "x", "type": "rooms"}]},                       # ids repetidos
+    {"blocks": [{"id": "../x", "type": "kpis"}]},
+    {"plan": {"image": "https://malo.example/x.jpg"}},                                              # imagen de afuera
+    {"plan": {"image": "/api/matterai/media/../../secrets.yaml"}},
+    {"plan": {"zones": [{"name": "Z", "poly": [[0, 0], [2, 2], [0, 1]]}]}},                         # punto fuera de la imagen
+    {"blocks": [{"id": f"b{i}", "type": "kpis"} for i in range(40)]},                               # demasiadas
+])
+async def test_invalid_dashboards_rejected(hass, hass_ws_client, bad) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "X", **bad}})
+    assert not (await ws.receive_json())["success"]  # NEGATIVO
+
+
+async def test_pin_from_app_updates_rooms_card(hass, hass_ws_client, hass_client_no_auth) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    gian = await _phone(hass, hass_ws_client, client, "Celu Gianfranco", "dev-g")
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "G", "blocks": BLOCKS}})
+    v = (await ws.receive_json())["result"]
+    await ws.send_json({"id": 2, "type": "matterai/views/assign", "device_id": "dev-g", "view_id": v["id"]})
+    await ws.receive_json()
+    msg = await _ws(hass_ws_client, hass, gian["token"], 3, {"type": "matterai/app/view_pin", "device_id": "dev-g", "pinned": ["Dormitorio", "Garage", "Baño"]})
+    assert msg["success"], msg
+    rb = next(b for b in msg["result"]["blocks"] if b["type"] == "rooms")
+    assert rb["cfg"]["rooms"] == ["Dormitorio", "Garage", "Baño"], "lo que fija desde la app cambia la tarjeta de ambientes"
+    assert len(msg["result"]["blocks"]) == len(BLOCKS), "el resto de las tarjetas queda igual"
+
+
+# ---------------------------------------------------------------- imágenes
+JPG = b"\xff\xd8\xff\xe0" + b"0" * 200
+PNG = b"\x89PNG\r\n\x1a\n" + b"0" * 200
+
+
+async def test_media_upload_and_private_access(hass, hass_client, hass_client_no_auth, hass_ws_client, hass_read_only_access_token) -> None:
+    import aiohttp  # noqa: PLC0415
+
+    await _setup(hass)
+    admin = await hass_client()
+
+    def form(data, name="render.jpg"):
+        f = aiohttp.FormData()
+        f.add_field("file", data, filename=name, content_type="image/jpeg")
+        return f
+
+    r = await admin.post("/api/matterai/media", data=form(JPG))
+    body = await r.json()
+    assert r.status == 200 and body["ok"] and body["path"].endswith(".jpg"), body
+    path = body["path"]
+    r = await admin.post("/api/matterai/media", data=form(PNG, "x.png"))
+    assert (await r.json())["path"].endswith(".png"), "el tipo sale del contenido, no del nombre"
+    r = await admin.post("/api/matterai/media", data=form(b"<script>alert(1)</script>", "x.jpg"))
+    assert r.status == 415  # NEGATIVO: no es una imagen aunque se llame .jpg
+    anon = await hass_client_no_auth()
+    r = await anon.post("/api/matterai/media", data=form(JPG))
+    assert r.status == 401  # NEGATIVO: sin usuario no se sube nada
+    user = await hass_client_no_auth()
+    r = await user.post("/api/matterai/media", data=form(JPG), headers={"Authorization": f"Bearer {hass_read_only_access_token}"})
+    assert r.status == 403  # NEGATIVO: un usuario común (o la app) no sube imágenes
+
+    r = await admin.get(path)
+    assert r.status == 200 and (await r.read()) == JPG
+    r = await anon.get(path)
+    assert r.status == 401  # NEGATIVO: no son públicas
+    r = await admin.get("/api/matterai/media/..%2F..%2Fsecrets.yaml")
+    assert r.status in (400, 404)  # NEGATIVO: nada de rutas raras (HA ya lo frena con 400)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "auth/sign_path", "path": path, "expires": 60})
+    signed = (await ws.receive_json())["result"]["path"]
+    r = await anon.get(signed)
+    assert r.status == 200, "con el link firmado (lo que usa la app en <img>) se ve"
+
+    await ws.send_json({"id": 2, "type": "matterai/media/list"})
+    assert any(m["path"] == path for m in (await ws.receive_json())["result"]["media"])
+    await ws.send_json({"id": 3, "type": "matterai/media/delete", "path": path})
+    assert (await ws.receive_json())["success"]
+    r = await admin.get(path)
+    assert r.status == 404
