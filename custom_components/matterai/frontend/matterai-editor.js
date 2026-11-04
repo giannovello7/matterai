@@ -22,6 +22,11 @@
 
   const ACTION_TYPES = [['none', 'Nada'], ['toggle', 'Prender / apagar / abrir'], ['more_info', 'Ver más (ventana del equipo)'], ['room', 'Abrir un ambiente'], ['screen', 'Abrir una pantalla'], ['service', 'Llamar a un servicio']];
   const KPI_KINDS = [['alarm', 'Alarma'], ['lights', 'Luces prendidas'], ['temp', 'Temperatura adentro'], ['acs', 'Aires'], ['curtains', 'Cortinas'], ['power', 'Consumo'], ['people', 'Quién está'], ['entity', 'Un equipo (portón, sensor…)']];
+  const DOM_NAME = { light: 'Luz', switch: 'Interruptor', cover: 'Cortina / portón', lock: 'Cerradura', camera: 'Cámara', climate: 'Aire', fan: 'Ventilador', media_player: 'Parlante / TV',
+    sensor: 'Sensor', binary_sensor: 'Sensor', scene: 'Escena', script: 'Script', automation: 'Automatización', input_boolean: 'Interruptor virtual', button: 'Botón', input_button: 'Botón',
+    alarm_control_panel: 'Alarma', vacuum: 'Aspiradora', water_heater: 'Termotanque', person: 'Persona', weather: 'Clima', number: 'Número', select: 'Opción', siren: 'Sirena', valve: 'Válvula', humidifier: 'Humidificador' };
+  // lo que puede ir adentro de un ambiente (como en la tarjeta)
+  const ROOM_DOMAINS = ['light', 'switch', 'cover', 'climate', 'fan', 'media_player', 'lock', 'camera', 'sensor', 'binary_sensor', 'scene', 'script', 'button', 'input_button', 'input_boolean', 'vacuum', 'valve', 'water_heater', 'humidifier', 'siren'];
   const PICK = { // qué equipos se ofrecen en cada campo
     camera: ['camera'], gate: ['cover', 'lock'], alarm: ['alarm_control_panel'], lock: ['lock'], away: ['input_boolean', 'switch', 'scene', 'script'],
     scenes: ['scene', 'script'], routines: ['automation'], any: null,
@@ -51,6 +56,22 @@
   .pick input{padding:6px 10px!important;font-size:12.5px!important}
   .pick select{width:100%}
   :host{all:initial}
+  .cbv{display:flex;align-items:center;gap:8px;width:100%;padding:8px 10px;border-radius:10px;border:1px solid rgba(160,175,200,.2);background:#0d1116;color:#e9ecf2;text-align:left;min-height:40px}
+  .cbv:hover{border-color:#f2b766}.cbv b{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cbv small{color:#8f99ab;font-size:11px}
+  .cbv .ph{color:#8f99ab;flex:1}
+  .dtag{flex:none;padding:2px 7px;border-radius:6px;background:#262e3a;color:#8f99ab;font-size:10.5px;font-weight:700;letter-spacing:.03em}
+  .cbp{position:fixed;z-index:80;width:360px;max-height:420px;display:flex;flex-direction:column;background:#161b21;border:1px solid rgba(160,175,200,.25);border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.6);overflow:hidden}
+  .cbp input{margin:10px;padding:10px 12px;border-radius:10px;border:1px solid #f2b766;background:#0d1116;color:#e9ecf2;font:inherit;outline:0}
+  .cbp .cbl{overflow:auto;padding:0 6px 8px}
+  .cbo{display:flex;align-items:center;gap:10px;width:100%;padding:8px 8px;border:0;border-radius:10px;background:none;color:#e9ecf2;text-align:left}
+  .cbo.on,.cbo:hover{background:#262e3a}.cbo .tx{flex:1;min-width:0}.cbo b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .cbo small{display:block;color:#8f99ab;font-size:11.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.cbo .st{color:#8f99ab;font-size:11.5px;flex:none}
+  .cbp .none{padding:14px;color:#8f99ab;font-size:13px}
+  .rme{display:flex;align-items:center;gap:6px;padding:7px 8px;border-radius:10px;background:#1e242e;margin-bottom:5px}.rme .tx{flex:1;min-width:0}
+  .rme b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rme small{color:#8f99ab;font-size:11px}
+  .rme button{border:0;background:none;color:#8f99ab;padding:3px 5px;border-radius:6px}.rme button:hover{background:#262e3a;color:#e9ecf2}
+  .rlist{display:flex;flex-direction:column;gap:5px;margin-bottom:10px}.rlist .eb{text-align:left;display:flex;justify-content:space-between;align-items:center}
+  .warnbox{padding:10px;border-radius:10px;background:rgba(242,183,102,.1);border:1px solid rgba(242,183,102,.35);font-size:12.5px;color:#e9ecf2;margin-bottom:10px}
   .fld{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.fld>span{font-size:12px;color:#8f99ab}
   .fld input,.fld select,.fld textarea{width:100%;padding:8px 10px;border-radius:10px;border:1px solid rgba(160,175,200,.2);background:#0d1116;color:#e9ecf2;font:inherit}
   .fld textarea{min-height:60px;font-family:"Red Hat Mono",monospace;font-size:12px}
@@ -218,7 +239,7 @@
       fr.appendChild(ifr);
       void size;
     }
-    pick(id) { this.sel = id; this.drawList(); this.drawProps(); if (this.vista) this.vista.setCtx({ edit: { selected: id, onSelect: (x) => this.pick(x) } }); this.bind(); }
+    pick(id) { if (id !== this.sel) { this.roomEd = null; this.rdraft = null; } this.sel = id; this.drawList(); this.drawProps(); if (this.vista) this.vista.setCtx({ edit: { selected: id, onSelect: (x) => this.pick(x) } }); this.bind(); }
 
     /* ───────── propiedades ───────── */
     entOptions(domains, val) {
@@ -232,9 +253,63 @@
       return Object.keys(by).sort().map((d) => `<optgroup label="${esc(d)}">${by[d].map((e) => `<option value="${esc(e)}" ${e === val ? 'selected' : ''}>${esc(this.fname(e))}</option>`).join('')}</optgroup>`).join('');
     }
     ent(label, key, val, domains, path) {
-      return `<div class="fld"><span>${esc(label)}</span><div class="pick"><input data-pf placeholder="Buscar…" autocomplete="off">
-        <select data-f="${esc(path || key)}"><option value="">— Ninguno —</option>${this.entOptions(domains, val)}</select></div>${val ? `<small class="hint">${esc(val)}</small>` : ''}</div>`;
+      return `<div class="fld"><span>${esc(label)}</span>${this.cbBtn(val, `data-cb="${esc(path || key)}" data-dom="${esc((domains || []).join(','))}"`)}</div>`;
     }
+    cbBtn(val, attrs) {
+      const d = val ? val.split('.')[0] : '';
+      return `<button type="button" class="cbv" ${attrs}>${val ? `<span class="dtag">${esc(DOM_NAME[d] || d)}</span><b>${esc(this.fname(val))}</b><small>${esc(this.areaOf(val))}</small>` : '<span class="ph">Elegir un equipo…</span>'}<span class="hint">▾</span></button>`;
+    }
+    areaOf(id) {
+      const h = this.hass || {}, e = (h.entities || {})[id] || {}, aid = e.area_id || ((h.devices || {})[e.device_id] || {}).area_id;
+      return (aid && h.areas && h.areas[aid] && h.areas[aid].name) || '';
+    }
+    stateTxt(id) {
+      const s = this.states()[id]; if (!s) return '';
+      const u = s.attributes.unit_of_measurement;
+      return { on: 'prendido', off: 'apagado', open: 'abierto', closed: 'cerrado', locked: 'cerrada', unlocked: 'abierta', unavailable: 'sin conexión', playing: 'sonando', idle: 'en espera' }[s.state] || (u ? `${s.state} ${u}` : s.state.length < 14 ? s.state : '');
+    }
+    /** Buscador de equipos: escribís y filtra por nombre, ambiente, tipo o id; con flechas y Enter. */
+    openCB(anchor, domains, onPick, allowNone = true) {
+      this.closeCB();
+      const S = this.states(), doms = domains && domains.length ? domains : null;
+      const all = Object.keys(S).filter((e) => !doms || doms.includes(e.split('.')[0])).map((e) => {
+        const d = e.split('.')[0], n = this.fname(e), a = this.areaOf(e);
+        return { e, d, n, a, k: `${n} ${a} ${DOM_NAME[d] || ''} ${e}`.toLowerCase() };
+      });
+      const box = document.createElement('div');
+      box.className = 'cbp';
+      box.innerHTML = `<input placeholder="Buscar por nombre, ambiente o tipo…" autocomplete="off"><div class="cbl"></div>`;
+      this.wrap.appendChild(box);
+      const r = anchor.getBoundingClientRect(), H = Math.min(420, innerHeight - 20);
+      box.style.left = `${Math.max(10, Math.min(r.left, innerWidth - 370))}px`;
+      box.style.top = `${r.bottom + 6 + H > innerHeight ? Math.max(10, r.top - H - 6) : r.bottom + 6}px`;
+      const inp = box.querySelector('input'), list = box.querySelector('.cbl');
+      let res = [], cur = 0;
+      const paint = () => {
+        const q = inp.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        res = all.filter((x) => q.every((w) => x.k.includes(w)));
+        res.sort((a, b) => (q.length && a.n.toLowerCase().startsWith(q[0]) ? 0 : 1) - (q.length && b.n.toLowerCase().startsWith(q[0]) ? 0 : 1) || a.n.localeCompare(b.n, 'es'));
+        res = res.slice(0, 80);
+        if (allowNone && !q.length) res.unshift({ e: '', n: 'Ninguno', a: '', d: '' });
+        cur = Math.min(cur, Math.max(0, res.length - 1));
+        list.innerHTML = res.length ? res.map((x, i) => `<button type="button" class="cbo ${i === cur ? 'on' : ''}" data-i="${i}">${x.e ? `<span class="dtag">${esc(DOM_NAME[x.d] || x.d)}</span>` : ''}<span class="tx"><b>${esc(x.n)}</b><small>${esc([x.a, x.e].filter(Boolean).join(' · '))}</small></span><span class="st">${esc(x.e ? this.stateTxt(x.e) : '')}</span></button>`).join('')
+          : '<div class="none">No hay equipos con ese nombre.</div>';
+        const on = list.querySelector('.cbo.on'); if (on && on.scrollIntoView) on.scrollIntoView({ block: 'nearest' });
+      };
+      const pick = (i) => { const x = res[i]; if (!x) return; this.closeCB(); onPick(x.e); };
+      inp.oninput = () => { cur = 0; paint(); };
+      inp.onkeydown = (e) => {
+        if (e.key === 'ArrowDown') { cur = Math.min(res.length - 1, cur + 1); paint(); e.preventDefault(); }
+        else if (e.key === 'ArrowUp') { cur = Math.max(0, cur - 1); paint(); e.preventDefault(); }
+        else if (e.key === 'Enter') { pick(cur); e.preventDefault(); }
+        else if (e.key === 'Escape') { this.closeCB(); e.stopPropagation(); }
+      };
+      list.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) pick(+b.dataset.i); };
+      this.cbOut = (e) => { if (!e.composedPath().includes(box) && !e.composedPath().includes(anchor)) this.closeCB(); };
+      setTimeout(() => document.addEventListener('pointerdown', this.cbOut, true), 0);
+      this.cb = box; paint(); inp.focus();
+    }
+    closeCB() { if (this.cb) { this.cb.remove(); this.cb = null; } if (this.cbOut) { document.removeEventListener('pointerdown', this.cbOut, true); this.cbOut = null; } }
     action(a, path, title) {
       a = a || { type: 'none' };
       const m = this.model(), rooms = m ? m.rooms.map((r) => r.name) : [];
@@ -287,8 +362,11 @@
           break;
         case 'rooms':
           h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="list" ${c.style !== 'grid' ? 'selected' : ''}>Lista</option><option value="grid" ${c.style === 'grid' ? 'selected' : ''}>Grilla</option></select></label>`;
+          if (this.roomEd != null) { r.innerHTML = this.roomEditor(); return; }
           h += this.multi('Ambientes (en este orden)', 'rooms', (c.rooms && c.rooms.length) ? c.rooms : (m ? m.rooms.slice(0, 4).map((x) => x.name) : []), (m ? m.rooms : []).map((x) => [x.name, x.name]));
           h += '<p class="hint">Cada persona también puede fijar o sacar ambientes desde su celular (mantener apretado).</p>';
+          h += `<h4>Qué hay adentro de cada ambiente</h4><div class="rlist">${(m ? m.rooms : []).map((x) => `<button class="eb sm" data-red="${esc(x.name)}"><span>${esc(x.name)}</span><span class="hint">Editar ›</span></button>`).join('')}
+            <button class="eb sm" data-red="">+ Ambiente nuevo</button></div>`;
           break;
         case 'scenes': h += autoChk('Todas las escenas de la casa') + (c.auto ? '' : this.multi('Escenas (en este orden)', 'entities', c.entities, opts(PICK.scenes))); break;
         case 'routines': h += autoChk('Las primeras automatizaciones') + (c.auto ? '' : this.multi('Automatizaciones', 'entities', c.entities, opts(PICK.routines))); break;
@@ -303,6 +381,60 @@
       }
       if (this.K === 'tablet') h += `<label class="fld"><span>Columna</span><select data-f="col">${[[0, 'Del plano'], [1, 'Columna 1'], [2, 'Columna 2']].map(([k, l]) => `<option value="${k}" ${(b.col || 0) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
       r.innerHTML = h;
+    }
+
+    /* ───────── ambientes por dentro (son de la casa: valen para todos los dashboards y la app) ───────── */
+    roomsCfg() {
+      if (Array.isArray(this.cfg.rooms) && this.cfg.rooms.length) return this.cfg.rooms;
+      // todavía se arman solos con las Áreas de HA: se pasan a manual con lo mismo que se ve hoy
+      const h = this.hass || {}, areas = h.areas || {}, ents = h.entities || {}, devs = h.devices || {}, S = this.states();
+      const rooms = Object.values(areas).map((a) => ({ name: a.name || a.area_id, entities: [], _a: a.area_id }));
+      const by = {}; rooms.forEach((x) => { by[x._a] = x; });
+      Object.keys(S).sort().forEach((id) => {
+        const e = ents[id] || {}; if (e.hidden || e.hidden_by || e.entity_category) return;
+        if (!ROOM_DOMAINS.includes(id.split('.')[0])) return;
+        const aid = e.area_id || (devs[e.device_id] || {}).area_id; if (aid && by[aid]) by[aid].entities.push(id);
+      });
+      return rooms.filter((x) => x.entities.length).map(({ _a, ...x }) => x); // eslint-disable-line no-unused-vars
+    }
+    roomEditor() {
+      if (!this.rdraft) {
+        const list = this.roomsCfg(), i = list.findIndex((x) => x.name === this.roomEd);
+        this.rdraft = i >= 0 ? clone(list[i]) : { name: this.roomEd || 'Ambiente nuevo', entities: [] };
+        this.rdraft._orig = i >= 0 ? list[i].name : null;
+      }
+      const R = this.rdraft, eid = (x) => (x && typeof x === 'object' ? x.entity : x), ICONS = window.MaeVista.ICONS;
+      const manual = Array.isArray(this.cfg.rooms) && this.cfg.rooms.length;
+      return `<button class="eb sm" data-rx="back">‹ Volver a la tarjeta</button><h4>Ambiente</h4>
+        ${manual ? '' : '<div class="warnbox">Hoy los ambientes salen solos de las Áreas de Home Assistant. Al guardar, quedan armados a mano (con lo mismo que se ve ahora) y desde ahí se editan acá.</div>'}
+        <label class="fld"><span>Nombre</span><input data-rn="name" value="${esc(R.name)}" maxlength="40"></label>
+        <label class="fld"><span>Ícono</span><select data-rn="icon"><option value="">Automático</option>${ICONS.map((n) => `<option ${R.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+        <h4>Equipos (en este orden)</h4>
+        ${(R.entities || []).map((x, i) => { const id = eid(x), d = id.split('.')[0]; return `<div class="rme"><span class="dtag">${esc(DOM_NAME[d] || d)}</span><span class="tx"><b>${esc((x && x.name) || this.fname(id))}</b><small>${esc(id)}${this.states()[id] ? '' : ' · no existe'}</small></span>
+          <button data-rmv="${i}" data-d="-1" title="Subir">↑</button><button data-rmv="${i}" data-d="1" title="Bajar">↓</button><button data-rdel="${i}" title="Sacar">✕</button></div>`; }).join('') || '<p class="hint">Todavía no tiene equipos.</p>'}
+        <div class="fld">${this.cbBtn('', 'data-radd="1"').replace('Elegir un equipo…', '+ Agregar un equipo')}</div>
+        <div style="display:flex;gap:8px;margin-top:12px"><button class="eb pri" data-rx="save">Guardar ambiente</button>${R._orig ? '<button class="eb warn" data-rx="del">Borrar ambiente</button>' : ''}</div>
+        <p class="hint">Los ambientes son de la casa: el cambio se ve en todos los dashboards y en la app al instante.</p>`;
+    }
+    async saveRoom(del) {
+      const R = clone(this.rdraft), orig = R._orig; delete R._orig;
+      R.name = String(R.name || '').trim() || 'Ambiente';
+      if (!R.icon) delete R.icon;
+      const list = clone(this.roomsCfg()), i = orig != null ? list.findIndex((x) => x.name === orig) : -1;
+      if (del) { if (i >= 0) list.splice(i, 1); } else if (i >= 0) list[i] = Object.assign({}, list[i], R); else list.push(R);
+      if (!del && list.filter((x) => x.name.toLowerCase() === R.name.toLowerCase()).length > 1) { this.toast('Ya hay un ambiente con ese nombre'); return; }
+      const cfg = Object.assign({}, this.cfg, { rooms: list });
+      try {
+        await this.hass.callWS({ type: 'matterai/config/save', config: cfg });
+        this.cfg = cfg; if (this.card && this.card.setConfig) this.card.setConfig(Object.assign({}, cfg));
+        // si cambió el nombre, las tarjetas y el plano de este dashboard lo siguen
+        if (orig && !del && orig !== R.name) {
+          Object.values(this.v.layouts || {}).forEach((l) => (l && l.blocks || []).forEach((b) => { if (b.cfg && Array.isArray(b.cfg.rooms)) b.cfg.rooms = b.cfg.rooms.map((n) => (n === orig ? R.name : n)); if (b.cfg && b.cfg.tap && b.cfg.tap.room === orig) b.cfg.tap.room = R.name; (b.cfg && b.cfg.items || []).forEach((it) => { ['tap', 'hold'].forEach((k) => { if (it[k] && it[k].room === orig) it[k].room = R.name; }); }); }));
+          ((this.v.plan || {}).zones || []).forEach((z) => { if (z.room === orig) z.room = R.name; });
+        }
+        this.toast(del ? 'Ambiente borrado' : 'Ambiente guardado: ya se ve en la app');
+        this.roomEd = null; this.rdraft = null; setTimeout(() => this.draw(), 150);
+      } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
     }
 
     /* ───────── edición ───────── */
@@ -343,7 +475,7 @@
           if (e.target.closest('[data-col]')) { const d = +e.target.closest('[data-col]').dataset.col; return this.change(() => { B[i].col = Math.max(0, Math.min(2, (B[i].col || 0) + d)); }); }
           if (e.target.closest('[data-dup]')) return this.change(() => { const nb = clone(B[i]); nb.id = `${nb.type}-${window.MaeVista.uid()}`.slice(0, 24); B.splice(i + 1, 0, nb); this.sel = nb.id; });
           if (e.target.closest('[data-del]')) return this.change(() => { B.splice(i, 1); if (this.sel === id) this.sel = null; });
-          this.sel = id; this.draw();
+          if (this.sel !== id) { this.roomEd = null; this.rdraft = null; } this.sel = id; this.draw();
         };
         // arrastrar con el mouse
         row.addEventListener('dragstart', (e) => { this.dragId = id; row.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', id); } catch (_) { /* navegador viejo */ } });
@@ -357,8 +489,32 @@
         box.addEventListener('dragleave', () => box.classList.remove('over'));
         box.addEventListener('drop', (e) => { e.preventDefault(); const from = this.dragId; this.dragId = null; if (!from) return; this.change(() => { const B = this.blocks(), i = B.findIndex((b) => b.id === from); const [b] = B.splice(i, 1); b.col = +box.dataset.colbox; B.push(b); }); });
       });
-      // propiedades
+      // buscador de equipos
       const b = this.selBlock();
+      W.querySelectorAll('#edr [data-cb]').forEach((x) => { x.onclick = () => this.openCB(x, x.dataset.dom ? x.dataset.dom.split(',') : null, (id) => {
+        const path = x.dataset.cb;
+        this.change(() => this.setPath(b, path, id || ''));
+      }); });
+      // ambientes por dentro
+      W.querySelectorAll('#edr [data-red]').forEach((x) => { x.onclick = () => { this.roomEd = x.dataset.red; this.rdraft = null; this.drawProps(); this.bind(); }; });
+      const R = this.rdraft, redraw = () => { this.drawProps(); this.bind(); };
+      if (R) {
+        W.querySelectorAll('#edr [data-rn]').forEach((x) => { x.onchange = () => { R[x.dataset.rn] = x.value; }; });
+        W.querySelectorAll('#edr [data-rdel]').forEach((x) => { x.onclick = () => { R.entities.splice(+x.dataset.rdel, 1); redraw(); }; });
+        W.querySelectorAll('#edr [data-rmv]').forEach((x) => { x.onclick = () => { const i = +x.dataset.rmv, j = i + +x.dataset.d; if (j < 0 || j >= R.entities.length) return; [R.entities[i], R.entities[j]] = [R.entities[j], R.entities[i]]; redraw(); }; });
+        W.querySelectorAll('#edr [data-radd]').forEach((x) => { x.onclick = () => this.openCB(x, ROOM_DOMAINS, (id) => {
+          if (!id) return; R.entities = R.entities || [];
+          if (R.entities.some((y) => (y && y.entity) === id || y === id)) { this.toast('Ya está en este ambiente'); return; }
+          R.entities.push(id); redraw();
+        }, false); });
+        W.querySelectorAll('#edr [data-rx]').forEach((x) => { x.onclick = () => {
+          const k = x.dataset.rx;
+          if (k === 'back') { this.roomEd = null; this.rdraft = null; redraw(); }
+          if (k === 'save') this.saveRoom(false);
+          if (k === 'del' && confirm(`¿Borrar el ambiente «${R._orig}»? Sus equipos no se borran.`)) this.saveRoom(true);
+        }; });
+      }
+      // propiedades
       W.querySelectorAll('#edr [data-f]').forEach((x) => {
         x.onchange = () => {
           const path = x.dataset.f;

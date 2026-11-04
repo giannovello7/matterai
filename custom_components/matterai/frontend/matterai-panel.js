@@ -742,6 +742,7 @@
         .dv-ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;background:rgba(127,127,127,.12);color:var(--primary-color,#03a9f4);flex:none}
         .dv-t{min-width:0}.dv-t b{font-size:15.5px;font-weight:600}.dv-t small{display:block;opacity:.7;font-size:12.5px;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
         .dv-tag{display:inline-block;margin-left:4px;padding:1px 8px;border-radius:999px;font-size:11px;font-weight:600;background:rgba(127,127,127,.14);opacity:.9}
+        .dv-tag.warn{background:rgba(255,152,0,.16);color:var(--warning-color,#ff9800)}.dv-note.warnn{background:rgba(255,152,0,.1);margin-top:8px}
         .dv-tag.on{background:rgba(67,160,71,.16);color:var(--success-color,#43a047)}.dv-tag.gen{background:rgba(3,169,244,.14);color:var(--primary-color,#03a9f4)}
         .dv-chev{width:38px;height:38px;border-radius:10px;border:0;background:none;color:inherit;cursor:pointer;display:grid;place-items:center;opacity:.7}
         .dv-chev:hover{background:rgba(127,127,127,.12)}.dv-card.open .dv-chev ha-icon{transform:rotate(180deg)}
@@ -773,9 +774,13 @@
             <button class="b" id="vauto"><ha-icon icon="mdi:pencil-ruler"></ha-icon>Personalizarlo</button></div>
         </div>
         <div class="box dv-eq"><div class="bh"><h2>Qué ve cada equipo</h2></div>
-          ${people.map((p) => `<div class="dv-row"><span class="dv-ic"><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon></span>
-            <span class="dv-t"><b>${esc(p.name)}</b><small class="mut" style="display:block">${esc([p.model, ago(p.last_used)].filter(Boolean).join(' · '))}</small></span>
-            <select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select></div>`).join('')}
+          ${people.map((p) => { const dup = people.filter((q) => q.name.toLowerCase() === p.name.toLowerCase()).length > 1;
+            const linked = p.created ? `vinculado el ${new Date(p.created * 1000).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+            return `<div class="dv-row"><span class="dv-ic"><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon></span>
+            <span class="dv-t"><b>${esc(p.name)}</b>${dup ? ' <span class="dv-tag warn">mismo nombre que otro</span>' : ''}<small class="mut" style="display:block">${esc([p.model || 'sin avisos registrados', linked, ago(p.last_used)].filter(Boolean).join(' · '))}</small></span>
+            <select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select>
+            <button class="dv-chev" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" title="Desvincular este equipo" aria-label="Desvincular"><ha-icon icon="mdi:link-variant-off"></ha-icon></button></div>`; }).join('')}
+          ${people.some((p) => people.filter((q) => q.name.toLowerCase() === p.name.toLowerCase()).length > 1) ? '<div class="dv-note warnn"><b>Hay equipos con el mismo nombre.</b> Casi siempre es el mismo equipo vinculado dos veces (por ejemplo, al reinstalar la app): el que dice «sin avisos registrados» o el que se vinculó primero ya no se usa. Desvinculalo con <ha-icon icon="mdi:link-variant-off" style="--mdc-icon-size:16px"></ha-icon> y queda uno solo. Si te equivocás, ese equipo deja de entrar y se vuelve a vincular con un código nuevo.</div>' : ''}
           ${loose.map((d) => `<div class="dv-row"><span class="dv-ic"><ha-icon icon="mdi:cellphone-link"></ha-icon></span><span class="dv-t"><b>${esc(d.name)}</b><small class="mut" style="display:block">${esc(d.model || '')} · acceso compartido</small></span>
             <select data-asg="${esc(d.device_id)}">${viewOpts(d.view)}</select></div>`).join('')}
           ${people.length || loose.length ? '' : '<p class="mut">Todavía no hay equipos con la app.</p>'}
@@ -823,6 +828,10 @@
         if (await call({ type: 'matterai/views/delete', view_id: x.id }, 'Dashboard borrado')) { this._vopen.delete(x.id); saveOpen(); this._renderViews(); }
       }; });
       main.querySelectorAll('[data-asgu]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign_user', user_id: sel.dataset.asgu, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
+      main.querySelectorAll('[data-unlink]').forEach((b) => { b.onclick = async () => {
+        if (!confirm(`¿Desvincular «${b.dataset.n}»? Ese equipo deja de entrar a la casa (se vuelve a vincular con un código nuevo).`)) return;
+        if (await call({ type: 'matterai/app/revoke', user_id: b.dataset.unlink }, 'Equipo desvinculado')) this._renderViews();
+      }; });
       main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
     }
 

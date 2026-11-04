@@ -201,7 +201,7 @@ def ws_views_list(hass: HomeAssistant, connection: websocket_api.ActiveConnectio
     for d in (house.listing() if house else []):
         mine = [e for e in entries if e.data.get("user_id") == d["user_id"]]
         people.append({
-            "user_id": d["user_id"], "name": d.get("name") or "Equipo", "last_used": d.get("last_used"),
+            "user_id": d["user_id"], "name": d.get("name") or "Equipo", "last_used": d.get("last_used"), "created": d.get("created"),
             "model": " ".join(x for x in (mine[0].data.get("manufacturer"), mine[0].data.get("model")) if x) if mine else "",
             "devices": [e.data.get("device_id") for e in mine if e.data.get("device_id")],
             "view": v.users.get(d["user_id"]) or next((v.assign[e.data["device_id"]] for e in mine if v.assign.get(e.data.get("device_id"))), None),
