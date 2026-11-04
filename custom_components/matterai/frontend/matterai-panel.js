@@ -713,7 +713,7 @@
         <div class="box"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Dashboards de esta casa</h2><button class="b pri" id="vnew">Nuevo dashboard</button></div>
           ${r.views.length ? `<table class="tb"><thead><tr><th>Nombre</th><th>Tipo</th><th>Fijados</th><th>Equipos</th><th></th></tr></thead><tbody>
             ${r.views.map((x) => `<tr ${x.id === this._vsel ? 'style="background:rgba(127,127,127,.08)"' : ''}><td><b>${esc(x.name)}</b>${r.default === x.id ? ' <small class="ok">· general</small>' : ''}<br><small class="mut">${x.by && x.by.startsWith('app') ? `cambiado desde la ${esc(x.by)}` : ''}</small></td>
-              <td>${KIND[x.kind] || x.kind}</td><td>${esc((x.pinned || []).join(', ') || '—')}</td><td>${esc(devsOf(x.id).join(', ') || '—')}</td><td><button class="b" data-vsel="${esc(x.id)}">Editar</button></td></tr>`).join('')}
+              <td>${KIND[x.kind] || x.kind}</td><td>${esc((x.pinned || []).join(', ') || '—')}</td><td>${esc(devsOf(x.id).join(', ') || '—')}</td><td style="white-space:nowrap"><button class="b pri" data-ved="${esc(x.id)}">Editar diseño</button> <button class="b" data-vsel="${esc(x.id)}">Opciones</button></td></tr>`).join('')}
           </tbody></table>` : '<p class="mut">Todavía no hay dashboards. Sin ninguno, cada equipo ve el inicio general armado con todos los ambientes. Creá uno por persona (o dejá que cada uno fije lo suyo desde la app).</p>'}
           <div class="row"><span class="mut">Dashboard general (para los equipos sin uno propio):</span><select id="vdef"><option value="">Inicio automático</option>${r.views.map((x) => `<option value="${esc(x.id)}" ${r.default === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div></div>
         ${this._vsel ? `<div class="box"><h2>Editar «${esc(v.name || '')}»</h2>
@@ -745,6 +745,10 @@
       };
       $('vdef').onchange = async (e) => { await call({ type: 'matterai/views/default', view_id: e.target.value || null }, 'Guardado'); this._renderViews(); };
       main.querySelectorAll('[data-vsel]').forEach((b) => { b.onclick = () => { this._vsel = b.dataset.vsel; this._vdraft = null; this._renderViews(); }; });
+      // modo edición: tarjetas, vista previa real, plano e imágenes (matterai-editor.js)
+      main.querySelectorAll('[data-ved]').forEach((b) => { b.onclick = async () => {
+        try { await loadScript(`${BASE}/matterai-editor.js?t=${Date.now()}`); await window.MaeEditor.open(this, b.dataset.ved); } catch (e) { this._toast(`No se pudo abrir el editor: ${e.message || e}`); }
+      }; });
       main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
       if (!this._vsel) return;
       const keep = () => { v.name = $('vname').value; v.kind = $('vkind').value; v.featured = { title: $('vft').value || null, camera: $('vcam').value || null, gate: $('vgate').value || null };

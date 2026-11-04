@@ -1,0 +1,205 @@
+{
+ "phone": {
+  "name": "Prearmado phone",
+  "kind": "phone",
+  "orientation": "landscape",
+  "blocks": [
+   {
+    "id": "kpis",
+    "type": "kpis",
+    "cfg": {
+     "auto": true
+    }
+   },
+   {
+    "id": "feat",
+    "type": "featured",
+    "title": "Garage",
+    "cfg": {
+     "entity": "camera.garage",
+     "gate": "cover.porton"
+    }
+   },
+   {
+    "id": "rooms",
+    "type": "rooms",
+    "title": "Lo tuyo",
+    "cfg": {
+     "rooms": [
+      "Living",
+      "Dormitorio",
+      "Cocina",
+      "Quincho"
+     ],
+     "auto": true
+    }
+   },
+   {
+    "id": "scenes",
+    "type": "scenes",
+    "title": "Escenas",
+    "cfg": {
+     "auto": true
+    }
+   }
+  ],
+  "plan": {
+   "image": "/local/p.svg",
+   "image_on": "/local/p-on.svg",
+   "image_day": null,
+   "zones": [
+    {
+     "name": "Living",
+     "room": "Living",
+     "lights": [
+      "light.living"
+     ],
+     "poly": [
+      [
+       0.1,
+       0.1
+      ],
+      [
+       0.4,
+       0.1
+      ],
+      [
+       0.4,
+       0.30000000000000004
+      ],
+      [
+       0.1,
+       0.30000000000000004
+      ]
+     ]
+    }
+   ]
+  }
+ },
+ "tablet": {
+  "name": "Prearmado tablet",
+  "kind": "tablet",
+  "orientation": "landscape",
+  "blocks": [
+   {
+    "id": "plan",
+    "type": "plan",
+    "col": 0,
+    "cfg": {}
+   },
+   {
+    "id": "kpis",
+    "type": "kpis",
+    "col": 1,
+    "cfg": {
+     "auto": true
+    }
+   },
+   {
+    "id": "scenes",
+    "type": "scenes",
+    "col": 1,
+    "title": "Escenas",
+    "cfg": {
+     "auto": true
+    }
+   },
+   {
+    "id": "away",
+    "type": "away",
+    "col": 1,
+    "title": "Modo ausente",
+    "cfg": {
+     "auto": true
+    }
+   },
+   {
+    "id": "routines",
+    "type": "routines",
+    "col": 1,
+    "title": "Rutinas",
+    "cfg": {
+     "auto": true
+    }
+   },
+   {
+    "id": "cam",
+    "type": "camera",
+    "col": 2,
+    "title": "Garage",
+    "cfg": {
+     "entity": "camera.garage",
+     "gate": "cover.porton"
+    }
+   },
+   {
+    "id": "music",
+    "type": "music",
+    "col": 2,
+    "title": "Música",
+    "cfg": {}
+   },
+   {
+    "id": "lock",
+    "type": "lock",
+    "col": 2,
+    "title": "Entrada principal",
+    "cfg": {
+     "entity": "lock.puerta_principal"
+    }
+   },
+   {
+    "id": "rooms",
+    "type": "rooms",
+    "col": 2,
+    "title": "Ambientes",
+    "cfg": {
+     "rooms": [
+      "Living",
+      "Dormitorio",
+      "Cocina",
+      "Quincho",
+      "Comedor",
+      "Garage",
+      "Baño",
+      "Jardín"
+     ],
+     "style": "grid",
+     "auto": true
+    }
+   }
+  ],
+  "plan": {
+   "image": "/local/p.svg",
+   "image_on": "/local/p-on.svg",
+   "image_day": null,
+   "zones": [
+    {
+     "name": "Living",
+     "room": "Living",
+     "lights": [
+      "light.living"
+     ],
+     "poly": [
+      [
+       0.1,
+       0.1
+      ],
+      [
+       0.4,
+       0.1
+      ],
+      [
+       0.4,
+       0.30000000000000004
+      ],
+      [
+       0.1,
+       0.30000000000000004
+      ]
+     ]
+    }
+   ]
+  }
+ }
+}

@@ -238,3 +238,18 @@ async def test_media_upload_and_private_access(hass, hass_client, hass_client_no
     assert (await ws.receive_json())["success"]
     r = await admin.get(path)
     assert r.status == 404
+
+
+async def test_prearmado_from_app_engine_is_valid(hass, hass_ws_client) -> None:
+    """El prearmado que arma el motor de la app (vista.js) lo acepta la casa tal cual (celular y tablet)."""
+    import json as _json  # noqa: PLC0415
+    import pathlib  # noqa: PLC0415
+
+    pre = _json.loads((pathlib.Path(__file__).parent / "fixtures" / "prearmado.json").read_text(encoding="utf-8"))
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    for i, (kind, view) in enumerate(pre.items()):
+        await ws.send_json({"id": i + 1, "type": "matterai/views/save", "view": view})
+        msg = await ws.receive_json()
+        assert msg["success"], (kind, msg)
+        assert msg["result"]["kind"] == kind and len(msg["result"]["blocks"]) == len(view["blocks"])

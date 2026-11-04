@@ -1,0 +1,588 @@
+/*
+ * MatterAI · motor de dashboards (vistas). Dibuja un dashboard de celular o de tablet a partir de su lista de
+ * tarjetas (lo que se arma en el editor del panel MatterAI). Lo usan la app (inicio) y la vista previa del editor.
+ *
+ *   const v = MaeVista.create(root, ctx); v.setView(view); v.render();
+ *   ctx: { card, hass(), base(), sign(path)→Promise<url>, toast(t), openEntity(id), openMenu(), openAutomations(),
+ *          deviceName(), onPin(names), edit: { selected, onSelect(id) } | null, kind: 'phone'|'tablet', orientation }
+ *
+ * Datos: el modelo de la casa lo da la tarjeta MatterAI (modo headless), que además abre sus ventanas (ambiente,
+ * clima, agenda, música, actividad, alarma con PIN, voz). Sin tarjetas configuradas se usa el prearmado.
+ */
+(function (root) {
+  'use strict';
+  const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+  const I = {
+    bulb: '<path d="M9 18h6M10 21h4M12 3a6 6 0 0 0-3.5 10.9c.6.5 1 1.2 1 2V16h5v-.1c0-.8.4-1.5 1-2A6 6 0 0 0 12 3z"/>',
+    shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>', gate: '<path d="M3 21V8l9-5 9 5v13M7 21v-8h10v8M7 17h10"/>',
+    lock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>', unlock: '<rect x="5" y="11" width="14" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 7.5-2"/>',
+    temp: '<path d="M14 14.8V5a2 2 0 0 0-4 0v9.8a4 4 0 1 0 4 0z"/>', snow: '<path d="M12 2v20M4.9 6.5l14.2 11M4.9 17.5l14.2-11M9 4l3 2 3-2M9 20l3-2 3 2"/>',
+    curt: '<path d="M3 3h18M5 3v18M19 3v18M5 3c0 6 4 10 5 18M19 3c0 6-4 10-5 18"/>', bolt: '<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+    user: '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>', home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z"/>',
+    moon: '<path d="M21 13A9 9 0 1 1 11 3a7 7 0 0 0 10 10z"/>', sun: '<circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>',
+    cloud: '<path d="M7 18h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 9.5 4.3 4.3 0 0 0 7 18z"/>', rain: '<path d="M7 15h10a4 4 0 0 0 .5-8A6 6 0 0 0 6 6.5 4.3 4.3 0 0 0 7 15z"/><path d="M8 21l1-3M12 21l1-3M16 21l1-3"/>',
+    bell: '<path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10 21h4"/>', menu: '<path d="M4 7h16M4 12h16M4 17h16"/>',
+    cam: '<path d="M3 7h12a2 2 0 0 1 2 2v1l4-3v10l-4-3v1a2 2 0 0 1-2 2H3z"/>', mic: '<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>',
+    list: '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>', music: '<path d="M9 18V5l11-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="17" cy="16" r="3"/>',
+    grid: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>',
+    chev: '<path d="M9 6l6 6-6 6"/>', x: '<path d="M18 6L6 18M6 6l12 12"/>', cdown: '<path d="M6 9l6 6 6-6"/>',
+    up: '<path d="M12 19V5M5 12l7-7 7 7"/>', down: '<path d="M12 5v14M19 12l-7 7-7-7"/>', pin: '<path d="M12 17v5M9 3h6l-1 6 4 4H6l4-4z"/>',
+    play: '<path d="M6 4l14 8-14 8z" fill="currentColor"/>', pause: '<path d="M7 4h3v16H7zM14 4h3v16h-3z" fill="currentColor"/>', next: '<path d="M5 4l10 8-10 8zM19 4v16"/>',
+    spark: '<path d="M12 3v4M12 17v4M3 12h4M17 12h4M6 6l2.5 2.5M15.5 15.5L18 18M6 18l2.5-2.5M15.5 8.5L18 6"/>',
+    battery: '<rect x="2" y="7" width="17" height="10" rx="2"/><path d="M22 11v2M6 10v4"/>', alert: '<path d="M12 3l10 18H2zM12 10v4M12 17h.01"/>',
+    door: '<path d="M6 21V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v17M3 21h18M14 12h.01"/>', bed: '<path d="M3 18v-7a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v7M3 14h18M3 18v2M21 18v2M7 9V6h4v3"/>',
+    bath: '<path d="M4 12h16v3a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5zM6 12V5a2 2 0 0 1 4 0"/>', sofa: '<path d="M4 11V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v3M3 17v-4a2 2 0 0 1 4 0v1h10v-1a2 2 0 0 1 4 0v4zM5 17v2M19 17v2"/>',
+    dining: '<path d="M4 9h16M6 9v11M18 9v11M8 4h8l1 5H7z"/>', pot: '<path d="M4 10h16v6a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4zM2 10h2M20 10h2"/>',
+    car: '<path d="M5 17h14M6 17v2M18 17v2M3 13l2-6h14l2 6v4H3z"/>', tree: '<path d="M12 22v-6M7 16h10l-5-13z"/>',
+    desk: '<path d="M3 8h18M5 8v12M19 8v12M5 13h6"/>', tool: '<path d="M14.7 6.3a4 4 0 0 0-5.4 5.4L3 18l3 3 6.3-6.3a4 4 0 0 0 5.4-5.4l-2.6 2.6-2.4-2.4z"/>',
+    film: '<rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 4v16M17 4v16M3 9h4M3 15h4M17 9h4M17 15h4"/>', kid: '<circle cx="12" cy="7" r="3"/><path d="M6 21v-4a6 6 0 0 1 12 0v4"/>',
+    pool: '<path d="M2 18c2 0 2-1.5 4-1.5S8 18 10 18s2-1.5 4-1.5 2 1.5 4 1.5 2-1.5 4-1.5M7 15V5a2 2 0 0 1 4 0M13 15V5a2 2 0 0 1 4 0M7 9h6"/>',
+    power: '<path d="M12 2v10M5.6 6.6a8 8 0 1 0 12.8 0"/>', cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+    robot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 17h6"/>', plug: '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>',
+    fan: '<circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7s3 4-2 7M14 12c4 0 7 1 7 4s-4 3-7-2M12 14c0 4-1 7-4 7s-3-4 2-7M10 12c-4 0-7-1-7-4s4-3 7 2"/>',
+    tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/>', water: '<path d="M12 3c-4 5-6 8-6 11a6 6 0 0 0 12 0c0-3-2-6-6-11z"/>',
+  };
+  const ICONS = Object.keys(I);
+  const ic = (n) => `<svg class="i" viewBox="0 0 24 24">${I[n] || I.home}</svg>`;
+  const ROOM_IC = { sofa: 'sofa', living: 'sofa', bed: 'bed', bath: 'bath', kitchen: 'pot', cook: 'pot', dining: 'dining', garage: 'car', car: 'car', tree: 'tree', garden: 'tree',
+    desk: 'desk', office: 'desk', door: 'door', entry: 'door', tool: 'tool', kid: 'kid', pool: 'pool', music: 'music', tv: 'film', film: 'film', sparkle: 'spark', grill: 'pot' };
+  const roomIc = (r) => ROOM_IC[r.icon] || (/(ba[ñn]o|toilette)/i.test(r.name) ? 'bath' : /dorm|habit|suite/i.test(r.name) ? 'bed' : /cocin/i.test(r.name) ? 'pot' : /garage|cochera/i.test(r.name) ? 'car' : /jard|patio|parque/i.test(r.name) ? 'tree' : 'home');
+  const WX = { sunny: 'sun', 'clear-night': 'moon', partlycloudy: 'cloud', cloudy: 'cloud', rainy: 'rain', pouring: 'rain', lightning: 'rain', 'lightning-rainy': 'rain', fog: 'cloud', windy: 'cloud' };
+  const dec = (n) => String(Math.round(n * 10) / 10).replace('.', ',');
+  const uid = () => Math.random().toString(36).slice(2, 10);
+
+  /* Catálogo de tarjetas (lo usa el editor: nombre, descripción, en qué equipo tiene sentido) */
+  const CATALOG = {
+    kpis: { name: 'Resumen', desc: 'Alarma, portón, luces, temperatura, aires, consumo', kinds: ['phone', 'tablet'] },
+    featured: { name: 'Cámara con botón', desc: 'Una cámara grande y su portón o puerta', kinds: ['phone', 'tablet'] },
+    rooms: { name: 'Ambientes', desc: 'Los ambientes elegidos, con su interruptor', kinds: ['phone', 'tablet'] },
+    scenes: { name: 'Escenas', desc: 'Escenas y scripts para tocar', kinds: ['phone', 'tablet'] },
+    buttons: { name: 'Botones', desc: 'Botones a elección, con su acción', kinds: ['phone', 'tablet'] },
+    camera: { name: 'Cámara con acciones', desc: 'Portero: cámara y botones (abrir, ver más)', kinds: ['phone', 'tablet'] },
+    alarm: { name: 'Alarma', desc: 'Botón grande para armar y desarmar', kinds: ['phone', 'tablet'] },
+    away: { name: 'Modo ausente', desc: 'Un interruptor o escena «me voy»', kinds: ['phone', 'tablet'] },
+    routines: { name: 'Rutinas', desc: 'Automatizaciones con su interruptor', kinds: ['phone', 'tablet'] },
+    music: { name: 'Música', desc: 'Lo que está sonando, con sus controles', kinds: ['phone', 'tablet'] },
+    lock: { name: 'Cerradura', desc: 'Abrir o cerrar, con su estado', kinds: ['phone', 'tablet'] },
+    plan: { name: 'Plano', desc: 'El render de la casa que se ilumina', kinds: ['tablet', 'phone'] },
+    clock: { name: 'Reloj y clima', desc: 'Hora, fecha y clima grandes', kinds: ['tablet'] },
+  };
+  const SCREEN_NAMES = { agenda: 'Agenda', clima: 'Clima', musica: 'Música', actividad: 'Actividad', camaras: 'Cámaras', seguridad: 'Seguridad', avisos: 'Avisos',
+    menu: 'Menú', casa: 'Toda la casa', luces: 'Luces prendidas', automatizaciones: 'Automatizaciones', aberturas: 'Puertas y ventanas' };
+
+  /* ───────── prearmado: el diseño de los prototipos con los equipos de esta casa ───────── */
+  function defaults(kind, m, legacy, hassStates, floorplan) {
+    const L = legacy || {};
+    const S = hassStates || {};
+    const f = L.featured || {};
+    const fname = (id) => (S[id] && S[id].attributes.friendly_name) || id;
+    const gate = f.gate || (m && m.access[0]) || null;
+    const cam = f.camera || (m && (m.cams.find((id) => /garage|cochera|port[oó]n|entrada|puerta/i.test(fname(id))) || m.cams[0])) || null;
+    const roomOfGate = gate && m && m.roomOf[gate];
+    const rooms = (L.pinned && L.pinned.length ? L.pinned : (m ? m.rooms.slice().sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, kind === 'tablet' ? 8 : 4).map((r) => r.name) : []));
+    const scenes = L.scenes && L.scenes.length ? L.scenes : null;
+    const lockId = m && m.access.find((id) => id.startsWith('lock.'));
+    const B = [];
+    if (kind === 'tablet') {
+      B.push({ id: 'plan', type: 'plan', col: 0, cfg: {} });
+      B.push({ id: 'kpis', type: 'kpis', col: 1, cfg: { auto: true } });
+      B.push({ id: 'scenes', type: 'scenes', col: 1, title: 'Escenas', cfg: scenes ? { entities: scenes } : { auto: true } });
+      B.push({ id: 'away', type: 'away', col: 1, title: 'Modo ausente', cfg: { auto: true } });
+      B.push({ id: 'routines', type: 'routines', col: 1, title: 'Rutinas', cfg: { auto: true } });
+      if (cam || gate) B.push({ id: 'cam', type: 'camera', col: 2, title: f.title || (roomOfGate && roomOfGate.name) || 'Entrada', cfg: { entity: cam, gate } });
+      B.push({ id: 'music', type: 'music', col: 2, title: 'Música', cfg: {} });
+      if (lockId) B.push({ id: 'lock', type: 'lock', col: 2, title: 'Entrada principal', cfg: { entity: lockId } });
+      B.push({ id: 'rooms', type: 'rooms', col: 2, title: 'Ambientes', cfg: { rooms, style: 'grid', auto: !L.pinned } });
+    } else {
+      B.push({ id: 'kpis', type: 'kpis', cfg: { auto: true } });
+      if (cam || gate) B.push({ id: 'feat', type: 'featured', title: f.title || (roomOfGate && roomOfGate.name) || 'Entrada', cfg: { entity: cam, gate } });
+      B.push({ id: 'rooms', type: 'rooms', title: 'Lo tuyo', cfg: { rooms, auto: !L.pinned } });
+      B.push({ id: 'scenes', type: 'scenes', title: 'Escenas', cfg: scenes ? { entities: scenes } : { auto: true } });
+    }
+    // plano: el que ya tenía la casa (tarjeta clásica: zonas rectangulares en %)
+    let plan = null;
+    if (floorplan && floorplan.image) {
+      plan = { image: floorplan.image, image_on: floorplan.image_on || null, image_day: floorplan.image_day || null,
+        zones: (floorplan.zones || []).filter((z) => Array.isArray(z.area) && z.area.length === 4).map((z) => {
+          const [x, y, w, h] = z.area.map((v) => v / 100);
+          return { name: z.name, room: z.room || z.name, lights: z.lights || [], poly: [[x, y], [x + w, y], [x + w, y + h], [x, y + h]] };
+        }) };
+    }
+    return { blocks: B, plan, orientation: 'landscape' };
+  }
+
+  /* ───────── una instancia por pantalla ───────── */
+  function create(el, ctx) {
+    const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, dismissed: new Set(load('matterai.vista.dismissed', [])) };
+    const card = () => ctx.card;
+    const hass = () => ctx.hass && ctx.hass();
+    const M = () => { const c = card(); return c && c.model ? c.model() : null; };
+    const st = (id) => { const h = hass(); return (id && h && h.states && h.states[id]) || null; };
+    const fname = (id) => { const s = st(id); return (s && s.attributes.friendly_name) || id || ''; };
+    const url = (u) => (u && u.charAt(0) === '/' && !u.startsWith('/api/matterai/media/') ? (ctx.base() || '').replace(/\/+$/, '') + u : u);
+    const toast = (t) => ctx.toast && ctx.toast(t);
+    const vib = () => { try { if (navigator.vibrate) navigator.vibrate(10); } catch (_) { /* sin vibración */ } };
+    const kind = () => ctx.kind || (X.view && X.view.kind) || 'phone';
+    const editing = () => !!ctx.edit;
+    function load(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } }
+    function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* sin almacenamiento */ } }
+
+    // imágenes privadas de la casa: link firmado (se renueva solo)
+    function img(path) {
+      if (!path) return '';
+      if (!path.startsWith('/api/matterai/media/')) return url(path);
+      const c = X.signed[path];
+      if (c && c.until > Date.now()) return c.url;
+      if (!c || !c.pending) {
+        X.signed[path] = { url: c ? c.url : '', until: 0, pending: true };
+        Promise.resolve(ctx.sign ? ctx.sign(path) : path).then((u) => { X.signed[path] = { url: u && u.charAt(0) === '/' ? (ctx.base() || '').replace(/\/+$/, '') + u : u, until: Date.now() + 20 * 3600e3 }; X.cache = {}; render(); })
+          .catch(() => { X.signed[path] = { url: '', until: Date.now() + 60e3 }; });
+      }
+      return c ? c.url : '';
+    }
+
+    /* layout: lo del editor, o el prearmado */
+    function layout(m) {
+      const v = X.view || {};
+      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape' };
+      const cfg = card() && card()._config;
+      const d = defaults(kind(), m, v, (hass() || {}).states, cfg && cfg.floorplan);
+      if (v.plan) d.plan = v.plan;
+      return d;
+    }
+    const roomByName = (m, n) => m.rooms.find((r) => r.name.toLowerCase() === String(n).toLowerCase() || String(r.id).toLowerCase() === String(n).toLowerCase());
+
+    /* ───────── acciones (lo que hace cada botón) ───────── */
+    function run(a, item) {
+      const c = card(), m = M(); if (!a || !c || !m) return;
+      const ent = a.entity || (item && item.entity);
+      if (a.confirm && typeof confirm === 'function' && !confirm(`¿${(item && item.name) || fname(ent) || 'Seguro'}?`)) return;
+      vib();
+      switch (a.type) {
+        case 'toggle': {
+          if (!ent) return;
+          const d = ent.split('.')[0];
+          if (d === 'lock' || d === 'cover') return c.access(ent); // con la confirmación y la huella / PIN de la app
+          if (d === 'scene' || d === 'script') return c.call(d, 'turn_on', { entity_id: ent });
+          if (d === 'button' || d === 'input_button') return c.call(d, 'press', { entity_id: ent });
+          if (d === 'alarm_control_panel') return openSheet('alarm', ent);
+          return c.call('homeassistant', 'toggle', { entity_id: ent });
+        }
+        case 'more_info': return ent && ctx.openEntity(ent);
+        case 'room': { const r = roomByName(m, a.room || ''); return r && c.openRoom(r.id); }
+        case 'screen': return screen(a.screen);
+        case 'service': {
+          if (!a.service) return;
+          const [d, s] = a.service.split('.');
+          const data = Object.assign({}, a.data || {});
+          if (ent && !data.entity_id) data.entity_id = ent;
+          return c.call(d, s, data);
+        }
+        default: return undefined;
+      }
+    }
+    function screen(k) {
+      const c = card(), m = M();
+      switch (k) {
+        case 'agenda': return m.f.agenda && c.openPanel('agenda');
+        case 'clima': return m.weather && c.openPanel('weather');
+        case 'musica': return c.openMusic();
+        case 'actividad': return c.openActivity();
+        case 'camaras': return c.openCameras();
+        case 'seguridad': case 'aberturas': return c.openPanel('open');
+        case 'luces': return c.openPanel('lights');
+        case 'avisos': return openSheet('avisos');
+        case 'casa': return openSheet('casa');
+        case 'menu': return ctx.openMenu && ctx.openMenu();
+        case 'automatizaciones': return ctx.openAutomations && ctx.openAutomations();
+        default: return undefined;
+      }
+    }
+
+    /* ───────── estados que se muestran ───────── */
+    function gateState(id) {
+      const s = st(id); if (!s) return { word: '', btn: '', open: false };
+      const lock = id.startsWith('lock.');
+      const open = lock ? s.state !== 'locked' : ['open', 'opening'].includes(s.state);
+      const moving = ['opening', 'closing', 'locking', 'unlocking'].includes(s.state);
+      return { lock, open, moving, word: lock ? (open ? 'Abierta' : 'Cerrada') : moving ? 'Moviendo' : open ? 'Abierto' : 'Cerrado',
+        btn: moving ? 'Moviendo…' : lock ? (open ? 'Cerrar' : 'Abrir') : open ? 'Cerrar' : 'Abrir' };
+    }
+    function entState(id) {
+      const s = st(id); if (!s) return { on: false, txt: 'No disponible' };
+      const d = id.split('.')[0], v = s.state;
+      if (d === 'cover' || d === 'lock') { const g = gateState(id); return { on: g.open, txt: g.word }; }
+      if (d === 'climate') return { on: v !== 'off', txt: v === 'off' ? 'Apagado' : `${s.attributes.temperature != null ? s.attributes.temperature + '° · ' : ''}${v === 'cool' ? 'Frío' : v === 'heat' ? 'Calor' : 'Auto'}` };
+      if (d === 'sensor') return { on: false, txt: `${v}${s.attributes.unit_of_measurement ? ' ' + s.attributes.unit_of_measurement : ''}` };
+      if (d === 'binary_sensor') return { on: v === 'on', txt: v === 'on' ? 'Activo' : 'Normal' };
+      if (d === 'scene' || d === 'script' || d === 'button' || d === 'input_button') return { on: false, txt: 'Tocar' };
+      if (d === 'media_player') return { on: v === 'playing', txt: v === 'playing' ? 'Sonando' : v === 'off' ? 'Apagado' : 'En pausa' };
+      if (d === 'alarm_control_panel') return { on: v.startsWith('armed') || v === 'triggered', txt: v.startsWith('armed') ? 'Armada' : v === 'triggered' ? 'Disparada' : 'Desarmada' };
+      return { on: v === 'on', txt: v === 'on' ? 'Prendido' : v === 'off' ? 'Apagado' : v };
+    }
+    function defIcon(id) {
+      const d = (id || '').split('.')[0], dc = (st(id) || { attributes: {} }).attributes.device_class;
+      return { light: 'bulb', switch: 'plug', cover: dc === 'garage' || dc === 'gate' ? 'gate' : 'curt', lock: 'lock', climate: 'snow', fan: 'fan', media_player: 'music', scene: 'spark', script: 'spark',
+        camera: 'cam', alarm_control_panel: 'shield', sensor: 'temp', binary_sensor: 'door', automation: 'robot', button: 'power', input_boolean: 'power' }[d] || 'power';
+    }
+    const kpiAuto = (m, k) => {
+      const out = [];
+      if (m.alarm) out.push({ kind: 'alarm' });
+      const g = m.access[0]; if (g) out.push({ kind: 'entity', entity: g });
+      out.push({ kind: 'lights' });
+      if (k === 'tablet') { out.push({ kind: 'acs' }); out.push({ kind: 'curtains' }); out.push(m.power ? { kind: 'power' } : { kind: 'temp' }); }
+      else if (!m.alarm || !g) out.splice(2, 0, { kind: 'temp' });
+      return out.slice(0, k === 'tablet' ? 6 : 3);
+    };
+    function kpi(m, it, i) {
+      let ico = 'power', lbl = '', val = '', cls = '', alert = false, tap = it.tap;
+      if (it.kind === 'alarm' && m.alarm) {
+        const a = m.alarm.state, armed = a.startsWith('armed'), trig = a === 'triggered';
+        ico = 'shield'; lbl = it.name || 'Alarma'; val = trig ? 'Disparada' : armed ? 'Armada' : a === 'arming' ? 'Armando' : 'Desarmada'; cls = trig || armed ? 'r' : 'g'; alert = trig || armed;
+        tap = tap || { type: 'toggle', entity: m.alarm.entity_id };
+      } else if (it.kind === 'lights') {
+        ico = 'bulb'; lbl = it.name || 'Luces'; val = m.lightsOn ? `${m.lightsOn} prendida${m.lightsOn > 1 ? 's' : ''}` : 'Apagadas'; cls = m.lightsOn ? 'w' : ''; tap = tap || { type: 'screen', screen: 'luces' };
+      } else if (it.kind === 'temp') { ico = 'temp'; lbl = it.name || 'Adentro'; val = m.tempIn != null ? `${dec(m.tempIn)}°` : '—'; }
+      else if (it.kind === 'acs') {
+        const on = m.rooms.flatMap((r) => r.climOn || []); ico = 'snow'; lbl = it.name || 'Aires'; val = on.length ? `${on.length} prendido${on.length > 1 ? 's' : ''}` : 'Apagados'; cls = on.length ? 'c' : '';
+      } else if (it.kind === 'curtains') {
+        const cv = [...new Set(m.rooms.flatMap((r) => r.covers || []))].filter((id) => !['gate', 'garage', 'door'].includes((st(id) || { attributes: {} }).attributes.device_class));
+        const open = cv.filter((id) => (st(id) || {}).state === 'open'); ico = 'curt'; lbl = it.name || 'Cortinas'; val = cv.length ? (open.length ? `${open.length} abierta${open.length > 1 ? 's' : ''}` : 'Cerradas') : '—';
+      } else if (it.kind === 'power') { ico = 'bolt'; lbl = it.name || 'Consumo'; val = m.power ? `${m.power.state} ${m.power.attributes.unit_of_measurement || ''}` : '—'; }
+      else if (it.kind === 'people') { const n = m.people.filter((p) => p.state === 'home').length; ico = 'user'; lbl = it.name || 'En casa'; val = n ? `${n} en casa` : 'Nadie'; }
+      else if (it.entity) {
+        const s = entState(it.entity), g = /^(cover|lock)\./.test(it.entity) ? gateState(it.entity) : null;
+        ico = it.icon || defIcon(it.entity); lbl = it.name || fname(it.entity).split(' ').slice(0, 2).join(' '); val = s.txt;
+        cls = g ? (g.open ? 'r' : 'g') : s.on ? 'w' : ''; alert = !!(g && g.open); tap = tap || { type: 'toggle', entity: it.entity };
+      } else return '';
+      return `<button class="v-kpi ${alert ? 'alert' : ''}" data-kt="${i}"><span class="l">${ic(it.icon || ico)}<span>${esc(lbl)}</span></span><span class="v ${cls}">${esc(val)}</span></button>`;
+    }
+    function roomRow(r, mark) {
+      const n = r.lightsOn.length, hasL = r.lightsCtl.length > 0, bits = [n ? `${n} prendida${n > 1 ? 's' : ''}` : (r.count ? 'Apagado' : '')];
+      if (r.temp != null) bits.push(`${dec(r.temp)}°`);
+      return `<div class="v-room${mark ? ' mark' : ''}" data-room="${esc(r.id)}"><span class="v-ric ${n ? 'on' : ''}">${ic(roomIc(r))}</span><span class="v-tx"><b>${esc(r.name)}</b><span>${esc(bits.filter(Boolean).join(' · ') || 'Ver')}</span></span>${hasL ? `<button class="v-pw ${n ? 'on' : ''}" data-tog="${esc(r.id)}" aria-label="Luces de ${esc(r.name)}"></button>` : `<span class="v-chev">${ic('chev')}</span>`}</div>`;
+    }
+    function roomTile(r) {
+      const n = r.lightsOn.length;
+      return `<div class="v-tile ${n ? 'lit' : ''}" data-room="${esc(r.id)}"><span class="v-tic">${ic(roomIc(r))}</span><b>${esc(r.name)}</b><span>${n ? `${n} prendida${n > 1 ? 's' : ''}` : 'Apagado'}</span></div>`;
+    }
+    const camSrc = (id) => { const s = st(id); return s && s.attributes.entity_picture ? url(s.attributes.entity_picture) + (s.attributes.entity_picture.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 10000) : ''; };
+    function player() {
+      const c = card(); if (!c || !c.players) return null;
+      const live = c.players().map(st).filter(Boolean);
+      return live.find((s) => s.state === 'playing') || live.find((s) => s.state === 'paused' && s.attributes.media_title) || null;
+    }
+
+    /* ───────── cada tarjeta ───────── */
+    function block(b, m) {
+      const c = b.cfg || {}, K = kind(), t = b.title ? `<h3>${esc(b.title)}</h3>` : '';
+      switch (b.type) {
+        case 'kpis': {
+          const items = (c.items && c.items.length && !c.auto) ? c.items : kpiAuto(m, K);
+          X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items;
+          return `${t}<div class="v-kpis n${Math.min(items.length, K === 'tablet' ? 6 : 3)}">${items.map((it, i) => kpi(m, it, i)).join('')}</div>`;
+        }
+        case 'featured': case 'camera': {
+          const cam = c.entity && st(c.entity) ? c.entity : null, gate = c.gate && st(c.gate) ? c.gate : null;
+          const g = gate ? gateState(gate) : null;
+          const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}">${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
+          return `${t}<div class="v-cam">${cam ? `<img class="v-feed" data-cam="${esc(cam)}" alt="" src="${esc(camSrc(cam))}"><span class="v-live"><i></i>EN VIVO</span>` : '<div class="v-feed none"></div>'}
+            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>`;
+        }
+        case 'rooms': {
+          const names = (c.rooms && c.rooms.length) ? c.rooms : m.rooms.slice(0, 4).map((r) => r.name);
+          const list = names.map((n) => roomByName(m, n)).filter(Boolean);
+          X.roomNames = names;
+          const grid = c.style === 'grid' || (K === 'tablet' && c.style !== 'list');
+          if (!list.length) return `${t}<p class="v-empty">${editing() ? 'Elegí los ambientes en las propiedades de la tarjeta.' : 'Mantené apretado un ambiente en «Toda la casa» para fijarlo acá.'}</p>`;
+          return `${t}<div class="${grid ? 'v-tiles' : 'v-rooms'}">${list.map((r) => (grid ? roomTile(r) : roomRow(r))).join('')}</div>`;
+        }
+        case 'scenes': {
+          const ids = ((c.entities && c.entities.length && !c.auto) ? c.entities : m.scenes).filter((id) => st(id)).slice(0, 12);
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">La casa no tiene escenas: elegilas en las propiedades.</p>` : '';
+          const icn = (id) => (/noche|dormir|night/i.test(fname(id)) ? 'moon' : /cine|pel[ií]cula|tv/i.test(fname(id)) ? 'film' : /sal|me voy|ausen/i.test(fname(id)) ? 'car' : /bienven|lleg/i.test(fname(id)) ? 'home' : /apag/i.test(fname(id)) ? 'power' : 'spark');
+          return `${t}<div class="${K === 'tablet' ? 'v-sgrid' : 'v-scenes'}">${ids.map((id) => `<button class="v-scene" data-scene="${esc(id)}"><span class="v-sic">${ic(icn(id))}</span>${esc(fname(id))}</button>`).join('')}</div>`;
+        }
+        case 'buttons': {
+          const items = c.items || [];
+          if (!items.length) return editing() ? `${t}<p class="v-empty">Agregá botones en las propiedades de la tarjeta.</p>` : '';
+          return `${t}<div class="v-btns ${c.style === 'list' ? 'list' : ''}">${items.map((it, i) => {
+            const s = it.entity ? entState(it.entity) : { on: false, txt: it.tap && it.tap.type === 'screen' ? SCREEN_NAMES[it.tap.screen] || '' : '' };
+            return `<button class="v-btn ${s.on ? 'on' : ''}" data-it="${i}"><span class="v-bic">${ic(it.icon || (it.entity ? defIcon(it.entity) : 'spark'))}</span><span class="v-tx"><b>${esc(it.name || fname(it.entity) || 'Botón')}</b><span>${esc(s.txt)}</span></span></button>`;
+          }).join('')}</div>`;
+        }
+        case 'alarm': {
+          const a = (c.entity && st(c.entity)) || m.alarm; if (!a) return editing() ? `${t}<p class="v-empty">La casa no tiene alarma.</p>` : '';
+          const armed = a.state.startsWith('armed') || a.state === 'triggered';
+          return `${t}<button class="v-alarm ${armed ? 'armed' : ''}" data-alarm="${esc(a.entity_id)}">${ic('shield')}<span class="v-tx"><b>${a.state === 'triggered' ? 'Alarma disparada' : armed ? 'Alarma armada' : 'Alarma desarmada'}</b><span>${armed ? 'Tocá para desarmar' : 'Tocá para armar'}</span></span></button>`;
+        }
+        case 'away': {
+          const id = c.entity && st(c.entity) ? c.entity : Object.keys((hass() || {}).states || {}).find((x) => /^(input_boolean|switch)\./.test(x) && /ausen|simul|vacacion/i.test(x + fname(x)));
+          if (!id) return editing() ? `${t}<p class="v-empty">Elegí el interruptor o la escena del modo ausente.</p>` : '';
+          const s = entState(id), dd = id.split('.')[0];
+          return `<div class="v-card ${s.on ? 'away' : ''}"><div class="v-row"><span class="v-tx"><b>${esc(b.title || 'Modo ausente')}</b><span>${s.on ? 'Activo · simulando presencia' : esc(fname(id))}</span></span>${dd === 'scene' || dd === 'script' ? `<button class="v-btn1" data-ent="${esc(id)}">Activar</button>` : `<button class="v-pw ${s.on ? 'on' : ''}" data-ent="${esc(id)}"></button>`}</div></div>`;
+        }
+        case 'routines': {
+          const S = (hass() || {}).states || {};
+          const ids = ((c.entities && c.entities.length && !c.auto) ? c.entities : Object.keys(S).filter((x) => x.startsWith('automation.')).slice(0, 4)).filter((x) => S[x]);
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">Elegí las automatizaciones a mostrar.</p>` : '';
+          return `<div class="v-card">${t}<div class="v-rt">${ids.map((id) => `<div class="v-rti"><span class="v-tx"><b>${esc(fname(id))}</b><span>${S[id].attributes.last_triggered ? 'Última: ' + new Date(S[id].attributes.last_triggered).toLocaleString('es-AR', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Nunca se ejecutó'}</span></span><button class="v-pw ${S[id].state === 'on' ? 'on' : ''}" data-auto="${esc(id)}"></button></div>`).join('')}</div></div>`;
+        }
+        case 'music': {
+          const p = player();
+          if (!p) return editing() ? `${t}<p class="v-empty">Aparece cuando hay música sonando.</p>` : '';
+          const art = p.attributes.entity_picture ? `style="background-image:url('${esc(url(p.attributes.entity_picture))}')"` : '';
+          return `<div class="v-card">${t}<div class="v-music"><span class="v-art" ${art}></span><span class="v-tx"><b>${esc(p.attributes.media_title || 'Música')}</b><span>${esc(p.attributes.media_artist || fname(p.entity_id))}</span></span>
+            <button class="v-mb pl" data-mp="${esc(p.entity_id)}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button><button class="v-mb" data-mn="${esc(p.entity_id)}">${ic('next')}</button></div></div>`;
+        }
+        case 'lock': {
+          const id = c.entity && st(c.entity) ? c.entity : m.access.find((x) => x.startsWith('lock.'));
+          if (!id) return editing() ? `${t}<p class="v-empty">Elegí la cerradura.</p>` : '';
+          const g = gateState(id), s = st(id), bat = Object.keys((hass() || {}).states || {}).find((x) => x.startsWith('sensor.') && x.includes(id.split('.')[1]) && /bat/i.test(x));
+          return `<div class="v-card">${t}<div class="v-row"><button class="v-lk ${g.open ? 'open' : ''}" data-gate="${esc(id)}">${ic(g.open ? 'unlock' : 'lock')}</button><span class="v-tx"><b>${g.word}</b><span>${esc(fname(id))}${bat ? ` · batería ${esc(st(bat).state)}%` : ''} · desde ${esc(new Date(s.last_changed).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</span></span></div></div>`;
+        }
+        case 'clock': {
+          const d = new Date(), w = m.weather;
+          return `<div class="v-clock" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || 'sun')}${esc(Math.round(Number(w.attributes.temperature)))}°</button>` : ''}</div>`;
+        }
+        case 'plan': return planHTML(m);
+        default: return editing() ? `<p class="v-empty">Tarjeta «${esc(b.type)}» (la app todavía no la conoce)</p>` : '';
+      }
+    }
+
+    /* ───────── plano: imagen apagada + prendida por ambiente, según las luces ───────── */
+    function planHTML(m) {
+      const p = X.layout.plan;
+      if (!p || !p.image) return editing() ? '<div class="v-plan empty"><p>Subí el render de la casa en «Plano» para verlo acá.</p></div>' : '';
+      const off = img(p.image), on = img(p.image_on || p.image), day = p.image_day ? img(p.image_day) : '';
+      const h = new Date().getHours(), isDay = day && h >= 7 && h < 20;
+      const zones = p.zones || [];
+      const pts = (poly) => poly.map(([x, y]) => `${(x * 1000).toFixed(1)},${(y * 1000).toFixed(1)}`).join(' ');
+      const ar = p.aspect || X.aspect || 0.6;
+      X.zonePolys = zones;
+      const zoneOn = (z) => (z.lights || []).filter((id) => (st(id) || {}).state === 'on').length;
+      const cen = (z) => { const P = z.pin || [z.poly.reduce((a, q) => a + q[0], 0) / z.poly.length, z.poly.reduce((a, q) => a + q[1], 0) / z.poly.length]; return P; };
+      return `<div class="v-plan" style="aspect-ratio:${ar}"><svg viewBox="0 0 1000 ${(1000 / ar).toFixed(0)}" preserveAspectRatio="none">
+        <defs>${zones.map((z, i) => `<mask id="vz${i}" maskUnits="userSpaceOnUse"><polygon points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}" fill="#fff"/></mask>`).join('')}</defs>
+        <image href="${esc(isDay ? day : off)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" data-planimg="1"/>
+        ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
+        ${zones.map((z, i) => `<polygon class="v-hit" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
+        </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}">${ic('bulb')}<b>${esc(z.name)}</b></span>`; }).join('')}
+        ${editing() ? '' : '<span class="v-ptag">Tocá un ambiente · mantené para ver todo</span>'}</div>`;
+    }
+
+    /* ───────── avisos de la casa (campanita) ───────── */
+    function notes(m) {
+      const c = card(), out = [];
+      if (m.alarm && m.alarm.state === 'triggered') out.push({ key: 'alarm-trig', lvl: 'r', ic: 'alert', t: 'Se disparó la alarma', d: fname(m.alarm.entity_id), a: 'Ver', run: () => c.openPanel('open') });
+      (c.suggestions ? c.suggestions() : []).forEach((s) => out.push({ key: 'sug:' + s.key, lvl: 'w', ic: s.icon === 'shield' ? 'shield' : 'bulb', t: s.title, d: s.text, a: s.btn, sug: s.key }));
+      m.openAcc.forEach((id) => out.push({ key: `open-${id}-${(st(id) || {}).last_changed}`, lvl: 'w', ic: 'gate', t: `${fname(id)} abierto`, d: 'Tocá para cerrarlo', a: 'Cerrar', run: () => c.access(id) }));
+      const S = (hass() || {}).states || {};
+      Object.keys(S).forEach((id) => {
+        const s = S[id];
+        if (id.startsWith('sensor.') && s.attributes.device_class === 'battery') {
+          const v = Number(s.state);
+          if (Number.isFinite(v) && v <= 15) out.push({ key: `bat-${id}-${Math.round(v / 5)}`, lvl: '', ic: 'battery', t: `Pila baja: ${String(s.attributes.friendly_name || id).replace(/\s*(bater[ií]a|battery)\s*/i, ' ').trim()}`, d: `${Math.round(v)}%`, a: null });
+        }
+      });
+      return out.filter((n) => !X.dismissed.has(n.key));
+    }
+    function dismiss(n) { if (n.sug) card().dismissSuggestion(n.sug); X.dismissed.add(n.key); save('matterai.vista.dismissed', [...X.dismissed].slice(-200)); }
+
+    /* ───────── dibujo ───────── */
+    function set(sel, html) { if (X.cache[sel] === html) return; X.cache[sel] = html; const e = X.el.querySelector(sel); if (e) e.innerHTML = html; }
+    function head(m, compact) {
+      const d = new Date(), w = m.weather, ns = notes(m).length;
+      return `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>
+        ${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (d.getHours() >= 7 && d.getHours() < 20 ? 'sun' : 'moon'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(w.state === 'sunny' || w.state === 'clear-night' ? 'Despejado' : w.state === 'rainy' || w.state === 'pouring' ? 'Lluvia' : 'Nublado')}</small>`}</button>` : ''}
+        <button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>
+        <button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`;
+    }
+    function wrapBlock(b, m) {
+      const inner = block(b, m);
+      if (!inner && !editing()) return '';
+      const sel = editing() && ctx.edit.selected === b.id;
+      return `<section class="v-b t-${b.type}${sel ? ' sel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${esc((CATALOG[b.type] || {}).name || b.type)}</span>` : ''}${inner}</section>`;
+    }
+    function render() {
+      if (!X.el || X.el.hidden) return;
+      const m = M();
+      if (!m) { if (X.el.innerHTML === '') X.el.innerHTML = '<p class="v-empty">Conectando con tu casa…</p>'; return; }
+      const L = X.layout = layout(m), K = kind(), ori = ctx.orientation || L.orientation || 'landscape';
+      const vertical = K === 'tablet' && (ori === 'portrait' || (ori === 'auto' && typeof innerHeight !== 'undefined' && innerHeight > innerWidth));
+      const sig = `${K}|${vertical}|${editing()}`;
+      if (X.shell !== sig) {
+        X.shell = sig; X.cache = {};
+        X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}`;
+        X.el.innerHTML = K === 'tablet'
+          ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
+          : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav>${shared()}`;
+      }
+      set('#v-head', head(m, K === 'phone'));
+      const bl = L.blocks;
+      if (K === 'tablet') {
+        // columna del plano (0), y las dos columnas de tarjetas
+        set('#v-c0', bl.filter((b) => (b.col || 0) === 0).map((b) => wrapBlock(b, m)).join(''));
+        set('#v-c1', bl.filter((b) => b.col === 1).map((b) => wrapBlock(b, m)).join(''));
+        set('#v-c2', bl.filter((b) => b.col === 2).map((b) => wrapBlock(b, m)).join(''));
+        const c = card();
+        const p = player();
+        set('#v-dock', [['home', 'Inicio', 'top'], ['cam', 'Cámaras', 'camaras', m.f.cameras], ['music', 'Música', 'musica', m.f.music], ['list', 'Actividad', 'actividad'],
+          ['mic', '', 'voice', c.voiceAvailable && c.voiceAvailable()], ['cal', 'Agenda', 'agenda', m.f.agenda], ['grid', 'Casa', 'casa'], ['menu', 'Menú', 'menu']]
+          .filter((x) => x[3] !== false).map(([i, t2, k], j) => (k === 'voice' ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>` : `<button class="${j === 0 ? 'on' : ''}" data-scr="${k}">${k === 'musica' && p && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`)).join(''));
+      } else {
+        set('#v-c1', bl.map((b) => wrapBlock(b, m)).join(''));
+        set('#v-allb', `${ic('grid')}Toda la casa`);
+        // reproductor: sólo con música; se esconde al botón Música
+        const p = editing() ? null : player();
+        if (!p) X.hidePlayer = false;
+        const shown = !!p && !X.hidePlayer, pl = X.el.querySelector('#v-player');
+        pl.classList.toggle('hide', !shown); X.el.classList.toggle('with-player', shown);
+        if (p) {
+          const art = p.attributes.entity_picture ? `style="background-image:url('${esc(url(p.attributes.entity_picture))}')"` : '';
+          set('#v-player', `<span class="v-art" ${art}></span><span class="v-tx"><b>${esc(p.attributes.media_title || 'Música')}</b><span>${esc(p.attributes.media_artist || fname(p.entity_id))} · ${p.state === 'playing' ? 'sonando' : 'en pausa'}</span></span>
+            <button class="v-pl" data-mp="${esc(p.entity_id)}" aria-label="${p.state === 'playing' ? 'Pausar' : 'Reproducir'}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button><button class="v-hide" data-k="hidep" aria-label="Esconder">${ic('cdown')}</button>`);
+        }
+        const c = card();
+        set('#v-nav', `<button class="on" data-scr="top">${ic('home')}Inicio</button>${m.f.cameras ? `<button data-scr="camaras">${ic('cam')}Cámaras</button>` : ''}
+          ${c.voiceAvailable && c.voiceAvailable() ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>` : ''}
+          <button data-scr="actividad">${ic('list')}Actividad</button>${m.f.music ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic('music')}Música</button>` : ''}`);
+      }
+      if (X.sheet) renderSheet();
+    }
+    function shared() {
+      return '<div class="v-sheet" id="v-sheet"><div class="v-sin"></div></div><div class="v-menu" id="v-menu"><div class="v-min"></div></div>';
+    }
+
+    /* ───────── hojas (avisos, toda la casa, alarma) y menú de fijar ───────── */
+    function renderSheet() {
+      const m = M(); if (!m) return;
+      const sh = X.el.querySelector('#v-sheet .v-sin'); if (!sh) return;
+      const hd = (t, s) => `<div class="v-grab"></div><div class="v-sh"><div><h2>${esc(t)}</h2>${s ? `<small>${esc(s)}</small>` : ''}</div><button class="v-x" data-close aria-label="Cerrar">${ic('x')}</button></div>`;
+      let h = '';
+      if (X.sheet === 'avisos') {
+        const ns = notes(m);
+        h = hd('Avisos', ns.length ? `${ns.length} de tu casa` : '') + (ns.length
+          ? `<div class="v-list">${ns.map((n, i) => `<div class="v-ntf ${n.lvl}"><span class="v-nic">${ic(n.ic)}</span><span class="v-tx"><b>${esc(n.t)}</b><span>${esc(n.d || '')}</span></span>${n.a ? `<button class="v-btn1 ${n.lvl ? 'w' : ''}" data-na="${i}">${esc(n.a)}</button>` : ''}<button class="v-dx" data-nd="${i}" aria-label="Descartar">${ic('x')}</button></div>`).join('')}</div>
+            <button class="v-allb" data-ndall>Descartar todos</button>`
+          : `<div class="v-empty big">${ic('bell')}<p>No hay avisos. Todo en orden en tu casa.</p></div>`);
+      }
+      if (X.sheet === 'casa') {
+        const pins = (X.roomNames || []).map((n) => (roomByName(m, n) || {}).id);
+        h = hd('Toda la casa', `${m.rooms.length} ambientes`) + `<div class="v-rooms">${m.rooms.map((r) => roomRow(r, pins.includes(r.id))).join('')}</div>
+          <p class="v-note">Los marcados están en tu inicio. Mantené apretado para sumar, mover o sacar.</p>`;
+      }
+      if (X.sheet === 'alarm') {
+        const a = st(X.sheetArg) || m.alarm;
+        if (a) {
+          const armed = a.state.startsWith('armed') || a.state === 'triggered';
+          h = hd('Alarma', fname(a.entity_id)) + `<div class="v-list">${armed ? `<button class="v-opt w" data-al="alarm_disarm">${ic('shield')}Desarmar</button>`
+            : `<button class="v-opt" data-al="alarm_arm_away">${ic('car')}Armar · me voy</button><button class="v-opt" data-al="alarm_arm_home">${ic('home')}Armar · estoy en casa</button>${a.attributes.supported_features & 4 ? `<button class="v-opt" data-al="alarm_arm_night">${ic('moon')}Armar · noche</button>` : ''}`}
+            <button class="v-opt ghost" data-scr="seguridad">${ic('door')}Ver sensores y aberturas</button></div>`;
+        }
+      }
+      if (sh.innerHTML !== h) sh.innerHTML = h;
+    }
+    function openSheet(k, arg) { X.sheet = k; X.sheetArg = arg || null; X.el.querySelector('#v-sheet').classList.add('show'); renderSheet(); }
+    function closeSheet() { X.sheet = null; const s = X.el.querySelector('#v-sheet'); if (s) s.classList.remove('show'); }
+    function openPinMenu(rid) {
+      const m = M(), r = m && m.byId[rid]; if (!r || !ctx.onPin) return;
+      const names = (X.roomNames || []).filter((n) => roomByName(m, n));
+      const i = names.findIndex((n) => (roomByName(m, n) || {}).id === rid);
+      X.menuFor = { rid, names, i };
+      X.el.querySelector('#v-menu .v-min').innerHTML = `<div class="t">${esc(r.name)}</div><p>Lo que fijás queda en tu inicio${X.view && X.view.name ? ` («${esc(X.view.name)}»)` : ''}.</p>
+        ${i >= 0 ? `${i > 0 ? `<button data-m="up">${ic('up')}Subir</button>` : ''}${i < names.length - 1 ? `<button data-m="down">${ic('down')}Bajar</button>` : ''}<button class="del" data-m="unpin">${ic('x')}Sacar de mi inicio</button>`
+          : `<button data-m="pin">${ic('pin')}Fijar en mi inicio</button>`}<button data-m="close">Cancelar</button>`;
+      X.el.querySelector('#v-menu').classList.add('show');
+    }
+    function menuAct(k) {
+      const f = X.menuFor; X.el.querySelector('#v-menu').classList.remove('show'); X.menuFor = null;
+      if (!f || k === 'close') return;
+      const m = M(), r = m.byId[f.rid], names = f.names.slice();
+      if (k === 'pin') { names.push(r.name); toast(`${r.name} en tu inicio`); }
+      if (k === 'unpin') { names.splice(f.i, 1); toast(`${r.name} sigue en «Toda la casa»`); }
+      if (k === 'up') names.splice(f.i - 1, 0, names.splice(f.i, 1)[0]);
+      if (k === 'down') names.splice(f.i + 1, 0, names.splice(f.i, 1)[0]);
+      ctx.onPin(names);
+    }
+
+    /* ───────── toques ───────── */
+    function blockOf(elx) { const s = elx.closest('[data-block]'); return s && X.layout.blocks.find((b) => b.id === s.dataset.block); }
+    function onClick(e) {
+      if (X.held) { X.held = false; return; }
+      const c = card(), m = M(); if (!c || !m) return;
+      const t = e.target;
+      if (editing()) { const b = t.closest('[data-block]'); if (b && ctx.edit.onSelect) ctx.edit.onSelect(b.dataset.block); e.preventDefault(); return; }
+      if (t.id === 'v-sheet' || t.closest('[data-close]')) return closeSheet();
+      if (t.id === 'v-menu') { X.el.querySelector('#v-menu').classList.remove('show'); return; }
+      const mm = t.closest('[data-m]'); if (mm) return menuAct(mm.dataset.m);
+      const tog = t.closest('[data-tog]'); if (tog) { vib(); const r = m.byId[tog.dataset.tog]; c.roomLights(tog.dataset.tog, !(r && r.lightsOn.length)); return; }
+      const na = t.closest('[data-na]'); if (na) { const n = notes(m)[+na.dataset.na]; if (n) { if (n.sug) c.runSuggestion(n.sug); else if (n.run) n.run(); dismiss(n); } return render(); }
+      const nd = t.closest('[data-nd]'); if (nd) { const n = notes(m)[+nd.dataset.nd]; if (n) dismiss(n); return render(); }
+      if (t.closest('[data-ndall]')) { notes(m).forEach(dismiss); return render(); }
+      const al = t.closest('[data-al]'); if (al) { const a = st(X.sheetArg) || m.alarm; c.alarm(al.dataset.al, a && a.entity_id); closeSheet(); return; }
+      const sc = t.closest('[data-scene]'); if (sc) { vib(); const id = sc.dataset.scene; c.call(id.split('.')[0], 'turn_on', { entity_id: id }); sc.classList.add('act'); setTimeout(() => sc.classList.remove('act'), 1200); toast(`Escena «${fname(id)}»`); return; }
+      const kt = t.closest('[data-kt]'); if (kt) { const b = blockOf(kt), items = X.kpiItems && b && X.kpiItems[b.id], it = items && items[+kt.dataset.kt]; if (it) { const a = it.tap || (it.kind === 'alarm' ? { type: 'toggle', entity: m.alarm && m.alarm.entity_id } : it.kind === 'lights' ? { type: 'screen', screen: 'luces' } : it.entity ? { type: 'toggle', entity: it.entity } : null); run(a, it); } return; }
+      const itb = t.closest('[data-it]'); if (itb) { const b = blockOf(itb), it = b && (b.cfg.items || [])[+itb.dataset.it]; if (it) run(it.tap || { type: it.entity ? 'toggle' : 'none' }, it); return; }
+      const gate = t.closest('[data-gate]'); if (gate) { vib(); return c.access(gate.dataset.gate); }
+      const alb = t.closest('[data-alarm]'); if (alb) return openSheet('alarm', alb.dataset.alarm);
+      const en = t.closest('[data-ent]'); if (en) { const id = en.dataset.ent, d = id.split('.')[0]; vib(); return c.call(d === 'scene' || d === 'script' ? d : 'homeassistant', d === 'scene' || d === 'script' ? 'turn_on' : 'toggle', { entity_id: id }); }
+      const au = t.closest('[data-auto]'); if (au) { vib(); const s = st(au.dataset.auto); return c.call('automation', s && s.state === 'on' ? 'turn_off' : 'turn_on', { entity_id: au.dataset.auto }); }
+      const mp = t.closest('[data-mp]'); if (mp) { vib(); return c.call('media_player', 'media_play_pause', { entity_id: mp.dataset.mp }); }
+      const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
+      const cam = t.closest('[data-cam]'); if (cam) return ctx.openEntity(cam.dataset.cam);
+      const z = t.closest('[data-zone]'); if (z) { const zz = X.zonePolys[+z.dataset.zone]; if (zz && zz.lights.length) { const any = zz.lights.some((id) => (st(id) || {}).state === 'on'); vib(); c.call('homeassistant', any ? 'turn_off' : 'turn_on', { entity_id: zz.lights }); toast(`${zz.name}: ${any ? 'apagado' : 'prendido'}`); } else if (zz && zz.room) { const r = roomByName(m, zz.room); if (r) c.openRoom(r.id); } return; }
+      const room = t.closest('[data-room]'); if (room) { if (X.sheet === 'casa') closeSheet(); return c.openRoom(room.dataset.room); }
+      const scr = t.closest('[data-scr]');
+      if (scr) {
+        const k = scr.dataset.scr;
+        if (k === 'top') { if (typeof scrollTo === 'function') scrollTo({ top: 0, behavior: 'smooth' }); return; }
+        if (k === 'voice') return c.voice();
+        if (X.sheet && k === 'seguridad') closeSheet();
+        return screen(k);
+      }
+      const kk = t.closest('[data-k]'); if (!kk) return;
+      const p = player();
+      if (kk.dataset.k === 'hidep') { X.hidePlayer = true; return render(); }
+      if (kk.dataset.k === 'music') { if (p && X.hidePlayer) { X.hidePlayer = false; return render(); } return c.openMusic(); }
+      if (kk.dataset.k === 'player') return c.openMusic();
+    }
+    let holdT = null;
+    function onDown(e) {
+      if (editing()) return;
+      const r = e.target.closest('[data-room],[data-zone],[data-it]'); if (!r) return;
+      if (e.target.closest('button') && !e.target.closest('[data-it]')) return; // el interruptor de un ambiente no abre el menú de fijar
+      X.held = false; clearTimeout(holdT);
+      holdT = setTimeout(() => {
+        X.held = true; vib();
+        const m = M();
+        if (r.dataset.room) { r.classList.add('press'); setTimeout(() => r.classList.remove('press'), 500); openPinMenu(r.dataset.room); }
+        else if (r.dataset.zone) { const zz = X.zonePolys[+r.dataset.zone], rr = zz && roomByName(m, zz.room || zz.name); if (rr) card().openRoom(rr.id); }
+        else if (r.dataset.it) { const b = blockOf(r), it = b && (b.cfg.items || [])[+r.dataset.it]; if (it && it.hold) run(it.hold, it); else if (it && it.entity) ctx.openEntity(it.entity); }
+      }, 520);
+    }
+    const onUp = () => clearTimeout(holdT);
+    el.addEventListener('click', onClick);
+    el.addEventListener('pointerdown', onDown);
+    ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, onUp));
+    el.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-room],[data-zone],[data-it]')) e.preventDefault(); });
+    const refreshCam = () => {
+      if (!X.el || X.el.hidden || (typeof document !== 'undefined' && document.hidden)) return;
+      X.el.querySelectorAll('img[data-cam]').forEach((im) => { const s = camSrc(im.dataset.cam); if (s && im.getAttribute('src') !== s) im.src = s; });
+    };
+    X.camT = setInterval(refreshCam, 10000);
+    X.clockT = setInterval(() => { if (!X.el.hidden) render(); }, 20000);
+
+    return {
+      setView(v) { X.view = v || null; X.cache = {}; X.shell = null; render(); },
+      view: () => X.view,
+      layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
+      render,
+      setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
+      destroy() { clearInterval(X.camT); clearInterval(X.clockT); el.removeEventListener('click', onClick); el.innerHTML = ''; },
+      _test: { notes, X, run },
+    };
+  }
+
+  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, ICONS, icon: ic, uid };
+})(typeof window !== 'undefined' ? window : globalThis);
