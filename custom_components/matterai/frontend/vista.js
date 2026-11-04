@@ -283,11 +283,13 @@
           return `${t}<div class="v-kpis n${Math.min(items.length, K === 'tablet' ? 6 : 3)}">${items.map((it, i) => kpi(m, it, i)).join('')}</div>`;
         }
         case 'featured': case 'camera': {
-          const cam = c.entity && st(c.entity) ? c.entity : null, gate = c.gate && st(c.gate) ? c.gate : null;
+          const list = [c.entity].concat(c.entities || [], m.cams || []).filter((id, i, a) => id && st(id) && a.indexOf(id) === i);
+          X.camIdx = X.camIdx || {}; const ci = (X.camIdx[b.id] || 0) % Math.max(list.length, 1); X.camList = X.camList || {}; X.camList[b.id] = list;
+          const cam = list[ci] || null, gate = c.gate && st(c.gate) ? c.gate : null;
           const g = gate ? gateState(gate) : null;
           const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}">${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
-          return `${t}<div class="v-cam">${cam ? `<img class="v-feed" data-cam="${esc(cam)}" alt="" src="${esc(camSrc(cam))}"><span class="v-live"><i></i>EN VIVO</span>` : '<div class="v-feed none"></div>'}
-            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>`;
+          return `${t}<div class="v-cam">${cam ? `<img class="v-feed" data-cam="${esc(cam)}" alt="" src="${esc(camSrc(cam))}"><span class="v-live"><i></i>EN VIVO</span>` : '<div class="v-feed none"></div>'}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
+            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>`;
         }
         case 'rooms': {
           const names = (c.rooms && c.rooms.length) ? c.rooms : m.rooms.slice(0, 4).map((r) => r.name);
@@ -415,7 +417,7 @@
         X.shell = sig; X.cache = {};
         X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}`;
         X.el.innerHTML = K === 'tablet'
-          ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
+          ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
           : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav>${shared()}`;
       }
       set('#v-head', head(m, K === 'phone'));
@@ -423,8 +425,12 @@
       if (K === 'tablet') {
         // columna del plano (0), y las dos columnas de tarjetas
         set('#v-c0', bl.filter((b) => (b.col || 0) === 0).map((b) => wrapBlock(b, m)).join(''));
-        set('#v-c1', bl.filter((b) => b.col === 1).map((b) => wrapBlock(b, m)).join(''));
-        set('#v-c2', bl.filter((b) => b.col === 2).map((b) => wrapBlock(b, m)).join(''));
+        // el resumen va de lado a lado sobre las dos columnas (como en el diseño)
+        const top = (b) => b.type === 'kpis' && (b.col || 0) !== 0;
+        set('#v-top', bl.filter(top).map((b) => wrapBlock(b, m)).join(''));
+        set('#v-c1', bl.filter((b) => b.col === 1 && !top(b)).map((b) => wrapBlock(b, m)).join(''));
+        set('#v-c2', bl.filter((b) => b.col === 2 && !top(b)).map((b) => wrapBlock(b, m)).join(''));
+        fit(vertical);
         const c = card();
         const p = player();
         set('#v-dock', [['home', 'Inicio', 'top'], ['cam', 'Cámaras', 'camaras', m.f.cameras], ['music', 'Música', 'musica', m.f.music], ['list', 'Actividad', 'actividad'],
@@ -449,6 +455,16 @@
           <button data-scr="actividad">${ic('list')}Actividad</button>${m.f.music ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic('music')}Música</button>` : ''}`);
       }
       if (X.sheet) renderSheet();
+    }
+    /* La tablet se arma sobre un lienzo de tamaño fijo (como el diseño) y se escala a la pantalla:
+     * así se ve igual en una tablet de 8" que en una de 12", sin tarjetas apretadas ni textos cortados. */
+    function fit(vertical) {
+      const e = X.el; if (!e || !e.style) return;
+      if (editing() || typeof innerWidth === 'undefined') { e.style.width = e.style.height = e.style.zoom = ''; return; }
+      const iw = innerWidth, ih = innerHeight, W = Math.max(iw, vertical ? 800 : 1180), s = iw / W;
+      // zoom (y no transform) para que el alto, el scroll vertical y las ventanas fijas sigan andando bien
+      e.style.zoom = s < 1 ? String(s) : ''; e.style.width = s < 1 ? W + 'px' : '';
+      e.style.height = vertical ? '' : Math.round(ih / s) + 'px';
     }
     function shared() {
       return '<div class="v-sheet" id="v-sheet"><div class="v-sin"></div></div><div class="v-menu" id="v-menu"><div class="v-min"></div></div>';
@@ -530,7 +546,8 @@
       const au = t.closest('[data-auto]'); if (au) { vib(); const s = st(au.dataset.auto); return c.call('automation', s && s.state === 'on' ? 'turn_off' : 'turn_on', { entity_id: au.dataset.auto }); }
       const mp = t.closest('[data-mp]'); if (mp) { vib(); return c.call('media_player', 'media_play_pause', { entity_id: mp.dataset.mp }); }
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
-      const cam = t.closest('[data-cam]'); if (cam) return ctx.openEntity(cam.dataset.cam);
+      const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, 1);
+      const cam = t.closest('[data-cam]'); if (cam) return openCam(cam.dataset.cam);
       const z = t.closest('[data-zone]'); if (z) { const zz = X.zonePolys[+z.dataset.zone]; if (zz && zz.lights.length) { const any = zz.lights.some((id) => (st(id) || {}).state === 'on'); vib(); c.call('homeassistant', any ? 'turn_off' : 'turn_on', { entity_id: zz.lights }); toast(`${zz.name}: ${any ? 'apagado' : 'prendido'}`); } else if (zz && zz.room) { const r = roomByName(m, zz.room); if (r) c.openRoom(r.id); } return; }
       const room = t.closest('[data-room]'); if (room) { if (X.sheet === 'casa') closeSheet(); return c.openRoom(room.dataset.room); }
       const scr = t.closest('[data-scr]');
@@ -547,9 +564,16 @@
       if (kk.dataset.k === 'music') { if (p && X.hidePlayer) { X.hidePlayer = false; return render(); } return c.openMusic(); }
       if (kk.dataset.k === 'player') return c.openMusic();
     }
-    let holdT = null;
+    // cámaras: la tarjeta de Frigate (grabaciones, todas las cámaras) si está configurada; si no, la ventana del equipo
+    function openCam(id) { const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id); }
+    function nextCam(elx, d) {
+      const b = blockOf(elx), list = b && X.camList && X.camList[b.id]; if (!list || list.length < 2) return;
+      X.camIdx[b.id] = ((X.camIdx[b.id] || 0) + d + list.length) % list.length; vib(); render();
+    }
+    let holdT = null, swipe = null;
     function onDown(e) {
       if (editing()) return;
+      const cv = e.target.closest('.v-cam'); swipe = cv ? { x: e.clientX, y: e.clientY, el: cv } : null;
       const r = e.target.closest('[data-room],[data-zone],[data-it]'); if (!r) return;
       if (e.target.closest('button') && !e.target.closest('[data-it]')) return; // el interruptor de un ambiente no abre el menú de fijar
       X.held = false; clearTimeout(holdT);
@@ -561,7 +585,11 @@
         else if (r.dataset.it) { const b = blockOf(r), it = b && (b.cfg.items || [])[+r.dataset.it]; if (it && it.hold) run(it.hold, it); else if (it && it.entity) ctx.openEntity(it.entity); }
       }, 520);
     }
-    const onUp = () => clearTimeout(holdT);
+    const onUp = (e) => {
+      clearTimeout(holdT);
+      if (swipe && e && e.type === 'pointerup') { const dx = e.clientX - swipe.x; if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(e.clientY - swipe.y)) { X.held = true; nextCam(swipe.el, dx < 0 ? 1 : -1); } }
+      swipe = null;
+    };
     el.addEventListener('click', onClick);
     el.addEventListener('pointerdown', onDown);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, onUp));
@@ -571,6 +599,8 @@
       X.el.querySelectorAll('img[data-cam]').forEach((im) => { const s = camSrc(im.dataset.cam); if (s && im.getAttribute('src') !== s) im.src = s; });
     };
     X.camT = setInterval(refreshCam, 10000);
+    const onResize = () => { if (kind() === 'tablet') { X.shell = null; render(); } };
+    if (typeof addEventListener === 'function') addEventListener('resize', onResize);
     X.clockT = setInterval(() => { if (!X.el.hidden) render(); }, 20000);
 
     return {
@@ -579,7 +609,7 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
-      destroy() { clearInterval(X.camT); clearInterval(X.clockT); el.removeEventListener('click', onClick); el.innerHTML = ''; },
+      destroy() { clearInterval(X.camT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };
   }

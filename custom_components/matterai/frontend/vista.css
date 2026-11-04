@@ -43,6 +43,8 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-cact{position:absolute;z-index:1;right:10px;bottom:10px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:62%}
 .v-gate{display:flex!important;align-items:center;gap:8px;padding:11px 15px!important;border-radius:13px;background:var(--warm)!important;color:#1b1408!important;font-weight:700!important}
 .v-gate.open{background:var(--red)!important;color:#1d0e0b!important}.v-gate.mv{background:var(--card2)!important;color:var(--fg)!important}
+.v-dots{position:absolute;z-index:1;top:12px;right:12px;display:flex;gap:5px;pointer-events:none}.v-dots b{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3)}.v-dots b.on{background:#fff}
+.v-cam{touch-action:pan-y}
 .v-cbtn{display:flex!important;align-items:center;gap:6px;padding:10px 12px!important;border-radius:12px;background:rgba(22,27,33,.82)!important;border:1px solid var(--line)!important;font-weight:600;font-size:12.5px}
 /* ambientes */
 .v-rooms{display:flex;flex-direction:column;gap:8px}
@@ -93,12 +95,12 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-clock{display:flex;align-items:center;gap:14px;cursor:pointer}.v-clock b{font-family:var(--f-mono);font-size:46px;font-weight:400;white-space:nowrap}.v-clock span{color:var(--muted);text-transform:capitalize;flex:1}
 /* plano */
 .v-plan{position:relative;width:100%;border-radius:20px;overflow:hidden;background:#181c24;border:1px solid var(--line)}
-.v-plan svg{position:absolute;inset:0;width:100%;height:100%}
+.v-plan>svg{position:absolute;inset:0;width:100%;height:100%}
 .v-plan.empty{aspect-ratio:.7;display:grid;place-items:center;text-align:center;color:var(--muted);padding:20px}
 .v-hit{fill:transparent;stroke:transparent;stroke-width:3;cursor:pointer;transition:fill .2s,stroke .2s}
 .v-hit:hover{fill:rgba(242,183,102,.08);stroke:rgba(242,183,102,.45)}
 .v-pin{position:absolute;transform:translate(-50%,-50%);display:flex;align-items:center;gap:5px;padding:5px 9px 5px 6px;border-radius:999px;background:rgba(18,22,29,.86);border:1px solid rgba(255,255,255,.18);font-size:11.5px;cursor:pointer;white-space:nowrap;user-select:none;-webkit-user-select:none}
-.v-pin svg.i{width:15px;height:15px;padding:3px;border-radius:50%;background:var(--off);color:#c4cad6;box-sizing:content-box}
+.v-pin b{font-weight:600}.v-pin svg.i{width:15px;height:15px;padding:3px;border-radius:50%;background:var(--off);color:#c4cad6;box-sizing:content-box}
 .v-pin.on svg.i{background:var(--warm);color:#1b1408}
 .v-ptag{position:absolute;left:50%;top:10px;transform:translateX(-50%);padding:5px 11px;border-radius:999px;background:rgba(20,25,32,.85);border:1px solid var(--line);font-size:11.5px;color:var(--muted);white-space:nowrap;pointer-events:none}
 /* todo / reproductor / barra (celular) */
@@ -116,18 +118,37 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-eq i{width:3px;border-radius:2px;background:var(--warm);animation:v-eq 1s infinite ease-in-out}.v-eq i:nth-child(2){animation-delay:.2s}.v-eq i:nth-child(3){animation-delay:.4s}
 @keyframes v-eq{0%,100%{height:4px}50%{height:12px}}
 /* ───── tablet (horizontal: plano · columnas; vertical: plano arriba) ───── */
-.vista.k-tablet{height:100vh;padding:16px;overflow:hidden}
+.vista.k-tablet{height:100vh;padding:16px;overflow:hidden;box-sizing:border-box}
 .v-tab{display:flex;gap:16px;height:100%}
 .v-c0{height:100%;flex:none;display:flex;flex-direction:column;gap:12px;max-width:46%}
 .v-c0 .v-b{height:100%}.v-c0 .v-plan{height:100%;width:auto;max-width:100%}
 .v-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
-.k-tablet .v-head .v-when b{font-size:46px}
+.k-tablet .v-head{gap:12px}.k-tablet .v-head .v-when b{font-size:50px;line-height:.95}.k-tablet .v-head .v-when span{font-size:13.5px}
+.k-tablet .v-chip{padding:10px 14px!important;border-radius:18px;font-size:22px;font-weight:400}.k-tablet .v-chip svg.i{width:26px;height:26px}
+.k-tablet .v-sq{width:44px;height:44px}
+.v-top:empty{display:none}
+.k-tablet .v-kpi{border-radius:16px}.k-tablet .v-kpi .l{font-size:11.5px}.k-tablet .v-kpi .v{font-size:19px}
+.k-tablet .v-c1>.v-b,.k-tablet .v-c2>.v-b{flex:none}
+.k-tablet :is(.v-c1,.v-c2)>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px}
+.k-tablet :is(.v-c1,.v-c2)>:is(.t-camera,.t-featured){padding:10px}.k-tablet :is(.v-c1,.v-c2)>:is(.t-camera,.t-featured)>h3{margin:4px 4px 10px}
+.k-tablet :is(.v-c1,.v-c2)>.v-b>h3{margin:0 0 10px}
+.k-tablet .v-b .v-card{border-radius:20px}
+.k-tablet .v-b .v-room,.k-tablet .v-b .v-tile,.k-tablet .v-b .v-scene,.k-tablet .v-b .v-btn,.k-tablet .v-b .v-kpi{background:var(--card2)!important;border-color:transparent!important}
+.k-tablet .v-b .v-tile.lit{background:linear-gradient(160deg,rgba(242,183,102,.18),var(--card2) 70%)!important;border-color:rgba(242,183,102,.3)!important}
+.k-tablet .v-b .v-scene.act{border-color:var(--warm)!important;background:var(--warm-s)!important}
+.k-tablet .v-top .v-kpi{background:var(--card)!important;border:1px solid var(--line)!important}
+.k-tablet .v-sgrid .v-scene{padding:14px 12px!important;border-radius:16px}
 .v-cols{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
 .v-c1,.v-c2{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto;scrollbar-width:none}
 .v-c1::-webkit-scrollbar,.v-c2::-webkit-scrollbar{display:none}
 .k-tablet .v-b>h3:first-child{margin-top:0}
 .v-dock{display:flex;justify-content:space-between;gap:6px;padding:8px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
-.v-dock .v-mic{margin-top:-18px}
+.vista .v-dock button{flex:1;width:auto;padding:8px 4px!important;border-radius:14px;font-size:11.5px;gap:4px}
+.vista .v-dock button svg.i{width:22px;height:22px}.vista .v-dock button.on{background:var(--card2)!important}
+.vista .v-nav .v-mic,.vista .v-dock .v-mic{display:grid!important;place-items:center;flex:none;padding:0!important}
+.vista .v-dock .v-mic{width:58px!important;height:58px;margin:-18px 6px 0;border-radius:50%;background:var(--fg)!important;color:var(--bg)!important}
+.vista .v-dock .v-mic svg.i{width:24px;height:24px}
+.v-dock .v-eq{top:4px;right:calc(50% - 20px)}
 .vista.k-tablet.vert{height:auto;min-height:100vh;overflow:visible}
 .vert .v-tab{flex-direction:column;height:auto}
 .vert .v-c0{max-width:none;height:auto}.vert .v-c0 .v-plan{height:auto;width:100%}
