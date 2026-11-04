@@ -44,15 +44,21 @@
   .cat{display:grid;grid-template-columns:1fr 1fr;gap:6px}
   .cat button{padding:10px;border-radius:12px;background:#1e242e;border:1px solid rgba(160,175,200,.15);text-align:left}.cat button b{display:block}.cat button small{color:#8f99ab;font-size:11.5px}
   .ed-c{overflow:auto;display:flex;align-items:flex-start;justify-content:center;padding:24px;background:#0b0e12}
-  .frame{position:relative;transform:translateZ(0);overflow:auto;border:10px solid #050608;border-radius:34px;background:#161b21;box-shadow:0 30px 80px rgba(0,0,0,.6);flex:none}
-  .frame .vista{min-height:100%!important;height:100%}
+  .fwrap{position:relative;flex:none}
+  .frame{position:absolute;left:0;top:0;transform-origin:0 0;border:10px solid #050608;border-radius:34px;background:#161b21;box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
+  .frame iframe{display:block;border:0;width:100%;height:100%;background:#161b21;border-radius:24px}
+  .pick{display:flex;flex-direction:column;gap:4px}
+  .pick input{padding:6px 10px!important;font-size:12.5px!important}
+  .pick select{width:100%}
+  :host{all:initial}
   .fld{display:flex;flex-direction:column;gap:4px;margin-bottom:10px}.fld>span{font-size:12px;color:#8f99ab}
   .fld input,.fld select,.fld textarea{width:100%;padding:8px 10px;border-radius:10px;border:1px solid rgba(160,175,200,.2);background:#0d1116;color:#e9ecf2;font:inherit}
   .fld textarea{min-height:60px;font-family:"Red Hat Mono",monospace;font-size:12px}
   .chk{display:flex;align-items:center;gap:8px;margin-bottom:10px}
-  .it{padding:10px;border-radius:12px;background:#1e242e;border:1px solid rgba(160,175,200,.15);margin-bottom:8px}
+  .it{display:block;padding:10px;border-radius:12px;background:#1e242e;border:1px solid rgba(160,175,200,.15);margin-bottom:8px}
+  .ed-r .fld,.ed-r .act,.ed-r .it>*{max-width:100%}
   .it .row{display:flex;gap:6px;align-items:center;margin-bottom:6px}.it .row b{flex:1}
-  .act{padding:8px;border-radius:10px;background:#161b21;margin-top:4px}
+  .act{display:block;padding:8px;border-radius:10px;background:#161b21;margin-top:4px}
   .ml{display:flex;flex-direction:column;gap:4px;max-height:220px;overflow:auto;padding:6px;border-radius:10px;background:#0d1116;border:1px solid rgba(160,175,200,.2)}
   .ml label{display:flex;align-items:center;gap:8px;font-size:13px}
   .ord{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:9px;background:#1e242e;margin-bottom:4px}.ord span{flex:1}
@@ -76,29 +82,47 @@
 
     async start() {
       await loadScript(`${BASE}/vista.js?t=${Date.now()}`);
-      const css = await fetch(`${BASE}/vista.css?t=${Date.now()}`).then((r) => r.text()).catch(() => '');
+      this.ver = Date.now();
       const [lst, cfg] = await Promise.all([this.hass.callWS({ type: 'matterai/views/list' }), this.hass.callWS({ type: 'matterai/config' })]);
       const v = lst.views.find((x) => x.id === this.viewId);
       if (!v) { this.p._toast('Ese dashboard no existe'); return; }
       this.cfg = cfg.config || {};
-      this.saved = clone(v);
-      this.v = clone(v);
+      this.v = Editor.normalize(clone(v));
+      this.K = v.kind || 'phone';
+      this.saved = clone(this.v);
       // la tarjeta MatterAI sin dibujarse: da el modelo de la casa (ambientes, luces, cámaras…)
       const Card = customElements.get('matterai-home-card');
       this.card = Card ? document.createElement('matterai-home-card') : null;
       if (this.card) { this.card.setAttribute('headless', ''); this.card.setConfig(Object.assign({}, this.cfg)); this.card.hass = this.hass; }
-      // estructura
+      // estructura: en su propio shadow root, así los estilos del panel no lo desacomodan
       const root = this.p.shadowRoot;
-      this.wrap = document.createElement('div');
-      this.wrap.innerHTML = `<style>${CSS}</style><style>${css}</style><div class="ed" id="ed"></div><div class="toastE" id="toastE"></div>`;
-      root.appendChild(this.wrap);
+      this.host = document.createElement('div');
+      root.appendChild(this.host);
+      this.wrap = this.host.attachShadow({ mode: 'open' });
+      this.wrap.innerHTML = `<style>${CSS}</style><div class="ed" id="ed"><div class="ed-top" id="edt"></div><div class="ed-l" id="edl"></div>
+        <div class="ed-c" id="edc"><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div></div></div><div class="ed-r" id="edr"></div></div><div class="toastE" id="toastE"></div>`;
       this.$ = (s) => this.wrap.querySelector(s);
-      if (!Array.isArray(this.v.blocks) || !this.v.blocks.length) this.prearmado(true);
+      if (!this.blocks().length) this.prearmado(true);
       this.draw();
+      this.resH = () => this.sizeFrame();
+      window.addEventListener('resize', this.resH);
       this.keyH = (e) => { if (e.key === 'Escape' && !this.pe) this.close(); };
       window.addEventListener('keydown', this.keyH);
       return this;
     }
+    /** Un dashboard tiene el diseño del celular y el de la tablet (layouts); los viejos tenían una sola lista. */
+    static normalize(v) {
+      v.layouts = v.layouts || {};
+      const k = v.kind || 'phone';
+      if (Array.isArray(v.blocks) && v.blocks.length && !(v.layouts[k] && v.layouts[k].blocks)) v.layouts[k] = { blocks: v.blocks, orientation: v.orientation || null };
+      delete v.blocks; delete v.orientation; delete v.updated; delete v.by;
+      return v;
+    }
+    get K() { return this._k || (this.v && this.v.kind) || 'phone'; }
+    set K(k) { this._k = k; }
+    lay() { const L = this.v.layouts || (this.v.layouts = {}); return L[this.K] || (L[this.K] = { blocks: [] }); }
+    /** Lo que ve el motor: el dashboard con las tarjetas del tipo que se está editando. */
+    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, layouts: undefined }); }
     model() { return this.card && this.card.model ? this.card.model() : null; }
     states() { return this.hass.states; }
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
@@ -109,30 +133,29 @@
 
     prearmado(silent) {
       const m = this.model();
-      const d = window.MaeVista.defaults(this.v.kind || 'phone', m || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, this.v, this.states(), this.cfg.floorplan);
+      const d = window.MaeVista.defaults(this.K, m || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, this.v, this.states(), this.cfg.floorplan);
       if (!silent) this.push();
-      this.v.blocks = d.blocks;
+      const l = this.lay();
+      l.blocks = d.blocks;
       if (!this.v.plan && d.plan) this.v.plan = d.plan;
-      if (!this.v.orientation) this.v.orientation = d.orientation;
+      if (this.K === 'tablet' && !l.orientation) l.orientation = d.orientation || 'landscape';
       if (!silent) { this.sel = null; this.draw(); this.toast('Listo: el prearmado con los equipos de esta casa'); }
     }
 
     /* ───────── dibujo ───────── */
     draw() {
-      const v = this.v, K = v.kind || 'phone';
-      this.$('#ed').innerHTML = `
-        <div class="ed-top"><button class="eb" data-e="close">← Volver</button><h2>${esc(v.name)}</h2>
-          <span class="eseg">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
-          ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${(v.orientation || 'landscape') === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
+      const v = this.v, K = this.K, ori = this.lay().orientation || 'landscape';
+      this.$('#edt').innerHTML = `<button class="eb" data-e="close">← Volver</button><h2>${esc(v.name)}</h2>
+          <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
+          ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
           <button class="eb" data-e="plan">Plano e imágenes</button><span class="sp"></span>
           <button class="eb" data-e="undo" ${this.undo.length ? '' : 'disabled'}>Deshacer</button><button class="eb" data-e="pre">Prearmado</button>
-          <button class="eb" data-e="reset" ${this.dirty() ? '' : 'disabled'}>Descartar cambios</button><button class="eb pri" data-e="save" ${this.dirty() ? '' : 'disabled'}>Guardar</button></div>
-        <div class="ed-l" id="edl"></div><div class="ed-c"><div class="frame" id="frame"></div></div><div class="ed-r" id="edr"></div>`;
+          <button class="eb" data-e="reset" ${this.dirty() ? '' : 'disabled'}>Descartar cambios</button><button class="eb pri" data-e="save" ${this.dirty() ? '' : 'disabled'}>Guardar</button>`;
       this.drawList(); this.drawPreview(); this.drawProps(); this.bind();
     }
-    blocks() { return this.v.blocks || (this.v.blocks = []); }
+    blocks() { const l = this.lay(); return l.blocks || (l.blocks = []); }
     drawList() {
-      const K = this.v.kind || 'phone', CAT = window.MaeVista.CATALOG;
+      const K = this.K, CAT = window.MaeVista.CATALOG;
       const row = (b) => `<div class="bl ${this.sel === b.id ? 'sel' : ''}" draggable="true" data-bl="${esc(b.id)}"><span class="h">⋮⋮</span>
         <span class="n">${esc((CAT[b.type] || {}).name || b.type)}<small>${esc(b.title || this.summary(b))}</small></span>
         <button data-mv="-1" title="Subir">↑</button><button data-mv="1" title="Bajar">↓</button>${K === 'tablet' ? '<button data-col="-1" title="Columna a la izquierda">←</button><button data-col="1" title="Columna a la derecha">→</button>' : ''}
@@ -155,34 +178,60 @@
       if (c.entities && c.entities.length) return `${c.entities.length} elegidas`;
       return '';
     }
-    drawPreview() {
-      const K = this.v.kind || 'phone', ori = this.v.orientation || 'landscape';
-      const fr = this.$('#frame');
+    /** Tamaño de la pantalla de la vista previa (celular 390×800, tablet 1180×760) escalada al lugar libre. */
+    sizeFrame() {
+      const K = this.K, ori = this.lay().orientation || 'landscape';
       const size = K === 'phone' ? [390, 800] : ori === 'portrait' ? [760, 1180] : [1180, 760];
-      const box = this.$('.ed-c').getBoundingClientRect();
-      const scale = Math.min(1, (box.width - 48) / (size[0] + 20), (box.height - 48) / (size[1] + 20));
-      fr.style.width = `${size[0]}px`; fr.style.height = `${size[1]}px`;
-      fr.style.transform = `translateZ(0) scale(${scale > 0 ? scale : 1})`; fr.style.transformOrigin = 'top center';
-      fr.innerHTML = '<div id="pv"></div>';
-      if (this.vista) this.vista.destroy();
-      this.vista = window.MaeVista.create(fr.querySelector('#pv'), {
-        card: this.card, hass: () => this.p._hass || this.hass, base: () => '', toast: () => {}, openEntity() {}, openMenu() {},
-        sign: async (path) => (await this.hass.callWS({ type: 'auth/sign_path', path, expires: 7200 })).path,
-        kind: K, orientation: ori, edit: { selected: this.sel, onSelect: (id) => { this.sel = id; this.drawList(); this.drawProps(); this.vista.setCtx({ edit: { selected: id, onSelect: this.vista._onSel } }); this.bind(); } },
-      });
-      this.vista._onSel = (id) => { this.sel = id; this.drawList(); this.drawProps(); this.vista.setCtx({ edit: { selected: id, onSelect: this.vista._onSel } }); this.bind(); };
-      this.vista.setView(this.v);
-      if (!this.card) fr.querySelector('#pv').innerHTML = '<p style="padding:20px;color:#8f99ab">La vista previa necesita la tarjeta MatterAI (recargá la página).</p>';
+      const box = this.$('#edc').getBoundingClientRect();
+      const W = size[0] + 20, H = size[1] + 20;
+      const sc = Math.max(0.2, Math.min(1, (box.width - 48) / W, (box.height - 48) / H));
+      const fr = this.$('#frame'), fw = this.$('#fwrap');
+      fr.style.width = `${W}px`; fr.style.height = `${H}px`; fr.style.transform = `scale(${sc})`;
+      fw.style.width = `${Math.round(W * sc)}px`; fw.style.height = `${Math.round(H * sc)}px`;
+      return size;
     }
+    /** La vista previa es una pantalla de verdad (un iframe con el motor de la app): la barra de abajo, el alto y el
+     *  ancho se comportan como en el equipo, y los estilos del panel no la tocan. */
+    drawPreview() {
+      const size = this.sizeFrame(), fr = this.$('#frame');
+      const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: { selected: this.sel, onSelect: (id) => this.pick(id) } });
+      if (this.vista && this.ifr && this.ifr.isConnected) { this.vista.setCtx(ctx()); this.vista.setView(this.viewFor()); return; }
+      if (!this.card) { fr.innerHTML = '<p style="padding:20px;color:#8f99ab">La vista previa necesita la tarjeta MatterAI (recargá la página).</p>'; return; }
+      fr.innerHTML = '';
+      const ifr = this.ifr = document.createElement('iframe');
+      ifr.title = 'Vista previa';
+      ifr.srcdoc = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500&display=swap">
+        <link rel="stylesheet" href="${BASE}/vista.css?t=${this.ver}"><style>html,body{margin:0;background:#161b21}</style></head>
+        <body><div id="pv"></div><script src="${BASE}/vista.js?t=${this.ver}"><\/script></body></html>`;
+      ifr.onload = () => {
+        const W = ifr.contentWindow;
+        if (!W || !W.MaeVista) { this.toast('No se pudo cargar la vista previa'); return; }
+        this.vista = W.MaeVista.create(W.document.getElementById('pv'), Object.assign({
+          card: this.card, hass: () => this.p._hass || this.hass, base: () => '', toast: () => {}, openEntity() {}, openMenu() {},
+          sign: async (path) => (await this.hass.callWS({ type: 'auth/sign_path', path, expires: 7200 })).path,
+        }, ctx()));
+        this.vista.setView(this.viewFor());
+      };
+      fr.appendChild(ifr);
+      void size;
+    }
+    pick(id) { this.sel = id; this.drawList(); this.drawProps(); if (this.vista) this.vista.setCtx({ edit: { selected: id, onSelect: (x) => this.pick(x) } }); this.bind(); }
 
     /* ───────── propiedades ───────── */
-    datalist(id, domains) {
-      const ids = Object.keys(this.states()).filter((e) => !domains || domains.includes(e.split('.')[0])).sort();
-      return `<datalist id="${id}">${ids.map((e) => `<option value="${esc(e)}">${esc(this.fname(e))}</option>`).join('')}</datalist>`;
+    entOptions(domains, val) {
+      const S = this.states();
+      const ids = Object.keys(S).filter((e) => !domains || domains.includes(e.split('.')[0]));
+      if (val && !ids.includes(val)) ids.push(val);
+      ids.sort((a, b) => this.fname(a).localeCompare(this.fname(b), 'es'));
+      if (domains && domains.length === 1) return ids.map((e) => `<option value="${esc(e)}" ${e === val ? 'selected' : ''}>${esc(this.fname(e))}</option>`).join('');
+      const by = {};
+      ids.forEach((e) => { (by[e.split('.')[0]] = by[e.split('.')[0]] || []).push(e); });
+      return Object.keys(by).sort().map((d) => `<optgroup label="${esc(d)}">${by[d].map((e) => `<option value="${esc(e)}" ${e === val ? 'selected' : ''}>${esc(this.fname(e))}</option>`).join('')}</optgroup>`).join('');
     }
     ent(label, key, val, domains, path) {
-      const dl = `dl-${key}-${(path || '').replace(/\W/g, '')}`;
-      return `<label class="fld"><span>${esc(label)}</span><input list="${dl}" data-f="${esc(path || key)}" value="${esc(val || '')}" placeholder="Buscar equipo…">${this.datalist(dl, domains)}${val ? `<small class="hint">${esc(this.fname(val))}</small>` : ''}</label>`;
+      return `<div class="fld"><span>${esc(label)}</span><div class="pick"><input data-pf placeholder="Buscar…" autocomplete="off">
+        <select data-f="${esc(path || key)}"><option value="">— Ninguno —</option>${this.entOptions(domains, val)}</select></div>${val ? `<small class="hint">${esc(val)}</small>` : ''}</div>`;
     }
     action(a, path, title) {
       a = a || { type: 'none' };
@@ -218,7 +267,8 @@
       const r = this.$('#edr');
       if (!b) {
         r.innerHTML = `<h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}"></label>
-          <p class="hint">Tocá una tarjeta en la vista previa (o en la lista) para editarla. Los cambios se ven al instante acá; al guardar, les llegan a los equipos con este dashboard, sin actualizar la app.</p>`;
+          <p class="hint">Estás editando el diseño para <b>${this.K === 'tablet' ? 'la tablet' : 'el celular'}</b>. Cambiá arriba entre Celular y Tablet: cada uno tiene el suyo, y los dos se guardan juntos.</p>
+          <p class="hint">Tocá una tarjeta en la vista previa (o en la lista) para editarla. Al guardar, les llega a los equipos con este dashboard al instante, sin actualizar la app.</p>`;
         return;
       }
       b.cfg = b.cfg || {};
@@ -230,6 +280,7 @@
         case 'kpis': h += autoChk('Automático (lo elige la app según la casa)') + (c.auto ? '' : this.items(b, { title: 'Datos', kpi: true, hold: false })); break;
         case 'featured': case 'camera':
           h += this.ent('Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate');
+          h += this.multi('Más cámaras (se pasan con «Otra cámara» o deslizando)', 'entities', c.entities, opts(PICK.camera).filter(([e]) => e !== c.entity));
           if (b.type === 'camera') h += this.items(b, { title: 'Botones extra', hold: true });
           break;
         case 'rooms':
@@ -248,7 +299,7 @@
         case 'plan': h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>'; break;
         default: h += '<p class="hint">Esta tarjeta no tiene opciones.</p>';
       }
-      if ((this.v.kind || 'phone') === 'tablet') h += `<label class="fld"><span>Columna</span><select data-f="col">${[[0, 'Del plano'], [1, 'Columna 1'], [2, 'Columna 2']].map(([k, l]) => `<option value="${k}" ${(b.col || 0) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+      if (this.K === 'tablet') h += `<label class="fld"><span>Columna</span><select data-f="col">${[[0, 'Del plano'], [1, 'Columna 1'], [2, 'Columna 2']].map(([k, l]) => `<option value="${k}" ${(b.col || 0) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
       r.innerHTML = h;
     }
 
@@ -263,10 +314,20 @@
     bind() {
       const W = this.wrap;
       W.querySelectorAll('[data-e]').forEach((x) => { x.onclick = () => this.cmd(x.dataset.e); });
-      W.querySelectorAll('[data-kind]').forEach((x) => { x.onclick = () => this.change(() => { this.v.kind = x.dataset.kind; if (!confirm('¿Rearmar las tarjetas para este tipo de equipo? (Cancelar deja las tarjetas como están)')) return; this.prearmado(true); }); });
-      W.querySelectorAll('[data-ori]').forEach((x) => { x.onclick = () => this.change(() => { this.v.orientation = x.dataset.ori; }); });
+      W.querySelectorAll('[data-kind]').forEach((x) => { x.onclick = () => {
+        if (x.dataset.kind === this.K) return;
+        this.K = x.dataset.kind; this.sel = null;
+        if (!this.blocks().length) this.prearmado(true); // todavía no tiene diseño para este tipo: arranca del prearmado
+        this.draw();
+      }; });
+      W.querySelectorAll('[data-ori]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().orientation = x.dataset.ori; }); });
+      W.querySelectorAll('[data-pf]').forEach((x) => { x.oninput = () => {
+        const q = x.value.trim().toLowerCase(), sel = x.parentNode.querySelector('select');
+        [...sel.options].forEach((o) => { o.hidden = !!q && o.value !== '' && !(`${o.textContent} ${o.value}`.toLowerCase().includes(q)); });
+        const first = [...sel.options].find((o) => !o.hidden && o.value); if (q && first) sel.size = Math.min(8, [...sel.options].filter((o) => !o.hidden).length + 1); else sel.size = 0;
+      }; });
       W.querySelectorAll('[data-add]').forEach((x) => { x.onclick = () => this.change(() => {
-        const K = this.v.kind || 'phone', id = `${x.dataset.add}-${window.MaeVista.uid()}`.slice(0, 24);
+        const K = this.K, id = `${x.dataset.add}-${window.MaeVista.uid()}`.slice(0, 24);
         const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] } }[x.dataset.add] || {};
         this.blocks().push({ id, type: x.dataset.add, col: K === 'tablet' ? (x.dataset.add === 'plan' ? 0 : 1) : 0, title: window.MaeVista.CATALOG[x.dataset.add].name, cfg });
         this.sel = id;
@@ -305,7 +366,10 @@
           this.change(() => this.setPath(b, path, val));
         };
       });
-      W.querySelectorAll('#edr [data-fb]').forEach((x) => { x.onchange = () => this.change(() => this.setPath(b, x.dataset.fb, x.checked)); });
+      W.querySelectorAll('#edr [data-fb]').forEach((x) => { x.onchange = () => this.change(() => {
+        if (x.dataset.fb === 'cfg.auto' && !x.checked) this.fromAuto(b); // pasa a manual con lo que se está viendo, para editarlo
+        this.setPath(b, x.dataset.fb, x.checked);
+      }); });
       W.querySelectorAll('#edr [data-fj]').forEach((x) => { x.onchange = () => { let val = null; try { val = x.value.trim() ? JSON.parse(x.value) : null; } catch (_) { this.toast('Los datos tienen que ser JSON, por ejemplo {"entity_id": "script.riego"}'); return; } this.change(() => this.setPath(b, x.dataset.fj, val)); }; });
       W.querySelectorAll('#edr [data-v]').forEach((x) => { x.onchange = () => this.change(() => { this.v[x.dataset.v] = x.value; }); });
       W.querySelectorAll('#edr [data-iadd]').forEach((x) => { x.onclick = () => this.change(() => { b.cfg.items = b.cfg.items || []; b.cfg.items.push(b.type === 'kpis' ? { kind: 'lights' } : { tap: { type: 'toggle' } }); }); });
@@ -314,11 +378,21 @@
       W.querySelectorAll('#edr [data-mk]').forEach((x) => { x.onchange = () => this.change(() => { const k = x.dataset.mk, L = (b.cfg[k] = b.cfg[k] || []); if (x.checked) { if (!L.includes(x.value)) L.push(x.value); } else b.cfg[k] = L.filter((y) => y !== x.value); }); });
       W.querySelectorAll('#edr [data-omv]').forEach((x) => { x.onclick = () => this.change(() => { const L = b.cfg[x.dataset.omv], i = +x.dataset.i, j = i + +x.dataset.d; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; }); });
     }
+    /** «Automático» → manual: arranca con lo que la app está mostrando (así se puede cambiar lo que ya está). */
+    fromAuto(b) {
+      const c = b.cfg = b.cfg || {}, m = this.model(), S = this.states();
+      if (b.type === 'kpis' && !(c.items && c.items.length)) {
+        const shown = this.vista && this.vista._test && this.vista._test.X.kpiItems && this.vista._test.X.kpiItems[b.id];
+        c.items = clone(shown && shown.length ? shown : [{ kind: 'lights' }, { kind: 'temp' }, { kind: 'alarm' }]);
+      }
+      if (b.type === 'scenes' && !(c.entities && c.entities.length)) c.entities = ((m && m.scenes) || []).filter((id) => S[id]).slice(0, 12);
+      if (b.type === 'routines' && !(c.entities && c.entities.length)) c.entities = Object.keys(S).filter((x) => x.startsWith('automation.')).slice(0, 4);
+    }
     move(id, d) {
       const B = this.blocks(), i = B.findIndex((b) => b.id === id), col = B[i].col || 0;
       // el vecino de la misma columna
       let j = i + d;
-      while (j >= 0 && j < B.length && (B[j].col || 0) !== col && (this.v.kind || 'phone') === 'tablet') j += d;
+      while (j >= 0 && j < B.length && (B[j].col || 0) !== col && this.K === 'tablet') j += d;
       if (j < 0 || j >= B.length) return;
       [B[i], B[j]] = [B[j], B[i]];
     }
@@ -333,11 +407,13 @@
       if (k === 'reset') { this.push(); this.v = clone(this.saved); this.draw(); return; }
       if (k === 'plan') return this.planEditor();
       if (k === 'save') {
-        const v = this.v;
-        const out = { id: v.id, name: v.name, kind: v.kind || 'phone', orientation: v.orientation || null, blocks: v.blocks || [], plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
+        const v = this.v, L = v.layouts || {};
+        const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null } : null);
+        const out = { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
+          plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
         try {
           const res = await this.hass.callWS({ type: 'matterai/views/save', view: out });
-          this.saved = clone(res); this.v = clone(res); this.undo = []; this.draw();
+          this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = []; this.draw();
           this.toast('Guardado: los equipos con este dashboard lo ven al instante');
         } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
       }
@@ -345,8 +421,9 @@
     close() {
       if (this.dirty() && !confirm('Hay cambios sin guardar. ¿Salir igual?')) return;
       window.removeEventListener('keydown', this.keyH);
+      window.removeEventListener('resize', this.resH);
       if (this.vista) this.vista.destroy();
-      this.wrap.remove();
+      this.host.remove();
       if (this.p._renderViews) this.p._renderViews();
     }
 

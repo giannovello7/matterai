@@ -23,7 +23,7 @@ from homeassistant.helpers import config_validation as cv
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
-from .view_schema import BLOCK, PLAN, check_size
+from .view_schema import BLOCK, PLAN, check_size, layout_schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +48,11 @@ VIEW_SCHEMA = vol.Schema({
     vol.Optional("orientation"): vol.Any(None, vol.In(["landscape", "portrait", "auto"])),
     vol.Optional("blocks"): vol.Any(None, vol.All([BLOCK], vol.Length(max=MAX_BLOCKS))),
     vol.Optional("plan"): vol.Any(None, PLAN),
+    # desde la 2.14: un mismo dashboard (el de una persona) tiene su diseño de celular y el de tablet
+    vol.Optional("layouts"): vol.Any(None, vol.Schema({
+        vol.Optional("phone"): vol.Any(None, layout_schema(MAX_BLOCKS)),
+        vol.Optional("tablet"): vol.Any(None, layout_schema(MAX_BLOCKS)),
+    }, extra=vol.REMOVE_EXTRA)),
 }, extra=vol.REMOVE_EXTRA)
 VIEW_SCHEMA = vol.All(VIEW_SCHEMA, check_size)
 
@@ -62,16 +67,18 @@ class Views:
         self._store: Store = Store(hass, 1, STORAGE_KEY)
         self.views: dict[str, dict[str, Any]] = {}
         self.assign: dict[str, str] = {}  # device_id de mobile_app → id del dashboard
+        self.users: dict[str, str] = {}   # usuario de un equipo vinculado → id del dashboard (anda aunque no haya mobile_app)
         self.default: str | None = None
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
         self.views = data.get("views") or {}
         self.assign = data.get("assign") or {}
+        self.users = data.get("users") or {}
         self.default = data.get("default")
 
     def _save(self) -> None:
-        self._store.async_delay_save(lambda: {"views": self.views, "assign": self.assign, "default": self.default}, 2)
+        self._store.async_delay_save(lambda: {"views": self.views, "assign": self.assign, "users": self.users, "default": self.default}, 2)
 
     def put(self, view: dict[str, Any], by: str = "instalador") -> dict[str, Any]:
         vid = view.get("id") or uuid.uuid4().hex[:10]
@@ -89,6 +96,7 @@ class Views:
             return False
         self.views.pop(vid)
         self.assign = {d: v for d, v in self.assign.items() if v != vid}
+        self.users = {u: v for u, v in self.users.items() if v != vid}
         if self.default == vid:
             self.default = None
         self._save()
@@ -103,12 +111,53 @@ class Views:
             self.assign.pop(device_id, None)
         self._save()
 
+    def set_user(self, user_id: str, vid: str | None) -> None:
+        if vid:
+            if vid not in self.views:
+                raise ValueError("Ese dashboard no existe")
+            self.users[user_id] = vid
+        else:
+            self.users.pop(user_id, None)
+        self._save()
+
     def for_device(self, device_id: str) -> dict[str, Any] | None:
         vid = self.assign.get(device_id) or self.default
         return self.views.get(vid) if vid else None
 
     def devices_of(self, vid: str) -> list[str]:
         return [d for d, v in self.assign.items() if v == vid]
+
+
+def resolve(view: dict[str, Any] | None, kind: str | None) -> dict[str, Any] | None:
+    """El dashboard listo para un equipo: con las tarjetas del diseño de su tipo (celular o tablet).
+
+    Sin diseño para ese tipo, va sin tarjetas y la app arma el prearmado. Los dashboards viejos
+    (una sola lista de tarjetas) valen para el tipo con el que se crearon."""
+    if not view:
+        return view
+    kind = kind if kind in KINDS else view.get("kind", "phone")
+    lay = (view.get("layouts") or {}).get(kind)
+    if lay is None and view.get("blocks") and view.get("kind", "phone") == kind:
+        lay = {"blocks": view.get("blocks"), "orientation": view.get("orientation")}
+    out = {k: val for k, val in view.items() if k != "layouts"}
+    out["kind"] = kind
+    out["blocks"] = (lay or {}).get("blocks") or None
+    out["orientation"] = (lay or {}).get("orientation") or view.get("orientation")
+    return out
+
+
+def _user_devices(hass: HomeAssistant, user_ids: set[str]) -> list[str]:
+    from .app_devices import app_entries  # noqa: PLC0415
+
+    return [e.data.get("device_id") for e in app_entries(hass) if e.data.get("user_id") in user_ids and e.data.get("device_id")]
+
+
+def _targets(hass: HomeAssistant, v: Views, vid: str) -> list[str]:
+    """Los equipos que muestran ese dashboard (por equipo o por su usuario)."""
+    if v.default == vid:
+        return ["all"]
+    out = set(v.devices_of(vid)) | set(_user_devices(hass, {u for u, x in v.users.items() if x == vid}))
+    return sorted(out)
 
 
 def _notify(hass: HomeAssistant, device_ids: list[str]) -> None:
@@ -137,13 +186,27 @@ def _owns_device(hass: HomeAssistant, user_id: str, device_id: str) -> bool:
 @websocket_api.require_admin
 @callback
 def ws_views_list(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    from .app_devices import app_entries  # noqa: PLC0415
+
     v = _rt(hass).get("views")
     ad = _rt(hass).get("app_devices")
+    house = _rt(hass).get("house")
     if v is None:
         connection.send_error(msg["id"], "not_setup", "La integración MatterAI no está configurada")
         return
     devices = [{"device_id": d["device_id"], "name": d["name"], "model": d.get("model", ""), "view": v.assign.get(d["device_id"])} for d in (ad.listing() if ad else [])]
-    connection.send_result(msg["id"], {"views": list(v.views.values()), "default": v.default, "devices": devices})
+    # cada equipo vinculado (celular o tablet) con su acceso propio: aparece aunque no se haya registrado en mobile_app
+    entries = app_entries(hass)
+    people = []
+    for d in (house.listing() if house else []):
+        mine = [e for e in entries if e.data.get("user_id") == d["user_id"]]
+        people.append({
+            "user_id": d["user_id"], "name": d.get("name") or "Equipo", "last_used": d.get("last_used"),
+            "model": " ".join(x for x in (mine[0].data.get("manufacturer"), mine[0].data.get("model")) if x) if mine else "",
+            "devices": [e.data.get("device_id") for e in mine if e.data.get("device_id")],
+            "view": v.users.get(d["user_id"]) or next((v.assign[e.data["device_id"]] for e in mine if v.assign.get(e.data.get("device_id"))), None),
+        })
+    connection.send_result(msg["id"], {"views": list(v.views.values()), "default": v.default, "devices": devices, "people": people})
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/views/save", vol.Required("view"): dict})
@@ -156,7 +219,7 @@ def ws_views_save(hass: HomeAssistant, connection: websocket_api.ActiveConnectio
     except (vol.Invalid, ValueError) as err:
         connection.send_error(msg["id"], "invalid", str(err))
         return
-    _notify(hass, v.devices_of(view["id"]) or (["all"] if v.default == view["id"] else []))
+    _notify(hass, _targets(hass, v, view["id"]))
     connection.send_result(msg["id"], view)
 
 
@@ -165,7 +228,7 @@ def ws_views_save(hass: HomeAssistant, connection: websocket_api.ActiveConnectio
 @callback
 def ws_views_delete(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     v = _rt(hass).get("views")
-    devs = v.devices_of(msg["view_id"])
+    devs = _targets(hass, v, msg["view_id"])
     if not v.delete(msg["view_id"]):
         connection.send_error(msg["id"], "not_found", "Ese dashboard no existe")
         return
@@ -191,6 +254,34 @@ def ws_views_assign(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     connection.send_result(msg["id"], {"ok": True})
 
 
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/views/assign_user",
+    vol.Required("user_id"): vol.All(str, vol.Length(max=64)),
+    vol.Optional("view_id"): vol.Any(str, None),
+})
+@websocket_api.require_admin
+@callback
+def ws_views_assign_user(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Asignar un dashboard a un equipo vinculado (su usuario), aunque no esté registrado en mobile_app."""
+    v = _rt(hass).get("views")
+    house = _rt(hass).get("house")
+    uid = msg["user_id"]
+    if v is None or house is None or not house.is_device_user(uid):
+        connection.send_error(msg["id"], "not_found", "Ese equipo no está vinculado")
+        return
+    try:
+        v.set_user(uid, msg.get("view_id"))
+    except ValueError as err:
+        connection.send_error(msg["id"], "invalid", str(err))
+        return
+    devs = _user_devices(hass, {uid})
+    for d in devs:  # lo elegido para el equipo manda sobre una asignación vieja por mobile_app
+        v.assign.pop(d, None)
+    v._save()  # noqa: SLF001
+    _notify(hass, devs)
+    connection.send_result(msg["id"], {"ok": True})
+
+
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/views/default", vol.Optional("view_id"): vol.Any(str, None)})
 @websocket_api.require_admin
 @callback
@@ -207,7 +298,7 @@ def ws_views_default(hass: HomeAssistant, connection: websocket_api.ActiveConnec
 
 
 # ---------------------------------------------------------------- la app
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/view", vol.Required("device_id"): str})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/view", vol.Required("device_id"): str, vol.Optional("kind"): vol.In(KINDS)})
 @callback
 def ws_app_view(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     """El dashboard de este equipo (o el general de la casa, o ninguno: la app arma el suyo por defecto)."""
@@ -217,8 +308,9 @@ def ws_app_view(hass: HomeAssistant, connection: websocket_api.ActiveConnection,
         connection.send_error(msg["id"], "unauthorized", "Este usuario no es un equipo de la casa")
         return
     mine = v.assign.get(msg["device_id"]) if _owns_device(hass, connection.user.id, msg["device_id"]) else None
+    mine = (mine if mine in v.views else None) or (v.users.get(connection.user.id) if house.is_device_user(connection.user.id) else None)
     view = v.views.get(mine) if mine else (v.views.get(v.default) if v.default else None)
-    connection.send_result(msg["id"], {"view": view, "personal": bool(mine)})
+    connection.send_result(msg["id"], {"view": resolve(view, msg.get("kind")), "personal": bool(mine)})
 
 
 @websocket_api.websocket_command({
@@ -237,6 +329,8 @@ def ws_app_view_pin(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         connection.send_error(msg["id"], "unauthorized", "Este equipo no puede cambiar ese dashboard")
         return
     vid = v.assign.get(msg["device_id"])
+    if not (vid and v.views.get(vid)) and house.is_device_user(uid):
+        vid = v.users.get(uid)
     if vid and v.views.get(vid):
         base = v.views[vid]
     else:
@@ -246,11 +340,20 @@ def ws_app_view_pin(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         base = {"name": name[:40], "kind": (gen or {}).get("kind", "phone"), "featured": dict((gen or {}).get("featured") or {}), "scenes": (gen or {}).get("scenes")}
     who = (house.devices.get(uid) or {}).get("name") or "app"
     new = {**base, "pinned": msg["pinned"]}
-    blocks = [dict(b) for b in (base.get("blocks") or [])]
-    rb = next((b for b in blocks if b.get("type") == "rooms"), None)
-    if rb is not None:  # con el editor de tarjetas: lo fijado es la tarjeta de ambientes
-        rb["cfg"] = {**(rb.get("cfg") or {}), "rooms": msg["pinned"], "auto": False}
-        new["blocks"] = blocks
+    def pin_rooms(blocks: list | None) -> list | None:
+        """Con el editor de tarjetas: lo fijado es la tarjeta de ambientes."""
+        if not blocks:
+            return blocks
+        out = [dict(b) for b in blocks]
+        rb = next((b for b in out if b.get("type") == "rooms"), None)
+        if rb is not None:
+            rb["cfg"] = {**(rb.get("cfg") or {}), "rooms": msg["pinned"], "auto": False}
+        return out
+
+    if base.get("blocks"):
+        new["blocks"] = pin_rooms(base["blocks"])
+    if base.get("layouts"):
+        new["layouts"] = {k: ({**lay, "blocks": pin_rooms(lay.get("blocks"))} if lay else lay) for k, lay in base["layouts"].items()}
     try:
         clean = VIEW_SCHEMA({k: val for k, val in new.items() if k not in ("updated", "by")})
     except vol.Invalid as err:
@@ -258,10 +361,13 @@ def ws_app_view_pin(hass: HomeAssistant, connection: websocket_api.ActiveConnect
         return
     view = v.put(clean, by=f"app · {who}")
     if not vid:
-        v.set_assign(msg["device_id"], view["id"])
-    others = [d for d in v.devices_of(view["id"]) if d != msg["device_id"]]
+        if house.is_device_user(uid):
+            v.set_user(uid, view["id"])
+        else:
+            v.set_assign(msg["device_id"], view["id"])
+    others = [d for d in _targets(hass, v, view["id"]) if d != msg["device_id"]]
     _notify(hass, others)  # sus otros equipos (celular y tablet de la misma persona) se actualizan
     connection.send_result(msg["id"], view)
 
 
-WS_COMMANDS = (ws_views_list, ws_views_save, ws_views_delete, ws_views_assign, ws_views_default, ws_app_view, ws_app_view_pin)
+WS_COMMANDS = (ws_views_list, ws_views_save, ws_views_delete, ws_views_assign, ws_views_assign_user, ws_views_default, ws_app_view, ws_app_view_pin)

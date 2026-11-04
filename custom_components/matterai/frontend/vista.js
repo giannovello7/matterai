@@ -418,7 +418,7 @@
         X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}`;
         X.el.innerHTML = K === 'tablet'
           ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
-          : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav>${shared()}`;
+          : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`;
       }
       set('#v-head', head(m, K === 'phone'));
       const bl = L.blocks;
@@ -440,7 +440,7 @@
         set('#v-c1', bl.map((b) => wrapBlock(b, m)).join(''));
         set('#v-allb', `${ic('grid')}Toda la casa`);
         // reproductor: sólo con música; se esconde al botón Música
-        const p = editing() ? null : player();
+        const p = player();
         if (!p) X.hidePlayer = false;
         const shown = !!p && !X.hidePlayer, pl = X.el.querySelector('#v-player');
         pl.classList.toggle('hide', !shown); X.el.classList.toggle('with-player', shown);

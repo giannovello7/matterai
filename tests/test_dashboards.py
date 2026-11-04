@@ -74,7 +74,7 @@ async def test_pin_from_app_creates_personal_and_follows_person(hass, hass_ws_cl
     v = msg["result"]
     assert v["name"] == "Celu Gianfranco" and v["pinned"] == ["Garage", "Dormitorio"] and v["by"].startswith("app")
     views = hass.data[DOMAIN]["views"]
-    assert views.assign["dev-g"] == v["id"], "se le asigna su dashboard personal"
+    assert views.users[gian["user_id"]] == v["id"], "se le asigna su dashboard personal (a su equipo vinculado)"
     # el instalador le asigna el mismo dashboard a la tablet de la misma persona: lo que fija en el celular aparece ahí
     views.set_assign("dev-tablet", v["id"])
     msg = await _ws(hass_ws_client, hass, gian["token"], 2, {"type": "matterai/app/view_pin", "device_id": "dev-g", "pinned": ["Dormitorio", "Garage", "Baño"]})
@@ -253,3 +253,58 @@ async def test_prearmado_from_app_engine_is_valid(hass, hass_ws_client) -> None:
         msg = await ws.receive_json()
         assert msg["success"], (kind, msg)
         assert msg["result"]["kind"] == kind and len(msg["result"]["blocks"]) == len(view["blocks"])
+
+
+# ---------------------------------------------------------------- un dashboard, dos diseños (2.14)
+PHONE = [{"id": "k", "type": "kpis", "cfg": {"auto": True}}, {"id": "r", "type": "rooms", "cfg": {"rooms": ["Garage"]}}]
+TABLET = [{"id": "p", "type": "plan", "col": 0}, {"id": "r", "type": "rooms", "col": 2, "cfg": {"rooms": ["Garage"]}}]
+
+
+async def test_one_dashboard_two_layouts(hass, hass_ws_client, hass_client_no_auth) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    gian = await _phone(hass, hass_ws_client, client, "Celu Gianfranco", "dev-g")
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Gianfranco", "kind": "phone",
+                        "layouts": {"phone": {"blocks": PHONE}, "tablet": {"blocks": TABLET, "orientation": "portrait"}}}})
+    v = (await ws.receive_json())["result"]
+    await ws.send_json({"id": 2, "type": "matterai/views/assign_user", "user_id": gian["user_id"], "view_id": v["id"]})
+    assert (await ws.receive_json())["success"]
+    tab = await _ws(hass_ws_client, hass, gian["token"], 3, {"type": "matterai/app/view", "device_id": "dev-g", "kind": "tablet"})
+    assert tab["result"]["view"]["kind"] == "tablet" and tab["result"]["view"]["blocks"][0]["type"] == "plan" and tab["result"]["view"]["orientation"] == "portrait"
+    assert "layouts" not in tab["result"]["view"], "al equipo le llega sólo su diseño"
+    cel = await _ws(hass_ws_client, hass, gian["token"], 4, {"type": "matterai/app/view", "device_id": "dev-g", "kind": "phone"})
+    assert cel["result"]["view"]["blocks"][0]["type"] == "kpis"
+    old = await _ws(hass_ws_client, hass, gian["token"], 5, {"type": "matterai/app/view", "device_id": "dev-g"})
+    assert old["result"]["view"]["blocks"][0]["type"] == "kpis", "la app 1.6 (sin «kind») recibe el diseño del tipo del dashboard"
+    # fijar desde la app cambia la tarjeta de ambientes de los dos diseños
+    msg = await _ws(hass_ws_client, hass, gian["token"], 6, {"type": "matterai/app/view_pin", "device_id": "dev-g", "pinned": ["Dormitorio", "Garage"]})
+    assert msg["success"], msg
+    lay = hass.data[DOMAIN]["views"].views[v["id"]]["layouts"]
+    assert all(next(b for b in lay[k]["blocks"] if b["type"] == "rooms")["cfg"]["rooms"] == ["Dormitorio", "Garage"] for k in ("phone", "tablet"))
+
+
+async def test_assign_to_linked_equipo_without_mobile_app(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """Un celular vinculado que todavía no se registró en mobile_app igual aparece y se le asigna dashboard."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    _, p = await _pair(client, decode((await _link(await hass_ws_client(hass)))["code"])["c"], "Celu Ana")
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Ana", "layouts": {"phone": {"blocks": PHONE}}}})
+    v = (await ws.receive_json())["result"]
+    await ws.send_json({"id": 2, "type": "matterai/views/list"})
+    people = (await ws.receive_json())["result"]["people"]
+    assert [x["name"] for x in people] == ["Celu Ana"] and people[0]["view"] is None
+    await ws.send_json({"id": 3, "type": "matterai/views/assign_user", "user_id": p["user_id"], "view_id": v["id"]})
+    assert (await ws.receive_json())["success"]
+    msg = await _ws(hass_ws_client, hass, p["token"], 4, {"type": "matterai/app/view", "device_id": "cualquiera", "kind": "phone"})
+    assert msg["result"]["view"]["name"] == "Ana" and msg["result"]["personal"] is True
+    # NEGATIVO: el celular no se asigna dashboards; ni a un usuario que no es un equipo de la casa
+    msg = await _ws(hass_ws_client, hass, p["token"], 5, {"type": "matterai/views/assign_user", "user_id": p["user_id"], "view_id": None})
+    assert not msg["success"] and msg["error"]["code"] == "unauthorized"
+    await ws.send_json({"id": 6, "type": "matterai/views/assign_user", "user_id": "no-existe", "view_id": v["id"]})
+    assert (await ws.receive_json())["error"]["code"] == "not_found"
+    # al borrar el dashboard, el equipo vuelve al general
+    await ws.send_json({"id": 7, "type": "matterai/views/delete", "view_id": v["id"]})
+    await ws.receive_json()
+    assert p["user_id"] not in hass.data[DOMAIN]["views"].users

@@ -121,10 +121,20 @@ PLAN = vol.Schema({
 }, extra=vol.REMOVE_EXTRA)
 
 
+def layout_schema(max_blocks: int) -> vol.Schema:
+    """Un diseño (el del celular o el de la tablet) de un dashboard."""
+    return vol.Schema({
+        vol.Optional("blocks"): vol.Any(None, vol.All([BLOCK], vol.Length(max=max_blocks))),
+        vol.Optional("orientation"): vol.Any(None, vol.In(["landscape", "portrait", "auto"])),
+    }, extra=vol.REMOVE_EXTRA)
+
+
 def check_size(view: dict[str, Any]) -> dict[str, Any]:
     if len(json.dumps(view, ensure_ascii=False)) > MAX_VIEW_BYTES:
         raise vol.Invalid("el dashboard es demasiado grande")
-    ids = [b["id"] for b in view.get("blocks") or []]
-    if len(ids) != len(set(ids)):
-        raise vol.Invalid("hay tarjetas repetidas")
+    lays = [view.get("blocks") or []] + [(lay or {}).get("blocks") or [] for lay in (view.get("layouts") or {}).values()]
+    for blocks in lays:
+        ids = [b["id"] for b in blocks]
+        if len(ids) != len(set(ids)):
+            raise vol.Invalid("hay tarjetas repetidas")
     return view
