@@ -1,10 +1,12 @@
 version: 2
 updates:
+  # las acciones de GitHub, todas juntas una vez por mes
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
-  - package-ecosystem: pip
-    directory: /
-    schedule:
-      interval: weekly
+      interval: monthly
+    groups:
+      acciones:
+        patterns: ["*"]
+  # requirements_test.txt NO va acá: esas versiones van atadas a la de Home Assistant de prueba y se suben juntas a mano.
+  # Las fallas conocidas de lo que se instala en cada casa las revisa pip-audit en el CI (todas las semanas).
