@@ -179,6 +179,9 @@ def ws_app_device_set(hass: HomeAssistant, connection: websocket_api.ActiveConne
         connection.send_error(msg["id"], "not_setup", "La integración MatterAI no está configurada")
         return
     ad.set(msg["device_id"], msg.get("profile"), msg.get("secure"))
+    from .audit import log as audit_log  # noqa: PLC0415
+
+    audit_log(hass, "access", "perfil del equipo", msg["device_id"], "instalador", f"perfil {msg.get('profile') or '='}{' · pedir huella' if msg.get('secure') else ''}")
     # la app de ese equipo lo toma al momento
     hass.bus.async_fire(EVENT_COMMAND, {"id": uuid.uuid4().hex, "command": "profile", "target": [msg["device_id"]]})
     connection.send_result(msg["id"], {"ok": True})

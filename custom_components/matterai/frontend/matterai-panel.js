@@ -49,6 +49,7 @@
     { k: 'backup', l: 'Copias de seguridad', i: 'mdi:backup-restore' },
     { k: 'tpl', l: 'Plantillas', i: 'mdi:package-variant-closed' },
     { k: 'conn', l: 'Conexiones', i: 'mdi:lan-connect' },
+    { k: 'sec', l: 'Seguridad', i: 'mdi:shield-account-outline' },
     { k: 'voice', l: 'Voz', i: 'mdi:microphone-outline' },
     { k: 'house', l: 'Ficha de la casa', i: 'mdi:home-city-outline' },
   ];
@@ -62,6 +63,7 @@
     backup: ['Copias de seguridad', 'El diseño de la app, las automatizaciones y sus ajustes. Restaurar todo o algunas.', 'system'],
     tpl: ['Plantillas', 'Automatizaciones y diseños armados acá para reutilizar en otras casas.', 'system'],
     conn: ['Conexiones', 'Acceso de la app, acceso remoto y panel central.', 'system'],
+    sec: ['Seguridad', 'Registro de quién abrió, desarmó o miró qué, y cómo entra el instalador a esta casa.', 'system'],
     voice: ['Voz', 'Control por voz de la app y las frases que no entendió.', 'system'],
     house: ['Ficha de la casa', 'Datos del cliente, versiones e identificación de la instalación.', 'system'],
   };
@@ -238,7 +240,7 @@
     }
     _render(tab, quiet = false) {
       const R = { home: this._renderHome, dash: this._renderDash, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
-        backup: () => this._renderCopias('backup'), tpl: () => this._renderCopias('tpl'), conn: this._renderConn, voice: this._renderVoice, house: this._renderHouse };
+        backup: () => this._renderCopias('backup'), tpl: () => this._renderCopias('tpl'), conn: this._renderConn, voice: this._renderVoice, house: this._renderHouse, sec: this._renderSec };
       const main = this.shadowRoot.getElementById('main');
       if (!quiet) main.innerHTML = `${this._head(tab)}<div class="box"><p class="mut">Cargando…</p></div>`;
       Promise.resolve(R[tab].call(this, quiet)).catch((e) => {
@@ -688,6 +690,44 @@
           try { await this._hass.callWS(msg); this._toast('Guardado: el equipo lo toma al instante'); this._renderDevs(box); } catch (e) { this._toast(`No se pudo guardar: ${e.message || e}`); }
         };
       });
+    }
+
+    /* ---------- Seguridad: registro de auditoría y acceso del instalador ---------- */
+    async _renderSec() {
+      const r = await this._hass.callWS({ type: 'matterai/audit', limit: 500 });
+      const users = (await this._hass.callWS({ type: 'config/auth/list' }).catch(() => [])).filter((u) => u.group_ids && u.group_ids.includes('system-admin') && !u.system_generated);
+      const sp = r.support || {};
+      const when = (t) => new Date(t * 1000).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+      const KIND = { critical: 'mdi:lock-alert-outline', camera: 'mdi:cctv', access: 'mdi:cellphone-key', support: 'mdi:account-wrench-outline' };
+      const integ = r.integrity || {};
+      const main = this._page('sec', `<div class="box"><h2>Acceso del instalador a esta casa</h2>
+          <p class="mut">Lo normal es <b>permanente</b>: entrás cuando hace falta y queda anotado acá. Si un cliente lo pide, el acceso lo habilita él desde la app (2 horas, 24 horas o 7 días) y se corta solo.</p>
+          <div class="row"><label><input type="radio" name="sm" value="always" ${sp.mode !== 'owner' ? 'checked' : ''}> Permanente</label>
+            <label><input type="radio" name="sm" value="owner" ${sp.mode === 'owner' ? 'checked' : ''}> Lo habilita el cliente desde la app</label></div>
+          <div class="row" id="smu" ${sp.mode === 'owner' ? '' : 'hidden'}><span class="mut">Usuario de soporte:</span>
+            <select id="su"><option value="">Elegí…</option>${users.filter((u) => !u.is_owner).map((u) => `<option value="${esc(u.id)}" ${sp.user_id === u.id ? 'selected' : ''}>${esc(u.name)}</option>`).join('')}</select></div>
+          <p class="mut" id="smh" ${sp.mode === 'owner' ? '' : 'hidden'}>Creá un administrador aparte para el soporte (por ejemplo «MatterAI Soporte», con verificación en 2 pasos). La cuenta <b>dueña</b> de Home Assistant nunca se desactiva: guardala fuera de línea como llave de emergencia.</p>
+          <div class="row"><label><input type="checkbox" id="sn" ${sp.notify ? 'checked' : ''}> Avisar a la app del cliente cada vez que entro</label></div>
+          <div class="row"><button class="b pri" id="ss">Guardar</button>${sp.mode === 'owner' ? `<span class="mut">${sp.open ? `Habilitado hasta ${esc(when(sp.until))}` : 'Ahora: cortado (el cliente lo habilita desde Opciones de la app)'}</span>` : ''}</div></div>
+        <div class="box"><h2>Registro de auditoría</h2>
+          <p class="mut">Cerraduras, alarma, portones, cámaras vistas desde la app, equipos vinculados o desvinculados, perfiles y cada vez que entra un administrador. No se puede editar: cada entrada guarda la huella (hash) de la anterior.</p>
+          <p>${integ.ok ? `<b class="ok">✓ Registro íntegro</b> · ${integ.rows} entradas` : `<b class="bad">⚠️ El registro fue modificado (entrada ${esc(integ.broken_at)})</b>`}</p>
+          ${r.entries.length ? `<table class="tb"><thead><tr><th>Cuándo</th><th>Qué</th><th>Quién</th></tr></thead><tbody>
+            ${r.entries.map((e) => `<tr><td>${esc(when(e.t))}</td><td><ha-icon icon="${KIND[e.kind] || 'mdi:information-outline'}"></ha-icon> ${esc(e.what)}${e.target ? ` · <b>${esc(e.target)}</b>` : ''}${e.detail ? `<br><small class="mut">${esc(e.detail)}</small>` : ''}</td><td>${esc(e.who || '')}</td></tr>`).join('')}
+          </tbody></table>` : '<p class="mut">Todavía no hay nada registrado.</p>'}</div>`);
+      if (!main) return;
+      const $ = (id) => main.querySelector(`#${id}`);
+      main.querySelectorAll('[name="sm"]').forEach((el) => { el.onchange = () => { const o = el.value === 'owner' && el.checked; $('smu').hidden = !o; $('smh').hidden = !o; }; });
+      $('ss').onclick = async () => {
+        const mode = main.querySelector('[name="sm"]:checked').value;
+        if (mode === 'owner' && !$('su').value) { this._toast('Elegí el usuario de soporte'); return; }
+        if (mode === 'owner' && !confirm('Ese usuario queda desactivado hasta que el cliente lo habilite desde la app. ¿Seguir?')) return;
+        try {
+          await this._hass.callWS({ type: 'matterai/support/set', mode, user_id: mode === 'owner' ? $('su').value : null, notify: $('sn').checked });
+          this._toast('Guardado');
+        } catch (e) { this._toast(`No se pudo: ${e.message || e}`); }
+        this._renderSec();
+      };
     }
 
     /* ---------- Conexiones ---------- */

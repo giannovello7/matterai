@@ -95,7 +95,13 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     app_devices = AppDevices(hass)
     await app_devices.async_load()
-    rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices)
+    from .audit import Audit  # noqa: PLC0415
+
+    audit = Audit(hass)
+    await audit.async_load()
+    audit.start()
+    entry.async_on_unload(audit.stop)
+    rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices, audit=audit)
     async_register_service(hass)
 
 
@@ -214,7 +220,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             frontend.remove_extra_js_url(hass, rt["card_url"])
         except (KeyError, ValueError):  # ya no estaba (frontend recién iniciado o quitado antes)
             pass
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit"):
         rt.pop(key, None)
     return True
 

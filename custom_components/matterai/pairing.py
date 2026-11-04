@@ -21,6 +21,7 @@ from homeassistant.components.http import HomeAssistantView
 from homeassistant.core import HomeAssistant, callback
 
 from .app_devices import app_entries
+from .audit import log as audit_log
 from .const import CONF_LOCAL_URL, CONF_NAME, CONF_SUPPORT, CONF_URL, CONF_WIFI, DOMAIN
 
 PAIR_PATH = "/api/matterai/pair"
@@ -53,8 +54,10 @@ async def async_pairing_link(hass: HomeAssistant, by: str | None = None) -> dict
 async def async_forget(hass: HomeAssistant, user_id: str) -> bool:
     """Desvincula un equipo: su acceso, su registro de mobile_app (avisos, ubicación) y su perfil."""
     rt = _rt(hass)
+    name = (rt["house"].devices.get(user_id) or {}).get("name", "") if rt else ""
     if rt is None or not await rt["house"].async_revoke(user_id):
         return False
+    audit_log(hass, "access", "equipo desvinculado", name)
     ad = rt.get("app_devices")
     for e in app_entries(hass):
         if e.data.get("user_id") == user_id:
@@ -106,6 +109,8 @@ class PairView(HomeAssistantView):
             self._fail(ip)
             return self.json({"ok": False, "msg": "Este código ya se usó o venció. Pedí uno nuevo."}, status_code=403, headers=headers)
         user_id, token = got
+        d = rt["house"].devices.get(user_id) or {}
+        audit_log(self.hass, "access", "equipo vinculado", d.get("name", ""), "QR del instalador" if d.get("via") == "pair" else "agregado desde la app", f"desde {ip}")
         return self.json({"ok": True, "token": token, "user_id": user_id}, headers=headers)
 
 
@@ -132,6 +137,7 @@ async def ws_app_upgrade(hass: HomeAssistant, connection: websocket_api.ActiveCo
     if got is None:
         connection.send_error(msg["id"], "not_shared", "Este equipo ya tiene su propio acceso")
         return
+    audit_log(hass, "access", "equipo pasado a su propio acceso", msg["name"])
     # su registro de mobile_app (avisos, ubicación) pasa a su usuario: así se desvincula todo junto
     for e in app_entries(hass):
         if msg["device_id"] and e.data.get("device_id") == msg["device_id"] and e.data.get("user_id") == shared_id:
@@ -207,6 +213,7 @@ async def ws_app_shared_off(hass: HomeAssistant, connection: websocket_api.Activ
         connection.send_error(msg["id"], "not_setup", "La integración MatterAI no está configurada")
         return
     await rt["house"].async_shared_off()
+    audit_log(hass, "access", "acceso compartido apagado", "", "instalador")
     connection.send_result(msg["id"], {"ok": True})
 
 
