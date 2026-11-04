@@ -333,6 +333,7 @@
         case 'music': {
           const p = player();
           if (!p) return editing() ? `${t}<p class="v-empty">Aparece cuando hay música sonando.</p>` : '';
+          if (K === 'tablet' && !editing()) return ''; // en la tablet la música va en la barra de arriba del dock
           const art = p.attributes.entity_picture ? `style="background-image:url('${esc(url(p.attributes.entity_picture))}')"` : '';
           return `<div class="v-card">${t}<div class="v-music"><span class="v-art" ${art}></span><span class="v-tx"><b>${esc(p.attributes.media_title || 'Música')}</b><span>${esc(p.attributes.media_artist || fname(p.entity_id))}</span></span>
             <button class="v-mb pl" data-mp="${esc(p.entity_id)}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button><button class="v-mb" data-mn="${esc(p.entity_id)}">${ic('next')}</button></div></div>`;
@@ -417,7 +418,7 @@
         X.shell = sig; X.cache = {};
         X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}`;
         X.el.innerHTML = K === 'tablet'
-          ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
+          ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
           : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`;
       }
       set('#v-head', head(m, K === 'phone'));
@@ -432,26 +433,19 @@
         set('#v-c2', bl.filter((b) => b.col === 2 && !top(b)).map((b) => wrapBlock(b, m)).join(''));
         fit(vertical);
         const c = card();
-        const p = player();
+        const p = drawPlayer();
         set('#v-dock', [['home', 'Inicio', 'top'], ['cam', 'Cámaras', 'camaras', m.f.cameras], ['music', 'Música', 'musica', m.f.music], ['list', 'Actividad', 'actividad'],
-          ['mic', '', 'voice', c.voiceAvailable && c.voiceAvailable()], ['cal', 'Agenda', 'agenda', m.f.agenda], ['grid', 'Casa', 'casa'], ['menu', 'Menú', 'menu']]
-          .filter((x) => x[3] !== false).map(([i, t2, k], j) => (k === 'voice' ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>` : `<button class="${j === 0 ? 'on' : ''}" data-scr="${k}">${k === 'musica' && p && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`)).join(''));
+          ['mic', '', 'voice', voiceOn()], ['cal', 'Agenda', 'agenda', m.f.agenda], ['grid', 'Casa', 'casa'], ['menu', 'Menú', 'menu']]
+          .filter((x) => x[3] !== false).map(([i, t2, k], j) => (k === 'voice' ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>`
+            : k === 'musica' ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`
+            : `<button class="${j === 0 ? 'on' : ''}" data-scr="${k}">${ic(i)}${t2}</button>`)).join(''));
       } else {
         set('#v-c1', bl.map((b) => wrapBlock(b, m)).join(''));
         set('#v-allb', `${ic('grid')}Toda la casa`);
         // reproductor: sólo con música; se esconde al botón Música
-        const p = player();
-        if (!p) X.hidePlayer = false;
-        const shown = !!p && !X.hidePlayer, pl = X.el.querySelector('#v-player');
-        pl.classList.toggle('hide', !shown); X.el.classList.toggle('with-player', shown);
-        if (p) {
-          const art = p.attributes.entity_picture ? `style="background-image:url('${esc(url(p.attributes.entity_picture))}')"` : '';
-          set('#v-player', `<span class="v-art" ${art}></span><span class="v-tx"><b>${esc(p.attributes.media_title || 'Música')}</b><span>${esc(p.attributes.media_artist || fname(p.entity_id))} · ${p.state === 'playing' ? 'sonando' : 'en pausa'}</span></span>
-            <button class="v-pl" data-mp="${esc(p.entity_id)}" aria-label="${p.state === 'playing' ? 'Pausar' : 'Reproducir'}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button><button class="v-hide" data-k="hidep" aria-label="Esconder">${ic('cdown')}</button>`);
-        }
-        const c = card();
+        const p = drawPlayer();
         set('#v-nav', `<button class="on" data-scr="top">${ic('home')}Inicio</button>${m.f.cameras ? `<button data-scr="camaras">${ic('cam')}Cámaras</button>` : ''}
-          ${c.voiceAvailable && c.voiceAvailable() ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>` : ''}
+          ${voiceOn() ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>` : ''}
           <button data-scr="actividad">${ic('list')}Actividad</button>${m.f.music ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic('music')}Música</button>` : ''}`);
       }
       if (X.sheet) renderSheet();
@@ -465,6 +459,29 @@
       // zoom (y no transform) para que el alto, el scroll vertical y las ventanas fijas sigan andando bien
       e.style.zoom = s < 1 ? String(s) : ''; e.style.width = s < 1 ? W + 'px' : '';
       e.style.height = vertical ? '' : Math.round(ih / s) + 'px';
+    }
+    /** Micrófono a la vista siempre (como en el diseño), salvo que el instalador apague la voz. */
+    function voiceOn() { const c = card(); return !!c && typeof c.voice === 'function' && !(c._config && c._config.voice === false); }
+    /** La barra de música (celular y tablet): sólo con música, con su progreso; la flecha la guarda en el botón Música. */
+    function drawPlayer() {
+      const p = player();
+      if (!p) X.hidePlayer = false;
+      const shown = !!p && !X.hidePlayer, pl = X.el.querySelector('#v-player');
+      if (pl) pl.classList.toggle('hide', !shown);
+      X.el.classList.toggle('with-player', shown);
+      if (p) {
+        const a = p.attributes, art = a.entity_picture ? `style="background-image:url('${esc(url(a.entity_picture))}')"` : '';
+        let pct = 0;
+        if (a.media_duration > 0 && a.media_position != null) {
+          const run = p.state === 'playing' && a.media_position_updated_at ? (Date.now() - new Date(a.media_position_updated_at).getTime()) / 1000 : 0;
+          pct = Math.max(0, Math.min(100, ((Number(a.media_position) + run) / Number(a.media_duration)) * 100));
+        }
+        const q = a.queue_size || (Array.isArray(a.queue) ? a.queue.length : 0);
+        set('#v-player', `<span class="v-art" ${art}></span><span class="v-tx"><b>${esc(a.media_title || 'Música')}</b><span>${esc(a.media_artist || fname(p.entity_id))} · ${p.state === 'playing' ? 'sonando' : 'en pausa'}${q ? ` · ${q} en cola` : ''}</span></span>
+          <button class="v-pl" data-mp="${esc(p.entity_id)}" aria-label="${p.state === 'playing' ? 'Pausar' : 'Reproducir'}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button>${kind() === 'tablet' ? `<button class="v-mb" data-mn="${esc(p.entity_id)}" aria-label="Siguiente">${ic('next')}</button>` : ''}<button class="v-hide" data-k="hidep" aria-label="Esconder">${ic('cdown')}</button>
+          ${pct ? `<span class="v-prog"><i style="width:${pct.toFixed(1)}%"></i></span>` : ''}`);
+      }
+      return p;
     }
     function shared() {
       return '<div class="v-sheet" id="v-sheet"><div class="v-sin"></div></div><div class="v-menu" id="v-menu"><div class="v-min"></div></div>';
