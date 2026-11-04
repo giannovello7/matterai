@@ -1,6 +1,6 @@
 # Pruebas de la integración (las corre el CI en Linux). HA 2024.12.5 + lo que necesitan sus componentes.
 pytest-homeassistant-custom-component==0.13.195
-home-assistant-frontend==20241127.8
+home-assistant-frontend==20261028.2
 hassil==2.0.5
 home-assistant-intents==2024.12.9
 mutagen
