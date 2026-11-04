@@ -49,8 +49,11 @@ def _manager(hass: HomeAssistant):
     return manager
 
 
-def collect(hass: HomeAssistant) -> tuple[dict[str, Any], dict[str, Any]]:
-    """(datos, resumen) de la copia de esta casa."""
+def collect(hass: HomeAssistant, private: bool = True) -> tuple[dict[str, Any], dict[str, Any]]:
+    """(datos, resumen) de la copia de esta casa.
+
+    private=False es la copia que sale al panel central: sin links de invitado ni historiales
+    (ver PRIVATE_DROP). La copia local para deshacer y la que baja el instalador a su PC van completas."""
     rt = hass.data.get(DOMAIN, {})
     dashboard = rt.get("dashboard")
     manager = hass.data.get(ESCENAS)
@@ -60,7 +63,7 @@ def collect(hass: HomeAssistant) -> tuple[dict[str, Any], dict[str, Any]]:
         "version": VERSION,
         "ha_version": HA_VERSION,
         "dashboard": dict(dashboard.config) if dashboard else None,
-        "automations": {"rules": manager.export_rules(), "settings": dict(manager.settings)} if manager else None,
+        "automations": {"rules": manager.export_rules(private=private), "settings": dict(manager.settings)} if manager else None,
     }
     summary = {
         "version": VERSION,
@@ -192,7 +195,7 @@ class Central:
 
     async def async_backup(self, reason: str = "automática", force: bool = False) -> bool:
         """Manda la copia si cambió algo desde la última (o si se pide). True si la mandó."""
-        data, summary = collect(self.hass)
+        data, summary = collect(self.hass, private=False)
         fp = fingerprint(data)
         if not force and fp == self.last_hash:
             return False

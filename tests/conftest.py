@@ -32,3 +32,17 @@ if sys.platform == "win32":
     aiohttp.connector.DefaultResolver = aiohttp.resolver.ThreadedResolver
     aiohttp.resolver.AsyncResolver = aiohttp.resolver.ThreadedResolver
     aiohttp.AsyncResolver = aiohttp.resolver.ThreadedResolver
+
+
+if sys.platform == "win32":
+    # pymicro-vad / pyspeex-noise (voz de HA) no se compilan en Windows; mobile_app los importa de rebote.
+    # En Linux (CI) están instalados de verdad: esto sólo deja correr las pruebas en una PC con Windows.
+    import types
+
+    for _mod in ("pymicro_vad", "pyspeex_noise"):
+        try:
+            __import__(_mod)
+        except ImportError:
+            _stub = types.ModuleType(_mod)
+            _stub.MicroVad = _stub.AudioProcessor = object
+            sys.modules[_mod] = _stub

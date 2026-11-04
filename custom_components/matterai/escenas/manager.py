@@ -123,6 +123,9 @@ def _is_admin(user) -> bool:
 
 # lo propio de cada casa: no viaja en las plantillas
 TEMPLATE_DROP = ("history", "invites", "learned_s", "runs", "last_run", "created", "created_by", "updated", "fire_at")
+# Lo que nunca sale de la casa en las copias que van al panel central: los links de invitado (abren portones)
+# y los historiales (quién usó cada link, desde qué IP, quién tocó el timbre).
+PRIVATE_DROP = ("invites", "history")
 _ENTITY_RE = re.compile(r"^[a-z_]+\.[a-z0-9_]+$")
 _ENTITY_DOMAINS = {
     "light", "switch", "binary_sensor", "sensor", "cover", "climate", "fan", "lock", "media_player", "camera", "alarm_control_panel",
@@ -540,8 +543,9 @@ class RuleManager:
 
     # ---------- copias y plantillas ----------
 
-    def export_rules(self, rule_ids: list[str] | None = None, template: bool = False) -> list[dict[str, Any]]:
-        """Reglas tal como se guardan. Como plantilla, sin lo propio de esta casa (historial, invitaciones, usos)."""
+    def export_rules(self, rule_ids: list[str] | None = None, template: bool = False, private: bool = True) -> list[dict[str, Any]]:
+        """Reglas tal como se guardan. Como plantilla, sin lo propio de esta casa (historial, invitaciones, usos).
+        Con private=False (copia para el panel central), sin los links de invitado ni los historiales."""
         out = []
         for rule in self.rules.values():
             if rule_ids is not None and rule["id"] not in rule_ids:
@@ -550,12 +554,21 @@ class RuleManager:
             if template:
                 for key in TEMPLATE_DROP:
                     item.pop(key, None)
+            elif not private:
+                for key in PRIVATE_DROP:
+                    item.pop(key, None)
             out.append(item)
         return out
 
     async def async_restore(self, rules: list[dict[str, Any]], settings: dict[str, Any] | None) -> int:
         """Reemplaza todas las reglas por las de una copia (las arranca de nuevo)."""
-        clean = [r for r in rules if isinstance(r, dict) and r.get("id") and r.get("kind") in KINDS]
+        clean = [copy.deepcopy(r) for r in rules if isinstance(r, dict) and r.get("id") and r.get("kind") in KINDS]
+        # las copias del panel central no traen invitados ni historiales: se conservan los de la casa
+        for r in clean:
+            old = self.rules.get(r["id"])
+            for key in PRIVATE_DROP:
+                if key not in r and old and key in old:
+                    r[key] = copy.deepcopy(old[key])
         await self.async_stop_all()
         self.rules = {r["id"]: r for r in clean}
         if isinstance(settings, dict):
@@ -611,7 +624,11 @@ class RuleManager:
         for raw in rules:
             if not isinstance(raw, dict) or not raw.get("id") or raw.get("kind") not in KINDS:
                 continue
-            self.rules[raw["id"]] = copy.deepcopy(raw)
+            item, old = copy.deepcopy(raw), self.rules.get(raw["id"])
+            for key in PRIVATE_DROP:
+                if key not in item and old and key in old:
+                    item[key] = copy.deepcopy(old[key])
+            self.rules[raw["id"]] = item
             await self._async_restart(raw["id"])
             n += 1
         self._save()

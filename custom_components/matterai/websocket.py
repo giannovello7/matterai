@@ -78,19 +78,13 @@ async def ws_config_save(hass: HomeAssistant, connection: websocket_api.ActiveCo
 @websocket_api.require_admin
 @websocket_api.async_response
 async def ws_pairing(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
-    rt = _rt(hass)
-    entry, house = rt["entry"], rt["house"]
-    url = entry.options.get(CONF_URL, entry.data.get(CONF_URL, ""))
-    if not url:
-        connection.send_error(msg["id"], "no_url", "Falta la dirección remota de la casa (Configurar → Dirección)")
-        return
-    if msg["regenerate"]:
-        await house.async_regenerate()
-    name = entry.options.get(CONF_NAME, entry.data.get(CONF_NAME, ""))
-    support = entry.options.get(CONF_SUPPORT, entry.data.get(CONF_SUPPORT))
-    local = entry.options.get(CONF_LOCAL_URL, entry.data.get(CONF_LOCAL_URL, ""))
-    wifi = entry.options.get(CONF_WIFI, entry.data.get(CONF_WIFI, ""))
-    connection.send_result(msg["id"], await house.async_pairing(url, name, support, local, wifi))
+    """QR / link para vincular un celular: cada vez un código nuevo de un solo uso («regenerate» queda por compatibilidad)."""
+    from .pairing import async_pairing_link  # noqa: PLC0415
+
+    try:
+        connection.send_result(msg["id"], await async_pairing_link(hass))
+    except ValueError as err:
+        connection.send_error(msg["id"], "no_url", str(err))
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/status"})
@@ -386,5 +380,6 @@ async def ws_watchdog(hass: HomeAssistant, connection: websocket_api.ActiveConne
 
 
 from .app_devices import WS_COMMANDS as APP_WS  # noqa: E402
+from .pairing import WS_COMMANDS as PAIR_WS  # noqa: E402
 
-COMMANDS = (*APP_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
+COMMANDS = (*APP_WS, *PAIR_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)

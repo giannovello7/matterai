@@ -12,6 +12,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import time
 import uuid
 from collections import deque
@@ -43,6 +44,19 @@ COMMANDS = ["screen_on", "screen_off", "brightness", "open", "camera", "tts", "r
 
 def app_entries(hass: HomeAssistant) -> list:
     return [e for e in hass.config_entries.async_entries("mobile_app") if e.data.get("app_id") == APP_ID]
+
+
+def push_hashes(hass: HomeAssistant) -> list[str]:
+    """Para el panel central: sha256 de «push_token|webhook_id» de cada equipo con la app.
+
+    El panel sólo reenvía notificaciones a estos equipos (y nunca ve el token ni el webhook)."""
+    out = []
+    for e in app_entries(hass):
+        token = ((e.data.get("app_data") or {}).get("push_token") or "").strip()
+        webhook = e.data.get("webhook_id") or ""
+        if token and webhook:
+            out.append(hashlib.sha256(f"{token}|{webhook}".encode()).hexdigest())
+    return sorted(set(out))
 
 
 class AppDevices:
@@ -125,7 +139,13 @@ def _rt_devices(hass: HomeAssistant) -> AppDevices | None:
 def ws_app_me(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     """Lo pide la app al conectarse: el perfil que le puso el instalador a este equipo."""
     ad = _rt_devices(hass)
-    connection.send_result(msg["id"], ad.profile(msg["device_id"]) if ad else {"profile": "full", "secure": False})
+    out = ad.profile(msg["device_id"]) if ad else {"profile": "full", "secure": False}
+    house = (hass.data.get(DOMAIN) or {}).get("house")
+    if house is not None and (connection.user.is_admin or house.is_app_user(connection.user.id)):
+        # firma de los accesos rápidos / stickers NFC de esta casa, y si todavía usa el acceso compartido viejo
+        out["run_key"] = house.run_key
+        out["shared"] = house.is_shared_user(connection.user.id)
+    connection.send_result(msg["id"], out)
 
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/actions", vol.Optional("since", default=0): vol.Coerce(float)})
@@ -193,7 +213,12 @@ def ws_app_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveConnec
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/notify_action", vol.Required("action"): vol.Match(r"^MAE\|[^|]+\|[^|]+$")})
 @callback
 def ws_app_notify_action(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
-    """Botón del portero en la pantalla de la app (tablet de pared): igual que tocarlo en la notificación."""
+    """Botón del portero en la pantalla de la app (tablet de pared): igual que tocarlo en la notificación.
+    Sólo los equipos vinculados a la casa (o el instalador)."""
+    house = (hass.data.get(DOMAIN) or {}).get("house")
+    if not connection.user.is_admin and (house is None or not house.is_app_user(connection.user.id)):
+        connection.send_error(msg["id"], "unauthorized", "Este usuario no es un equipo de la casa")
+        return
     hass.bus.async_fire("mobile_app_notification_action", {"action": msg["action"]}, context=connection.context(msg))
     connection.send_result(msg["id"], {"ok": True})
 

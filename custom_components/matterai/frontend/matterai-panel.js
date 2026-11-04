@@ -610,14 +610,14 @@
       const main = this._page('app', `<div class="box pair"><div class="qr">${qr.createSvgTag({ cellSize: 4, margin: 0, scalable: true })}</div><div>
         <h2>Vincular el celular de ${esc(p.name || 'el cliente')}</h2>
         <p>El cliente abre la app MatterAI y escanea este código (o abre el link desde el celular). Queda conectado a <b>${esc(p.url)}</b> sin ver nunca Home Assistant.</p>
+        <p class="mut">Cada código sirve para <b>un solo celular</b> y vence en ${esc(String(p.hours || 24))} horas: cada equipo queda con su propio acceso, que no vence nunca. Desde la app, quien ya está vinculado puede agregar otros celulares (Opciones → Agregar otro celular).</p>
         <div class="link">${esc(p.link)}</div>
-        <div class="row"><button class="b pri" id="copy">Copiar link</button><a class="b" href="${esc(wa)}" target="_blank" rel="noopener">Mandar por WhatsApp</a><button class="b" id="print">Imprimir</button></div>
-        <h3>¿Perdió el celular o querés cortar el acceso?</h3>
-        <p class="mut">Un acceso nuevo deja sin conexión a todos los celulares vinculados hasta ahora: hay que volver a escanear.</p>
-        <div class="row"><button class="b warn" id="regen">Generar acceso nuevo</button></div></div></div>
+        <div class="row"><button class="b pri" id="copy">Copiar link</button><a class="b" href="${esc(wa)}" target="_blank" rel="noopener">Mandar por WhatsApp</a><button class="b" id="print">Imprimir</button><button class="b" id="regen">Otro código</button></div></div></div>
+        <div class="box" id="acc"><h2>Accesos a la casa</h2><p class="mut">Cargando…</p></div>
         <div class="box" id="devs"><h2>Celulares y tablets</h2><p class="mut">Cargando…</p></div>`);
       if (!main) return;
       this._renderDevs(main.querySelector('#devs'));
+      this._renderAccess(main.querySelector('#acc'));
       const $ = (id) => main.querySelector(`#${id}`);
       $('copy').onclick = async () => { try { await navigator.clipboard.writeText(p.link); this._toast('Link copiado'); } catch (_) { this._toast('No se pudo copiar: seleccionalo a mano'); } };
       $('print').onclick = () => {
@@ -625,7 +625,45 @@
         w.document.write(`<html><body style="font-family:sans-serif;text-align:center;padding:40px"><h1>${esc(p.name || 'Tu casa')}</h1><p>Abrí la app <b>MatterAI</b> y escaneá este código</p><div style="width:320px;margin:20px auto">${qr.createSvgTag({ cellSize: 6, margin: 2, scalable: true })}</div><p style="color:#888">MatterAI · Hogar inteligente</p></body></html>`);
         w.document.close(); w.focus(); w.print();
       };
-      $('regen').onclick = () => { if (confirm('¿Generar un acceso nuevo? Los celulares vinculados tendrán que volver a escanear.')) this._renderApp(true); };
+      $('regen').onclick = () => this._renderApp(true);
+    }
+
+    /** Un acceso por equipo: cuándo se usó por última vez y cortar uno solo (celular perdido, empleado que ya no está). */
+    async _renderAccess(box) {
+      let r;
+      try { r = await this._hass.callWS({ type: 'matterai/app/access' }); } catch (e) { box.innerHTML = `<h2>Accesos a la casa</h2><p class="mut">${esc(e.message || e)}</p>`; return; }
+      const when = (t) => (t ? new Date(t * 1000).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
+      const VIA = { pair: 'QR del instalador', invite: 'Agregado desde la app', upgrade: 'Pasado del acceso compartido' };
+      const sh = r.shared || {};
+      box.innerHTML = `<h2>Accesos a la casa</h2>
+        <p class="mut">Cada celular o tablet tiene su propio acceso. Si se pierde un celular, desvinculalo acá: los demás siguen andando.</p>
+        ${r.devices.length ? `<table class="tb"><thead><tr><th>Equipo</th><th>Vinculado</th><th>Último uso</th><th></th></tr></thead><tbody>
+          ${r.devices.map((d) => `<tr><td><b>${esc(d.name)}</b>${d.apps.length ? `<br><small class="mut">${esc(d.apps.join(', '))}</small>` : ''}</td>
+            <td>${esc(when(d.created))}<br><small class="mut">${esc(VIA[d.via] || '')}</small></td><td>${esc(when(d.last_used))}</td>
+            <td><button class="b warn" data-rev="${esc(d.user_id)}" data-n="${esc(d.name)}">Desvincular</button></td></tr>`).join('')}
+        </tbody></table>` : '<p class="mut">Todavía no hay equipos con acceso propio.</p>'}
+        ${sh.active ? `<h3>Acceso compartido (versión anterior)</h3>
+          <p class="mut">Los celulares vinculados antes de MatterAI 2.10 usaban un acceso compartido. Se pasan solos a uno propio la próxima vez que abren la app.
+          ${sh.devices && sh.devices.length ? `Todavía lo usan: <b>${esc(sh.devices.join(', '))}</b>.` : 'Ya no lo usa ningún equipo registrado.'} Último uso: ${esc(when(sh.last_used))}.</p>
+          <div class="row"><button class="b warn" id="shoff">Apagar el acceso compartido</button></div>` : ''}`;
+      box.querySelectorAll('[data-rev]').forEach((b) => {
+        b.onclick = async () => {
+          if (!confirm(`¿Desvincular «${b.dataset.n}»? Ese equipo deja de tener acceso a la casa al instante.`)) return;
+          try { await this._hass.callWS({ type: 'matterai/app/revoke', user_id: b.dataset.rev }); this._toast('Equipo desvinculado'); } catch (e) { this._toast(`No se pudo: ${e.message || e}`); }
+          this._renderAccess(box);
+          const devs = this.shadowRoot ? this.shadowRoot.querySelector('#devs') : null;
+          if (devs) this._renderDevs(devs);
+        };
+      });
+      const off = box.querySelector('#shoff');
+      if (off) {
+        off.onclick = async () => {
+          const left = sh.devices && sh.devices.length ? `\n\nTodavía lo usan: ${sh.devices.join(', ')}. Esos equipos tendrán que volver a escanear un código.` : '';
+          if (!confirm(`¿Apagar el acceso compartido de la versión anterior?${left}`)) return;
+          try { await this._hass.callWS({ type: 'matterai/app/shared_off' }); this._toast('Acceso compartido apagado'); } catch (e) { this._toast(`No se pudo: ${e.message || e}`); }
+          this._renderAccess(box);
+        };
+      }
     }
 
     /** Equipos con la app: perfil (qué ve cada uno) y si pide huella para la seguridad. */

@@ -62,6 +62,10 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
         hass.http.register_static_path(STATIC_URL, FRONTEND_DIR, False)
     for command in COMMANDS:
         websocket_api.async_register_command(hass, command)
+    # canje del código de vinculación de los celulares (un acceso por equipo)
+    from .pairing import async_register_view  # noqa: PLC0415
+
+    async_register_view(hass)
     # Si en esta casa sigue instalada la integración aparte «MatterAI Escenas», las automatizaciones
     # las maneja ella: correr las dos haría que cada automatización se ejecute dos veces.
     if not _escenas_aparte(hass):
@@ -94,8 +98,6 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices)
     async_register_service(hass)
 
-    # el usuario y el acceso de la app quedan listos desde el primer momento
-    await house.async_token()
 
     # la página carga el cargador (dirección fija); él trae la última versión de la tarjeta aunque no se reinicie HA
     card_url = f"{STATIC_URL}/{LOADER_FILENAME}?f={CARD_FILENAME}&v={await _version_tag(hass, LOADER_FILENAME)}"
@@ -144,6 +146,20 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         entry.async_on_unload(async_at_started(hass, _start))
         entry.async_on_unload(hb.stop)
+
+        # un celular nuevo (o con token de notificaciones nuevo): latido enseguida, así el panel ya le
+        # reenvía los avisos (sólo manda a equipos registrados por la casa)
+        from homeassistant.config_entries import SIGNAL_CONFIG_ENTRY_CHANGED  # noqa: PLC0415
+        from homeassistant.helpers.dispatcher import async_dispatcher_connect  # noqa: PLC0415
+
+        from .app_devices import APP_ID  # noqa: PLC0415
+
+        @callback
+        def _mobile_changed(_change, changed: ConfigEntry) -> None:
+            if changed.domain == "mobile_app" and changed.data.get("app_id") == APP_ID:
+                hass.async_create_background_task(hb.async_send(), "matterai_heartbeat_push")
+
+        entry.async_on_unload(async_dispatcher_connect(hass, SIGNAL_CONFIG_ENTRY_CHANGED, _mobile_changed))
 
     # automatizaciones: el motor primero, después sus entidades (portón, botones, sensores)
     if _escenas_aparte(hass):

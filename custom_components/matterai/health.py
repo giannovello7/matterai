@@ -243,7 +243,9 @@ class Heartbeat:
             await self.central.async_backup()
 
     async def async_send(self) -> bool:
-        payload = {"house_id": self.house_id, "name": self.name, "url": self.url, **await async_collect(self.hass)}
+        from .app_devices import push_hashes  # noqa: PLC0415
+
+        payload = {"house_id": self.house_id, "name": self.name, "url": self.url, **await async_collect(self.hass), "push": push_hashes(self.hass)}
         if self._result:
             payload["result"] = self._result
         session = async_get_clientsession(self.hass)

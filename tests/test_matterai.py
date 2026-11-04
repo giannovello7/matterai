@@ -15,7 +15,7 @@ from homeassistant.setup import async_setup_component
 
 from pytest_homeassistant_custom_component.common import MockConfigEntry
 
-from custom_components.matterai.const import DOMAIN, APP_USER_NAME
+from custom_components.matterai.const import DOMAIN
 from custom_components.matterai.cors import cors_status
 from custom_components.matterai.dashboard import find_card
 from custom_components.matterai.health import collect
@@ -68,45 +68,7 @@ async def test_config_flow_bad_url(hass: HomeAssistant) -> None:
     assert res["type"] is FlowResultType.FORM and res["errors"] == {"url": "bad_url"}
 
 
-# ---------------- usuario de la app y vinculación ----------------
-
-async def test_app_user_and_pairing(hass: HomeAssistant, hass_ws_client, hass_admin_user) -> None:
-    await _setup(hass)
-    users = [u for u in await hass.auth.async_get_users() if u.name == APP_USER_NAME]
-    assert len(users) == 1
-    user = users[0]
-    assert not user.is_admin and user.is_active  # la app entra sin permisos de administrador
-
-    ws = await hass_ws_client(hass)
-    await ws.send_json({"id": 1, "type": "matterai/pairing"})
-    msg = await ws.receive_json()
-    assert msg["success"], msg
-    pair = msg["result"]
-    assert pair["link"].startswith("https://app.matterai.com.ar/#v=")
-    data = decode(pair["code"])
-    assert data["u"] == "https://perez.matterai.com.ar" and data["n"] == "Casa Pérez" and data["s"] == "5491100000000"
-    # el token sirve para entrar como el usuario de la app
-    rt = await _validate(hass, data["t"])
-    assert rt is not None and rt.user.id == user.id
-
-    # el mismo QR mientras no se regenere
-    await ws.send_json({"id": 2, "type": "matterai/pairing"})
-    assert decode((await ws.receive_json())["result"]["code"])["t"] == data["t"]
-
-    # acceso nuevo: el anterior deja de funcionar
-    await ws.send_json({"id": 3, "type": "matterai/pairing", "regenerate": True})
-    new = decode((await ws.receive_json())["result"]["code"])
-    assert new["t"] != data["t"]
-    assert await _validate(hass, data["t"]) is None
-    assert await _validate(hass, new["t"]) is not None
-
-
-async def test_reuses_user_after_reinstall(hass: HomeAssistant) -> None:
-    entry = await _setup(hass)
-    await hass.config_entries.async_remove(entry.entry_id)
-    await hass.async_block_till_done()
-    await _setup(hass)
-    assert len([u for u in await hass.auth.async_get_users() if u.name == APP_USER_NAME]) == 1
+# (la vinculación de celulares y sus pruebas negativas están en test_seguridad.py)
 
 
 # ---------------- configuración del dashboard ----------------
