@@ -255,6 +255,16 @@
   const SCROLL_MAX_WAIT = 1500; // un cambio de estado nunca espera más que esto
   const CSS = `
   :host{display:block;--accent:#7c9cff;--txt:#eef1f8;--mut:rgba(238,241,248,.58);--line:rgba(255,255,255,.08);--glass:rgba(255,255,255,.045);--glass2:rgba(255,255,255,.075)}
+  /* headless: la app dibuja su propio inicio; la tarjeta sólo abre sus ventanas (ambiente, clima, agenda, música, actividad, alarma, voz) */
+  :host([headless]) .wrap,:host([headless]) .foot,:host([headless]) .aurora,:host([headless]) .dots{display:none!important}
+  :host([headless]) .app{min-height:0;padding:0;background:transparent;overflow:visible}
+  /* tema sobrio (grafito y acento cálido, como el inicio nuevo de la app) */
+  :host([theme=sobrio]){--accent:#f2b766;--txt:#e9ecf2;--mut:#8f99ab;--line:rgba(160,175,200,.15);--glass:#262e3a;--glass2:#2e3644}
+  :host([theme=sobrio]) .app,:host([theme=sobrio]) .app[data-phase]{--bg:#161b21;font-family:"Red Hat Display",system-ui,-apple-system,"Segoe UI",sans-serif}
+  :host([theme=sobrio]) .sheet,:host([theme=sobrio]) .actv,:host([theme=sobrio]) .app.fluid .sheet,:host([theme=sobrio]) .app.fluid .actv{background:#1e242e!important;border-color:rgba(160,175,200,.15)!important}
+  :host([theme=sobrio]) .backdrop,:host([theme=sobrio]) .app.fluid .backdrop{background:rgba(8,10,14,.6)!important}
+  :host([theme=sobrio]) .glass,:host([theme=sobrio]) .app.fluid .glass{background:#262e3a!important;border-color:rgba(160,175,200,.15)!important;box-shadow:none!important}
+  :host([theme=sobrio]) .toast,:host([theme=sobrio]) .app.fluid .toast{background:#262e3a!important;border:1px solid rgba(160,175,200,.15)}
   *{box-sizing:border-box}
   button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;padding:0}
   .ic{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round;flex:none}
@@ -1650,6 +1660,15 @@
     _update() {
       if (!this._hass || !this._root) return;
       const m = this._m = this._model();
+      if (this.hasAttribute('headless')) {
+        this._sugs = this._suggestions(m);
+        if (this._room || this._panel) { if (this._drag) this._sheetDirty = true; else this._renderSheet(); }
+        this._actLive();
+        if (this._act) this._renderAct();
+        if (this._mus) this._muLive();
+        this.dispatchEvent(new CustomEvent('matterai-model', { detail: m }));
+        return;
+      }
       const ins = this._insight(m);
       const u = this._hass.user, first = u && u.name ? u.name.split(' ')[0] : '';
       const hr = new Date().getHours();
@@ -3061,6 +3080,26 @@
       const sd = Object.assign(withEntry ? { config_entry_id: this._mus.entry } : {}, data || {});
       return this._hass.callWS({ type: 'call_service', domain: 'music_assistant', service, return_response: true, service_data: sd })
         .then((r) => (r && (r.response || r)) || {});
+    }
+
+    /* ---------- para el inicio de la app (tarjeta en modo headless) ---------- */
+    model() { if (!this._m && this._hass && this._root) this._m = this._model(); return this._m; }
+    suggestions() { return this._sugs || []; }
+    runSuggestion(key) { this._runSuggestion(key); }
+    dismissSuggestion(key) { this._dismissed.add(key); this._schedule(); }
+    openRoom(id) { this._openRoom(id); }
+    openPanel(kind) { this._openPanel(kind); }
+    alarm(svc, eid) { this._alarm(svc, eid); }
+    access(eid) { this._access(eid); }
+    roomLights(id, on) { this._roomLights(this._m && this._m.byId[id], on); }
+    call(domain, service, data) { return this._call(domain, service, data); }
+    moreInfo(eid) { this._moreInfo(eid); }
+    voiceAvailable() { return this._voiceAvailable(); }
+    voice() { this._voiceStart(); }
+    players() { return this._musPlayers(); }
+    openCameras() {
+      const ev = new CustomEvent('matterai-camera-card', { detail: { config: this._config.camera_card }, bubbles: true, composed: true, cancelable: true });
+      if (this.dispatchEvent(ev) && this._m && this._m.cams[0]) this._moreInfo(this._m.cams[0]);
     }
 
     openMusic(opts) {
