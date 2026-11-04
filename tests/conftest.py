@@ -46,3 +46,20 @@ if sys.platform == "win32":
             _stub = types.ModuleType(_mod)
             _stub.MicroVad = _stub.AudioProcessor = object
             sys.modules[_mod] = _stub
+
+
+import pytest as _pytest
+
+
+@_pytest.fixture(scope="session", autouse=True)
+def _pycares_thread_before_tests():
+    """pycares (DNS de aiohttp en Linux) arranca un hilo propio la primera vez que se usa, y queda vivo para siempre.
+    Si eso pasa en medio de una prueba, el control de HA lo toma como un hilo que la prueba dejó colgado:
+    se arranca acá, antes de todas las pruebas."""
+    try:
+        import pycares  # noqa: PLC0415
+
+        pycares._shutdown_manager.start()  # noqa: SLF001
+    except Exception:  # noqa: BLE001 - versión de pycares sin ese hilo, o sin pycares: nada que hacer
+        pass
+    yield
