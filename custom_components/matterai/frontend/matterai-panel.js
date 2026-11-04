@@ -42,6 +42,7 @@
     { g: 'App del cliente', d: 'Lo que configurás para la app MatterAI' },
     { k: 'dash', l: 'Diseño de la app', i: 'mdi:cellphone-cog' },
     { k: 'auto', l: 'Automatizaciones', i: 'mdi:robot-outline' },
+    { k: 'views', l: 'Dashboards', i: 'mdi:view-dashboard-edit-outline' },
     { k: 'app', l: 'Vincular celulares', i: 'mdi:qrcode' },
     { g: 'Sistema MatterAI', d: 'Control interno de la instalación' },
     { k: 'health', l: 'Salud y avisos', i: 'mdi:heart-pulse' },
@@ -57,6 +58,7 @@
     home: ['Resumen', 'Cómo está esta casa de un vistazo.', null],
     dash: ['Diseño de la app', 'Ambientes, equipos y cámaras que ve la familia. Los cambios llegan a la app recién al tocar Guardar.', 'client'],
     auto: ['Automatizaciones', 'Las del cliente y los equipos del instalador (portón inteligente, sensor de ocupación), que el cliente no ve.', 'client'],
+    views: ['Dashboards', 'Qué ve primero cada persona: sus ambientes, su cámara y portón, sus escenas. Se asigna a sus equipos; lo que fijen desde la app queda acá.', 'client'],
     app: ['Vincular celulares', 'Código QR y link para que la familia conecte la app MatterAI a esta casa.', 'client'],
     health: ['Salud y avisos', 'Todo lo que hay que atender en esta casa. Lo mismo le llega al panel central.', 'system'],
     wd: ['Mantenimiento', 'Los servicios que MatterAI vigila y recupera solo: complementos e integraciones.', 'system'],
@@ -240,7 +242,7 @@
     }
     _render(tab, quiet = false) {
       const R = { home: this._renderHome, dash: this._renderDash, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
-        backup: () => this._renderCopias('backup'), tpl: () => this._renderCopias('tpl'), conn: this._renderConn, voice: this._renderVoice, house: this._renderHouse, sec: this._renderSec };
+        backup: () => this._renderCopias('backup'), tpl: () => this._renderCopias('tpl'), conn: this._renderConn, voice: this._renderVoice, house: this._renderHouse, sec: this._renderSec, views: this._renderViews };
       const main = this.shadowRoot.getElementById('main');
       if (!quiet) main.innerHTML = `${this._head(tab)}<div class="box"><p class="mut">Cargando…</p></div>`;
       Promise.resolve(R[tab].call(this, quiet)).catch((e) => {
@@ -690,6 +692,77 @@
           try { await this._hass.callWS(msg); this._toast('Guardado: el equipo lo toma al instante'); this._renderDevs(box); } catch (e) { this._toast(`No se pudo guardar: ${e.message || e}`); }
         };
       });
+    }
+
+    /* ---------- Dashboards por persona ---------- */
+    async _renderViews() {
+      const [r, cfg] = await Promise.all([this._hass.callWS({ type: 'matterai/views/list' }), this._hass.callWS({ type: 'matterai/config' })]);
+      const rooms = ((cfg.config || {}).rooms || []).map((x) => x.name).filter(Boolean);
+      const st = this._hass.states;
+      const ids = (d) => Object.keys(st).filter((id) => id.startsWith(d + '.')).sort();
+      const fname = (id) => (st[id] && st[id].attributes.friendly_name) || id;
+      const cams = ids('camera'), covers = ids('cover').concat(ids('lock')), scenes = ids('scene').concat(ids('script'));
+      if (!this._vsel || !r.views.some((v) => v.id === this._vsel)) this._vsel = r.views.length ? r.views[0].id : null;
+      const v = this._vdraft && this._vdraft.id === this._vsel ? this._vdraft : JSON.parse(JSON.stringify(r.views.find((x) => x.id === this._vsel) || {}));
+      this._vdraft = v;
+      const KIND = { phone: 'Celular', tablet: 'Tablet de pared' };
+      const devsOf = (id) => r.devices.filter((d) => d.view === id).map((d) => d.name);
+      const opt = (list, val, none) => `<option value="">${none}</option>${list.map((id) => `<option value="${esc(id)}" ${val === id ? 'selected' : ''}>${esc(fname(id))}</option>`).join('')}`;
+      const pinned = v.pinned || [];
+      const main = this._page('views', `
+        <div class="box"><div class="row" style="justify-content:space-between"><h2 style="margin:0">Dashboards de esta casa</h2><button class="b pri" id="vnew">Nuevo dashboard</button></div>
+          ${r.views.length ? `<table class="tb"><thead><tr><th>Nombre</th><th>Tipo</th><th>Fijados</th><th>Equipos</th><th></th></tr></thead><tbody>
+            ${r.views.map((x) => `<tr ${x.id === this._vsel ? 'style="background:rgba(127,127,127,.08)"' : ''}><td><b>${esc(x.name)}</b>${r.default === x.id ? ' <small class="ok">· general</small>' : ''}<br><small class="mut">${x.by && x.by.startsWith('app') ? `cambiado desde la ${esc(x.by)}` : ''}</small></td>
+              <td>${KIND[x.kind] || x.kind}</td><td>${esc((x.pinned || []).join(', ') || '—')}</td><td>${esc(devsOf(x.id).join(', ') || '—')}</td><td><button class="b" data-vsel="${esc(x.id)}">Editar</button></td></tr>`).join('')}
+          </tbody></table>` : '<p class="mut">Todavía no hay dashboards. Sin ninguno, cada equipo ve el inicio general armado con todos los ambientes. Creá uno por persona (o dejá que cada uno fije lo suyo desde la app).</p>'}
+          <div class="row"><span class="mut">Dashboard general (para los equipos sin uno propio):</span><select id="vdef"><option value="">Inicio automático</option>${r.views.map((x) => `<option value="${esc(x.id)}" ${r.default === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></div></div>
+        ${this._vsel ? `<div class="box"><h2>Editar «${esc(v.name || '')}»</h2>
+          <div class="row"><label>Nombre <input id="vname" value="${esc(v.name || '')}" maxlength="40"></label>
+            <label>Tipo <select id="vkind">${Object.entries(KIND).map(([k, l]) => `<option value="${k}" ${v.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label></div>
+          <h3>Lo suyo (arriba, en este orden)</h3>
+          <div id="vpins">${pinned.map((n, i) => `<div class="row" style="gap:6px"><b style="flex:1">${esc(n)}</b><button class="b" data-up="${i}" ${i ? '' : 'disabled'}>↑</button><button class="b" data-dn="${i}" ${i < pinned.length - 1 ? '' : 'disabled'}>↓</button><button class="b warn" data-rm="${i}">Sacar</button></div>`).join('') || '<p class="mut">Nada fijado: se muestran los ambientes de la casa.</p>'}</div>
+          <div class="row"><select id="vadd"><option value="">Sumar un ambiente…</option>${rooms.filter((n) => !pinned.includes(n)).map((n) => `<option>${esc(n)}</option>`).join('')}</select></div>
+          <h3>Destacado (cámara grande con su portón o puerta)</h3>
+          <div class="row"><label>Título <input id="vft" value="${esc((v.featured || {}).title || '')}" placeholder="Garage" maxlength="40"></label>
+            <label>Cámara <select id="vcam">${opt(cams, (v.featured || {}).camera, 'Sin cámara')}</select></label>
+            <label>Portón / puerta <select id="vgate">${opt(covers, (v.featured || {}).gate, 'Sin botón')}</select></label></div>
+          <h3>Escenas a la vista</h3>
+          <p class="mut">Sin elegir ninguna, se muestran las de la casa.</p>
+          <div class="row" style="flex-wrap:wrap">${scenes.map((id) => `<label class="chip"><input type="checkbox" data-sc="${esc(id)}" ${(v.scenes || []).includes(id) ? 'checked' : ''}> ${esc(fname(id))}</label>`).join('') || '<span class="mut">La casa no tiene escenas.</span>'}</div>
+          <div class="row"><button class="b pri" id="vsave">Guardar</button><button class="b warn" id="vdel">Borrar dashboard</button></div></div>` : ''}
+        <div class="box"><h2>Qué dashboard usa cada equipo</h2>
+          <p class="mut">Asigná el mismo a todos los equipos de una persona (su celular y su tablet). Lo que fije desde cualquiera aparece en todos.</p>
+          ${r.devices.length ? `<table class="tb"><thead><tr><th>Equipo</th><th>Dashboard</th></tr></thead><tbody>${r.devices.map((d) => `<tr><td><b>${esc(d.name)}</b><br><small class="mut">${esc(d.model || '')}</small></td>
+            <td><select data-asg="${esc(d.device_id)}"><option value="">${r.default ? 'El general' : 'Inicio automático'}</option>${r.views.map((x) => `<option value="${esc(x.id)}" ${d.view === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></td></tr>`).join('')}</tbody></table>`
+            : '<p class="mut">Todavía no hay equipos con la app (aparecen cuando se vinculan).</p>'}</div>`);
+      if (!main) return;
+      const $ = (id) => main.querySelector(`#${id}`);
+      const call = async (msg, ok) => { try { const res = await this._hass.callWS(msg); if (ok) this._toast(ok); return res; } catch (e) { this._toast(`No se pudo: ${e.message || e}`); return null; } };
+      $('vnew').onclick = async () => {
+        const name = prompt('Nombre del dashboard (por ejemplo, el de la persona: «Gianfranco»)'); if (!name) return;
+        const nv = await call({ type: 'matterai/views/save', view: { name, kind: 'phone', pinned: [] } }, 'Dashboard creado');
+        if (nv) { this._vsel = nv.id; this._vdraft = null; this._renderViews(); }
+      };
+      $('vdef').onchange = async (e) => { await call({ type: 'matterai/views/default', view_id: e.target.value || null }, 'Guardado'); this._renderViews(); };
+      main.querySelectorAll('[data-vsel]').forEach((b) => { b.onclick = () => { this._vsel = b.dataset.vsel; this._vdraft = null; this._renderViews(); }; });
+      main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
+      if (!this._vsel) return;
+      const keep = () => { v.name = $('vname').value; v.kind = $('vkind').value; v.featured = { title: $('vft').value || null, camera: $('vcam').value || null, gate: $('vgate').value || null };
+        v.scenes = [...main.querySelectorAll('[data-sc]')].filter((c) => c.checked).map((c) => c.dataset.sc); };
+      const move = (i, d) => { keep(); const p2 = v.pinned || []; const [x] = p2.splice(i, 1); p2.splice(i + d, 0, x); v.pinned = p2; this._renderViews(); };
+      main.querySelectorAll('[data-up]').forEach((b) => { b.onclick = () => move(+b.dataset.up, -1); });
+      main.querySelectorAll('[data-dn]').forEach((b) => { b.onclick = () => move(+b.dataset.dn, 1); });
+      main.querySelectorAll('[data-rm]').forEach((b) => { b.onclick = () => { keep(); v.pinned.splice(+b.dataset.rm, 1); this._renderViews(); }; });
+      $('vadd').onchange = (e) => { if (!e.target.value) return; keep(); v.pinned = (v.pinned || []).concat([e.target.value]); this._renderViews(); };
+      $('vsave').onclick = async () => {
+        keep();
+        const res = await call({ type: 'matterai/views/save', view: { id: v.id, name: v.name, kind: v.kind, pinned: v.pinned || [], featured: v.featured, scenes: v.scenes.length ? v.scenes : null } }, 'Guardado: sus equipos lo toman al instante');
+        if (res) { this._vdraft = null; this._renderViews(); }
+      };
+      $('vdel').onclick = async () => {
+        if (!confirm(`¿Borrar «${v.name}»? Sus equipos pasan al dashboard general.`)) return;
+        if (await call({ type: 'matterai/views/delete', view_id: v.id }, 'Dashboard borrado')) { this._vsel = null; this._vdraft = null; this._renderViews(); }
+      };
     }
 
     /* ---------- Seguridad: registro de auditoría y acceso del instalador ---------- */

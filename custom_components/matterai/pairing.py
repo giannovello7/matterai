@@ -63,6 +63,8 @@ async def async_forget(hass: HomeAssistant, user_id: str) -> bool:
         if e.data.get("user_id") == user_id:
             if ad is not None:
                 ad.devices.pop(e.data.get("device_id") or "", None)
+            if rt.get("views") is not None:
+                rt["views"].set_assign(e.data.get("device_id") or "", None)
             await hass.config_entries.async_remove(e.entry_id)
     if ad is not None:
         ad._save()  # noqa: SLF001
