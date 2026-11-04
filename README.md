@@ -278,6 +278,24 @@ La app lee la configuración con `matterai/config` y queda escuchando `matterai/
 - **Equipos de versiones anteriores:** usaban un acceso compartido por todos. Se pasan solos a uno propio la próxima vez que abren la app. Cuando no queda ninguno, **Apagar el acceso compartido** lo corta para siempre.
 - **Accesos rápidos y stickers NFC firmados:** la casa le da a sus equipos una firma (`run_key`). Un link o sticker sin esa firma no ejecuta nada. Los stickers grabados con la app 1.2 hay que volver a grabarlos.
 
+### Registro de auditoría y acceso del instalador (panel → Seguridad)
+
+- **Registro:** queda anotado quién hizo cada cosa: el equipo de la app, el instalador o una automatización. Se anotan:
+  - cerraduras, alarma y portones;
+  - cámaras vistas desde la app;
+  - equipos vinculados y desvinculados, y cambios de perfil;
+  - cada vez que entra un administrador.
+
+  No se puede editar: cada entrada guarda el hash de la anterior, y el panel avisa si alguien la tocó a mano. Se guardan las últimas 5000.
+- **Acceso del instalador:**
+  - *Permanente* es lo normal. Opcionalmente, la app del cliente recibe un aviso cada vez que entrás.
+  - *Lo habilita el cliente* es para quien lo pida. El usuario de soporte, un administrador aparte, queda desactivado. El cliente lo habilita desde la app (Opciones → Acceso de tu instalador) por 2 h, 24 h o 7 días, y vence solo.
+  - La cuenta **dueña** de Home Assistant nunca se desactiva: guardala fuera de línea como llave de emergencia.
+- **Avisos de seguridad:** Salud y avisos y el panel central avisan cuando:
+  - Home Assistant está en internet sin bloqueo de intentos;
+  - hay administradores sin verificación en 2 pasos;
+  - el acceso compartido viejo ya no lo usa nadie y se puede apagar.
+
 ### Celulares y tablets en la casa
 
 Cada equipo con la app MatterAI de Android se registra solo en la casa, como la app oficial de Home Assistant (integración **mobile_app**). Queda como un dispositivo con:
@@ -341,6 +359,9 @@ Con la app cerrada también entiende las notificaciones de la app oficial: `mess
 | `matterai/app/invite` (`device_id`) | equipos de la casa con perfil completo | código para otro celular |
 | `matterai/app/forget_me` | el equipo | desvincularse (Opciones → Desvincular) |
 | `matterai/app/access` · `app/revoke` · `app/shared_off` | admin | accesos de la casa, desvincular uno, apagar el compartido |
+| `matterai/audit` (`limit`) | admin | registro de auditoría + verificación de integridad |
+| `matterai/support/set` (`mode`, `user_id`, `notify`) | admin | cómo entra el instalador a esta casa |
+| `matterai/app/support` · `app/support_grant` (`hours`: 0, 2, 24, 168) | equipos de la casa con perfil completo | ver / habilitar / cortar el acceso del instalador |
 | `matterai/status` | admin | estado de la casa |
 | `matterai/heartbeat` | admin | mandar un latido ya al panel central |
 | `matterai/app/me` (`device_id`) | cualquier usuario (la app) | perfil y huella de ese equipo |
