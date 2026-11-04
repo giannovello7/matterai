@@ -46,6 +46,5 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install "setuptools<75" semgrep==1.97.0
-      # reglas públicas de seguridad (sin cuenta); por ahora informa sin frenar el merge
+      # reglas públicas de seguridad (sin cuenta): un hallazgo grave pone el CI en rojo
       - run: semgrep scan --config p/security-audit --config p/secrets --config p/python --config p/javascript --metrics=off --error --severity ERROR
-        continue-on-error: true
