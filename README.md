@@ -278,6 +278,38 @@ La app lee la configuración con `matterai/config` y queda escuchando `matterai/
 - **Equipos de versiones anteriores:** usaban un acceso compartido por todos. Se pasan solos a uno propio la próxima vez que abren la app. Cuando no queda ninguno, **Apagar el acceso compartido** lo corta para siempre.
 - **Accesos rápidos y stickers NFC firmados:** la casa le da a sus equipos una firma (`run_key`). Un link o sticker sin esa firma no ejecuta nada. Los stickers grabados con la app 1.2 hay que volver a grabarlos.
 
+### Dashboards por persona y editor (panel → Dashboards)
+
+- **Qué es un dashboard:** qué ve primero cada persona en la app. Se crea uno por persona («Gianfranco», «Tablet living») y se asigna a sus equipos. Lo que cada uno fija desde el celular (mantener apretado un ambiente) queda en su dashboard. Los permisos siguen siendo el perfil del equipo.
+- **«Editar diseño»** abre el modo edición:
+  - **Vista previa real** del celular o de la tablet, horizontal o vertical. Es el mismo motor que la app.
+  - **Tarjetas:**
+    - resumen;
+    - cámara con botón;
+    - ambientes;
+    - escenas;
+    - botones;
+    - cámara con acciones;
+    - alarma;
+    - modo ausente;
+    - rutinas;
+    - música;
+    - cerradura;
+    - plano;
+    - reloj.
+
+    Se mueven arrastrando con el mouse o con flechas, se pasan de columna en la tablet, se duplican y se borran. Cada tarjeta tiene sus equipos (con buscador) y cada botón su acción al tocar y al mantener:
+    - prender o apagar;
+    - ver más;
+    - abrir un ambiente;
+    - abrir una pantalla (agenda, clima, música, cámaras, actividad…);
+    - llamar a un servicio con sus datos.
+  - **«Prearmado»** arma el diseño base con los equipos de la casa.
+  - **«Plano e imágenes»:**
+    - se suben el render apagado, el prendido y el de día (JPG, PNG o WebP, hasta 12 MB). Quedan privados en `<config>/matterai_media`, y la app los pide con un link firmado;
+    - se dibuja cada ambiente con el mouse, se ajustan sus puntos y se eligen las luces que lo iluminan.
+- **Al guardar,** los equipos con ese dashboard lo toman al instante, sin actualizar ni recargar la app. Sólo hace falta una app nueva cuando se agrega un tipo de tarjeta.
+
 ### Registro de auditoría y acceso del instalador (panel → Seguridad)
 
 - **Registro:** queda anotado quién hizo cada cosa: el equipo de la app, el instalador o una automatización. Se anotan:
@@ -359,6 +391,9 @@ Con la app cerrada también entiende las notificaciones de la app oficial: `mess
 | `matterai/app/invite` (`device_id`) | equipos de la casa con perfil completo | código para otro celular |
 | `matterai/app/forget_me` | el equipo | desvincularse (Opciones → Desvincular) |
 | `matterai/app/access` · `app/revoke` · `app/shared_off` | admin | accesos de la casa, desvincular uno, apagar el compartido |
+| `matterai/views/list` · `views/save` · `views/delete` · `views/assign` · `views/default` | admin | dashboards: crear, editar (tarjetas, plano), asignar a equipos |
+| `matterai/app/view` · `app/view_pin` (`device_id`) | el equipo | su dashboard; fijar / sacar ambientes |
+| `POST /api/matterai/media` · `GET /api/matterai/media/<id>` · `matterai/media/list` · `media/delete` | admin (subir) · usuario o link firmado (ver) | imágenes de los dashboards |
 | `matterai/audit` (`limit`) | admin | registro de auditoría + verificación de integridad |
 | `matterai/support/set` (`mode`, `user_id`, `notify`) | admin | cómo entra el instalador a esta casa |
 | `matterai/app/support` · `app/support_grant` (`hours`: 0, 2, 24, 168) | equipos de la casa con perfil completo | ver / habilitar / cortar el acceso del instalador |

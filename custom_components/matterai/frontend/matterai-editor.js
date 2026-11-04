@@ -166,7 +166,7 @@
       fr.innerHTML = '<div id="pv"></div>';
       if (this.vista) this.vista.destroy();
       this.vista = window.MaeVista.create(fr.querySelector('#pv'), {
-        card: this.card, hass: () => this.hass, base: () => '', toast: () => {}, openEntity() {}, openMenu() {},
+        card: this.card, hass: () => this.p._hass || this.hass, base: () => '', toast: () => {}, openEntity() {}, openMenu() {},
         sign: async (path) => (await this.hass.callWS({ type: 'auth/sign_path', path, expires: 7200 })).path,
         kind: K, orientation: ori, edit: { selected: this.sel, onSelect: (id) => { this.sel = id; this.drawList(); this.drawProps(); this.vista.setCtx({ edit: { selected: id, onSelect: this.vista._onSel } }); this.bind(); } },
       });
