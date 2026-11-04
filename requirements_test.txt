@@ -8,6 +8,6 @@ ha-ffmpeg
 pymicro-vad==1.0.1
 pyspeex-noise==1.0.2
 PyTurboJPEG==1.7.5
-hass-nabucasa==0.86.0
+hass-nabucasa==2.8.1
 PyNaCl==1.5.0
 anthropic
