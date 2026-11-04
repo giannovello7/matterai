@@ -269,6 +269,15 @@ Las versiones nuevas aparecen en **Ajustes → Actualizaciones**.
 
 La app lee la configuración con `matterai/config` y queda escuchando `matterai/config/subscribe`. En casas viejas sin la integración, sigue buscando la tarjeta en los paneles como antes.
 
+### Vincular celulares (un acceso por equipo, desde la 2.10)
+
+- El QR / link del panel (**Vincular celulares**) lleva un **código de un solo uso** que vence en 24 horas. Nunca lleva el acceso a la casa.
+- La app lo canjea en la casa (`POST /api/matterai/pair`) y ese equipo queda con **su propio usuario y acceso**: no administrador, y no vence nunca. El cliente no vuelve a entrar.
+- **Agregar otro celular:** desde la app (Opciones → Agregar otro celular), quien ya está vinculado muestra un QR o manda un link para otro equipo. No está disponible para los perfiles restringidos.
+- **Accesos a la casa** (panel → Vincular celulares) muestra cada equipo, cuándo se vinculó y su último uso, con un botón **Desvincular** que corta sólo ese equipo. También borra su registro de avisos y ubicación.
+- **Equipos de versiones anteriores:** usaban un acceso compartido por todos. Se pasan solos a uno propio la próxima vez que abren la app. Cuando no queda ninguno, **Apagar el acceso compartido** lo corta para siempre.
+- **Accesos rápidos y stickers NFC firmados:** la casa le da a sus equipos una firma (`run_key`). Un link o sticker sin esa firma no ejecuta nada. Los stickers grabados con la app 1.2 hay que volver a grabarlos.
+
 ### Celulares y tablets en la casa
 
 Cada equipo con la app MatterAI de Android se registra solo en la casa, como la app oficial de Home Assistant (integración **mobile_app**). Queda como un dispositivo con:
@@ -326,13 +335,18 @@ Con la app cerrada también entiende las notificaciones de la app oficial: `mess
 | `matterai/config` | cualquier usuario (la app) | configuración del dashboard + nombre de la casa |
 | `matterai/config/subscribe` | cualquier usuario | avisos cuando el instalador guarda |
 | `matterai/config/save` | admin | guardar la configuración |
-| `matterai/pairing` (`regenerate`) | admin | link/QR de vinculación (o acceso nuevo) |
+| `matterai/pairing` | admin | link/QR de vinculación: código nuevo de un solo uso cada vez |
+| `POST /api/matterai/pair` (`code`, `name`) | sin usuario (lo protege el código) | canjear el código por el acceso de un equipo nuevo |
+| `matterai/app/upgrade` (`name`, `device_id`) | el acceso compartido viejo | pasar este equipo a su propio acceso |
+| `matterai/app/invite` (`device_id`) | equipos de la casa con perfil completo | código para otro celular |
+| `matterai/app/forget_me` | el equipo | desvincularse (Opciones → Desvincular) |
+| `matterai/app/access` · `app/revoke` · `app/shared_off` | admin | accesos de la casa, desvincular uno, apagar el compartido |
 | `matterai/status` | admin | estado de la casa |
 | `matterai/heartbeat` | admin | mandar un latido ya al panel central |
 | `matterai/app/me` (`device_id`) | cualquier usuario (la app) | perfil y huella de ese equipo |
 | `matterai/app/subscribe` (`device_id`, `name`) | cualquier usuario | órdenes de la casa para ese equipo (portero, `app_command`) |
 | `matterai/app/actions` (`since`) | cualquier usuario | qué equipo dio cada orden (Actividad) |
-| `matterai/app/notify_action` (`action`) | cualquier usuario | botón del portero desde la pantalla de la app |
+| `matterai/app/notify_action` (`action`) | equipos de la casa | botón del portero desde la pantalla de la app |
 | `matterai/app/devices` · `matterai/app/device_set` | admin | listar equipos y cambiar su perfil / huella |
 
 ## Pruebas
@@ -342,7 +356,7 @@ python -m venv venv && venv\Scripts\pip install pytest-homeassistant-custom-comp
 venv\Scripts\python -m pytest
 ```
 
-Corren sobre un Home Assistant real de prueba: alta, usuario y token de la app, permisos (la app lee pero no guarda ni ve el QR), suscripción a cambios, avisos, latido al panel central y formatos de CORS.
+Corren sobre un Home Assistant real de prueba. `tests/test_seguridad.py` prueba la vinculación por equipo, desvincular, los permisos y las copias sin secretos, con pruebas negativas. El resto prueba: alta, permisos (la app lee pero no guarda ni ve el QR), suscripción a cambios, avisos, latido al panel central y formatos de CORS.
 
 ## Licencia
 
