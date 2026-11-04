@@ -695,6 +695,7 @@
     /* ---------- Seguridad: registro de auditoría y acceso del instalador ---------- */
     async _renderSec() {
       const r = await this._hass.callWS({ type: 'matterai/audit', limit: 500 });
+      const arco = await this._hass.callWS({ type: 'matterai/privacy/arco_list' }).catch(() => ({ requests: [], kinds: {} }));
       const users = (await this._hass.callWS({ type: 'config/auth/list' }).catch(() => [])).filter((u) => u.group_ids && u.group_ids.includes('system-admin') && !u.system_generated);
       const sp = r.support || {};
       const when = (t) => new Date(t * 1000).toLocaleString('es-AR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
@@ -709,6 +710,13 @@
           <p class="mut" id="smh" ${sp.mode === 'owner' ? '' : 'hidden'}>Creá un administrador aparte para el soporte (por ejemplo «MatterAI Soporte», con verificación en 2 pasos). La cuenta <b>dueña</b> de Home Assistant nunca se desactiva: guardala fuera de línea como llave de emergencia.</p>
           <div class="row"><label><input type="checkbox" id="sn" ${sp.notify ? 'checked' : ''}> Avisar a la app del cliente cada vez que entro</label></div>
           <div class="row"><button class="b pri" id="ss">Guardar</button>${sp.mode === 'owner' ? `<span class="mut">${sp.open ? `Habilitado hasta ${esc(when(sp.until))}` : 'Ahora: cortado (el cliente lo habilita desde Opciones de la app)'}</span>` : ''}</div></div>
+        <div class="box"><h2>Pedidos de datos personales (ARCO)</h2>
+          <p class="mut">Lo que piden los clientes desde la app (Opciones → Privacidad): ver sus datos, corregirlos, darse de baja. La ley da <b>10 días corridos</b> para el acceso y <b>5 días hábiles</b> para corregir o borrar. Al resolverlo, anotá qué hiciste: queda como constancia.</p>
+          ${arco.requests.length ? `<table class="tb"><thead><tr><th>Cuándo</th><th>Pedido</th><th>Estado</th><th></th></tr></thead><tbody>
+            ${arco.requests.map((q) => `<tr><td>${esc(when(q.at))}</td><td><b>${esc(arco.kinds[q.kind] || q.kind)}</b> · ${esc(q.device)}${q.detail ? `<br><small class="mut">${esc(q.detail)}</small>` : ''}</td>
+              <td>${q.status === 'open' ? '<b class="wn">Pendiente</b>' : `<b class="ok">Resuelto</b> ${esc(when(q.resolved_at))}${q.note ? `<br><small class="mut">${esc(q.note)}</small>` : ''}`}</td>
+              <td>${q.status === 'open' ? `<button class="b" data-arco="${esc(q.id)}">Marcar resuelto</button>` : ''}</td></tr>`).join('')}
+          </tbody></table>` : '<p class="mut">No hay pedidos.</p>'}</div>
         <div class="box"><h2>Registro de auditoría</h2>
           <p class="mut">Cerraduras, alarma, portones, cámaras vistas desde la app, equipos vinculados o desvinculados, perfiles y cada vez que entra un administrador. No se puede editar: cada entrada guarda la huella (hash) de la anterior.</p>
           <p>${integ.ok ? `<b class="ok">✓ Registro íntegro</b> · ${integ.rows} entradas` : `<b class="bad">⚠️ El registro fue modificado (entrada ${esc(integ.broken_at)})</b>`}</p>
@@ -717,6 +725,14 @@
           </tbody></table>` : '<p class="mut">Todavía no hay nada registrado.</p>'}</div>`);
       if (!main) return;
       const $ = (id) => main.querySelector(`#${id}`);
+      main.querySelectorAll('[data-arco]').forEach((b) => {
+        b.onclick = async () => {
+          const note = prompt('¿Qué hiciste? (queda como constancia, por ejemplo: «Le mandé sus datos por mail el 4/11»)');
+          if (note == null) return;
+          try { await this._hass.callWS({ type: 'matterai/privacy/arco_resolve', request_id: b.dataset.arco, note }); this._toast('Pedido resuelto'); } catch (e) { this._toast(`No se pudo: ${e.message || e}`); }
+          this._renderSec();
+        };
+      });
       main.querySelectorAll('[name="sm"]').forEach((el) => { el.onchange = () => { const o = el.value === 'owner' && el.checked; $('smu').hidden = !o; $('smh').hidden = !o; }; });
       $('ss').onclick = async () => {
         const mode = main.querySelector('[name="sm"]:checked').value;

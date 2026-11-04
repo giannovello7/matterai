@@ -22,6 +22,7 @@ from __future__ import annotations
 import asyncio
 from datetime import timedelta
 import logging
+import time
 from typing import Any
 
 import aiohttp
@@ -208,6 +209,13 @@ async def async_security_alerts(hass: HomeAssistant) -> list[dict[str, str]]:
             admins_sin_2fa.append(user.name or "sin nombre")
     if admins_sin_2fa:
         out.append(_alert("warning", "security:mfa", f"Administrador(es) sin verificación en 2 pasos: {', '.join(sorted(admins_sin_2fa)[:4])} (Perfil → Seguridad → Módulos de autenticación)"))
+    pv = rt.get("privacy")
+    if pv is not None:
+        from .privacy import ARCO_KINDS  # noqa: PLC0415
+
+        for r in pv.open_requests():
+            days = int((time.time() - r["at"]) // 86400)
+            out.append(_alert("warning", f"arco:{r['id']}", f"Pedido de datos personales sin resolver ({days} día(s)): {ARCO_KINDS.get(r['kind'], r['kind'])} · {r['device']}"))
     house = rt.get("house")
     if house is not None and house.shared_status().get("active"):
         from .app_devices import app_entries  # noqa: PLC0415

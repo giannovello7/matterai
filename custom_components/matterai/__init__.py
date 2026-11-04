@@ -66,6 +66,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     from .pairing import async_register_view  # noqa: PLC0415
 
     async_register_view(hass)
+    from .privacy import async_register_view as async_register_consent_view  # noqa: PLC0415
+
+    async_register_consent_view(hass)
     # Si en esta casa sigue instalada la integración aparte «MatterAI Escenas», las automatizaciones
     # las maneja ella: correr las dos haría que cada automatización se ejecute dos veces.
     if not _escenas_aparte(hass):
@@ -101,7 +104,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await audit.async_load()
     audit.start()
     entry.async_on_unload(audit.stop)
-    rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices, audit=audit)
+    from .privacy import Privacy  # noqa: PLC0415
+
+    privacy = Privacy(hass)
+    await privacy.async_load()
+    rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices, audit=audit, privacy=privacy)
     async_register_service(hass)
 
 
@@ -220,7 +227,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             frontend.remove_extra_js_url(hass, rt["card_url"])
         except (KeyError, ValueError):  # ya no estaba (frontend recién iniciado o quitado antes)
             pass
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy"):
         rt.pop(key, None)
     return True
 
