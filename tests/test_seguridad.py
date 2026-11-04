@@ -312,3 +312,17 @@ async def test_central_backup_has_no_guest_links(hass) -> None:
     # restaurar una copia del panel no borra los invitados de la casa
     await manager.async_restore(central["automations"]["rules"], None)
     assert manager.rules["inv1"]["invites"][0]["token"] == "LINK-SECRETO-PORTON"
+
+
+# ---------------------------------------------------------------- avisos de seguridad de la casa
+async def test_security_alerts(hass, hass_admin_user) -> None:
+    house = await _setup(hass)
+    from custom_components.matterai.health import async_security_alerts  # noqa: PLC0415
+
+    keys = {a["key"]: a for a in await async_security_alerts(hass)}
+    assert "security:ip_ban" in keys, "HA en internet sin bloqueo de intentos: avisa"
+    assert "security:mfa" in keys and hass_admin_user.name in keys["security:mfa"]["text"], "administrador sin 2 pasos: avisa"
+    assert "security:shared" not in keys, "sin acceso compartido, nada que apagar"
+    await _shared(hass, house)
+    keys = {a["key"] for a in await async_security_alerts(hass)}
+    assert "security:shared" in keys, "acceso compartido prendido que ya nadie usa: sugiere apagarlo"

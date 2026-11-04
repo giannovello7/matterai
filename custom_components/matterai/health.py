@@ -175,7 +175,46 @@ async def async_collect(hass: HomeAssistant) -> dict[str, Any]:
         data["alerts"] = alerts + wd.alerts()
         if wd.maintenance:
             data["stats"]["maintenance"] = True
+    try:
+        data["alerts"] += await async_security_alerts(hass)
+    except Exception:  # noqa: BLE001 - un aviso de más no puede romper el latido
+        _LOGGER.debug("No se pudieron revisar los avisos de seguridad", exc_info=True)
     return data
+
+
+async def async_security_alerts(hass: HomeAssistant) -> list[dict[str, str]]:
+    """Lo que deja a la casa más expuesta de lo necesario (se ve en el panel MatterAI y en el panel central).
+
+    - Home Assistant publicado en internet (túnel) sin bloqueo de IP tras intentos fallidos de entrar.
+    - Usuarios administradores (el del instalador, el dueño) sin verificación en 2 pasos.
+    - El acceso compartido de la app (versiones anteriores) sigue prendido aunque ya nadie lo usa.
+    """
+    out: list[dict[str, str]] = []
+    rt = hass.data.get(DOMAIN) or {}
+    entry = rt.get("entry")
+    remote = bool(entry and (entry.options.get("url") or entry.data.get("url")))
+    http = getattr(hass, "http", None)
+    if remote and http is not None:
+        from homeassistant.components.http.ban import KEY_BAN_MANAGER, KEY_LOGIN_THRESHOLD  # noqa: PLC0415
+
+        # HA trae ip_ban_enabled prendido pero login_attempts_threshold en -1: nunca bloquea a nadie
+        if http.app.get(KEY_BAN_MANAGER) is None or (http.app.get(KEY_LOGIN_THRESHOLD) or -1) <= 0:
+            out.append(_alert("warning", "security:ip_ban", "Home Assistant está en internet sin bloqueo tras intentos fallidos de entrar (http: login_attempts_threshold). Ver «Seguridad de cada casa» en APP.md"))
+    admins_sin_2fa = []
+    for user in await hass.auth.async_get_users():
+        if user.system_generated or not user.is_active or not user.is_admin:
+            continue
+        if not await hass.auth.async_get_enabled_mfa(user):
+            admins_sin_2fa.append(user.name or "sin nombre")
+    if admins_sin_2fa:
+        out.append(_alert("warning", "security:mfa", f"Administrador(es) sin verificación en 2 pasos: {', '.join(sorted(admins_sin_2fa)[:4])} (Perfil → Seguridad → Módulos de autenticación)"))
+    house = rt.get("house")
+    if house is not None and house.shared_status().get("active"):
+        from .app_devices import app_entries  # noqa: PLC0415
+
+        if not any(house.is_shared_user(e.data.get("user_id")) for e in app_entries(hass)):
+            out.append(_alert("info", "security:shared", "Ningún celular usa ya el acceso compartido viejo de la app: se puede apagar (Vincular celulares → Accesos a la casa)"))
+    return out
 
 
 async def _async_supervisor_alerts(hass: HomeAssistant) -> list[dict[str, str]]:

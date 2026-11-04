@@ -125,8 +125,17 @@ async def test_health_alerts(hass: HomeAssistant) -> None:
     hass.states.async_set("alarm_control_panel.casa", "triggered", {"friendly_name": "Casa"})
     data = collect(hass)
     texts = " | ".join(a["text"] for a in data["alerts"])
-    assert data["stats"]["lights_on"] == 1 and data["stats"]["unavailable"] == 1
-    assert "Alarma disparada: Casa" in texts and "sin responder: Cocina" in texts and "Pilas bajas: Puerta (8%)" in texts
+    # recién apagada no avisa (un corte de un minuto no molesta); a los 15 minutos sí
+    assert data["stats"]["lights_on"] == 1 and data["stats"]["unavailable"] == 0 and data["stats"]["unavailable_recent"] == 1
+    assert "Alarma disparada: Casa" in texts and "Pila baja: Puerta (8%)" in texts
+    from datetime import timedelta  # noqa: PLC0415
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from homeassistant.util import dt as dt_util  # noqa: PLC0415
+
+    with patch("custom_components.matterai.health.dt_util.utcnow", return_value=dt_util.utcnow() + timedelta(minutes=20)):
+        data = collect(hass)
+    assert data["stats"]["unavailable"] == 1 and "Sin responder: Cocina" in " | ".join(a["text"] for a in data["alerts"])
 
 
 async def test_heartbeat(hass: HomeAssistant, aioclient_mock, hass_ws_client) -> None:
@@ -214,7 +223,7 @@ async def test_card_resource_replaces_old_copy(hass: HomeAssistant, hass_storage
     res = lovelace["resources"] if isinstance(lovelace, dict) else lovelace.resources
     urls = [i["url"] for i in res.async_items()]
     assert any(u.startswith("/matterai_static/matterai-loader.js?f=matterai-home-card.js") for u in urls)  # el cargador trae la última tarjeta
-    assert sum("matterai" in u for u in urls) == 1
+    assert sum("matterai-home-card" in u for u in urls) == 1, urls  # una sola tarjeta (la de automatizaciones va aparte)
     assert not any("/local/matterai-home/" in u for u in urls)
     assert "/hacsfiles/otra/otra.js" in urls  # las demás no se tocan
 
