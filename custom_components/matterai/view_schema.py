@@ -150,11 +150,24 @@ PLAN = vol.Schema({
 }, extra=vol.REMOVE_EXTRA)
 
 
+# botones posibles de la barra de abajo («voice» es el micrófono)
+DOCK_KEYS = ("top", "camaras", "musica", "actividad", "voice", "agenda", "casa", "menu", "luces", "clima", "seguridad", "automatizaciones")
+
+HEADER = vol.Schema({
+    vol.Optional("clock"): bool,    # hora y fecha
+    vol.Optional("weather"): bool,  # clima
+    vol.Optional("bell"): bool,     # campanita de avisos
+    vol.Optional("menu"): bool,     # menú
+}, extra=vol.REMOVE_EXTRA)
+
+
 def layout_schema(max_blocks: int) -> vol.Schema:
     """Un diseño (el del celular o el de la tablet) de un dashboard."""
     return vol.Schema({
         vol.Optional("blocks"): vol.Any(None, vol.All([BLOCK], vol.Length(max=max_blocks))),
         vol.Optional("orientation"): vol.Any(None, vol.In(["landscape", "portrait", "auto"])),
+        vol.Optional("header"): vol.Any(None, HEADER),                                       # desde la 2.20
+        vol.Optional("dock"): vol.Any(None, vol.All([vol.In(DOCK_KEYS)], vol.Length(max=10))),
     }, extra=vol.REMOVE_EXTRA)
 
 

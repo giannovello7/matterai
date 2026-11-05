@@ -165,6 +165,8 @@ def resolve(view: dict[str, Any] | None, kind: str | None) -> dict[str, Any] | N
     out["kind"] = kind
     out["blocks"] = (lay or {}).get("blocks") or None
     out["orientation"] = (lay or {}).get("orientation") or view.get("orientation")
+    out["header"] = (lay or {}).get("header") or None  # qué se ve arriba (hora, clima, avisos, menú)
+    out["dock"] = (lay or {}).get("dock") or None      # botones de la barra de abajo, en orden
     return out
 
 

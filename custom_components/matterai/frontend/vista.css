@@ -247,7 +247,21 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .vista.editing .v-b *{pointer-events:none}
 .v-btag{position:absolute;z-index:3;top:-9px;right:6px;padding:1px 8px;border-radius:8px;background:var(--card2);border:1px solid var(--line);font-size:10.5px;color:var(--muted)}
 .vista.editing .v-b.sel .v-btag{background:var(--warm);color:#1b1408;border:0}
-.vista.editing .v-nav,.vista.editing .v-player,.vista.editing .v-dock{pointer-events:none}
+.vista.editing .v-player{pointer-events:none}
+.v-hsp{flex:1}
+/* editor: el encabezado y la barra de abajo se tocan para editarlos */
+.vista.editing #v-head,.vista.editing .v-nav,.vista.editing .v-dock{cursor:pointer;outline:1px dashed transparent;outline-offset:4px;border-radius:14px}
+.vista.editing #v-head:hover,.vista.editing .v-nav:hover,.vista.editing .v-dock:hover{outline-color:rgba(242,183,102,.6)}
+.vista.editing #v-head.zsel,.vista.editing .v-nav.zsel,.vista.editing .v-dock.zsel{outline:2px solid var(--warm)}
+.vista.editing #v-head *,.vista.editing .v-nav *,.vista.editing .v-dock *{pointer-events:none}
+/* editor: zonas del plano y carteles que se arrastran */
+.vista.editing .v-b .v-plan [data-zone]{pointer-events:auto;cursor:pointer}.vista.editing .v-b .v-plan .v-pin{cursor:grab;touch-action:none}
+.vista.editing .v-plan .v-hit:hover{fill:rgba(242,183,102,.12)}
+.v-hit.zsel{fill:rgba(242,183,102,.22)!important;stroke:var(--warm);stroke-width:4;vector-effect:non-scaling-stroke}
+/* editor: las columnas de la tablet muestran su barra para recorrerlas */
+.vista.editing .v-c1,.vista.editing .v-c2,.vista.editing .v-c0{scrollbar-width:thin;scrollbar-color:rgba(242,183,102,.5) transparent}
+.vista.editing .v-c1::-webkit-scrollbar,.vista.editing .v-c2::-webkit-scrollbar{display:block;width:6px}
+.vista.editing .v-c1::-webkit-scrollbar-thumb,.vista.editing .v-c2::-webkit-scrollbar-thumb{background:rgba(242,183,102,.5);border-radius:6px}
 .vista.editing .v-b{cursor:grab}.vista.editing .v-b.dragging{opacity:.35}
 .vista.editing .v-b.dropb{box-shadow:0 -4px 0 var(--warm)}.vista.editing .v-b.dropa{box-shadow:0 4px 0 var(--warm)}
 .v-etool{position:absolute;z-index:4;top:-15px;left:8px;display:flex;gap:2px;padding:2px;border-radius:9px;background:var(--warm);box-shadow:0 4px 14px rgba(0,0,0,.4)}

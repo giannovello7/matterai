@@ -374,3 +374,20 @@ async def test_try_on_device_and_history(hass, hass_ws_client, hass_client_no_au
     assert old["layouts"]["phone"]["blocks"][0]["type"] == "kpis"
     await ws.send_json({"id": 11, "type": "matterai/views/history_get", "view_id": v["id"], "index": 5})
     assert not (await ws.receive_json())["success"]
+
+
+async def test_header_and_dock_reach_the_device(hass, hass_ws_client, hass_client_no_auth) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    gian = await _phone(hass, hass_ws_client, client, "Celu Gianfranco", "dev-g")
+    lay = {"blocks": PHONE, "header": {"weather": False}, "dock": ["top", "luces", "voice"]}
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "G", "layouts": {"phone": lay}}})
+    v = (await ws.receive_json())["result"]
+    await ws.send_json({"id": 2, "type": "matterai/views/assign_user", "user_id": gian["user_id"], "view_id": v["id"]})
+    await ws.receive_json()
+    got = (await _ws(hass_ws_client, hass, gian["token"], 3, {"type": "matterai/app/view", "device_id": "dev-g", "kind": "phone"}))["result"]["view"]
+    assert got["header"] == {"weather": False} and got["dock"] == ["top", "luces", "voice"]
+    # NEGATIVO: botón de barra desconocido
+    await ws.send_json({"id": 4, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE, "dock": ["hackear"]}}}})
+    assert not (await ws.receive_json())["success"]

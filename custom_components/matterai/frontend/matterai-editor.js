@@ -311,7 +311,7 @@
     set K(k) { this._k = k; }
     lay() { const L = this.v.layouts || (this.v.layouts = {}); return L[this.K] || (L[this.K] = { blocks: [] }); }
     /** Lo que ve el motor: el dashboard con las tarjetas del tipo que se está editando. */
-    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, layouts: undefined }); }
+    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, layouts: undefined }); }
     model() { return this.card && this.card.model ? this.card.model() : null; }
     states() { return this.hass.states; }
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
@@ -425,7 +425,8 @@
     /** Lo que la vista previa puede hacer en el editor: elegir, la barra de la tarjeta, arrastrar y agregar. */
     editCtx() {
       const R = this.rdraft;
-      return { selected: this.sel, el: this.el != null ? this.el : null, onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
+      return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
+        onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col), onRoom: (a, i) => this.roomAct(a, i),
         room: R ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
@@ -436,6 +437,8 @@
       if (id !== this.sel || !(sub && sub.room)) { this.roomEd = null; this.rdraft = null; }
       this.sel = id; this.focus = sub && sub.item != null ? sub.item : null;
       this.el = sub && sub.el != null ? sub.el : null;
+      this.zone = sub && sub.zone ? sub.zone : null;
+      this.pz = sub && sub.pz != null ? sub.pz : null;
       // tocar algo de adentro de una tarjeta automática la arma a mano con lo mismo que se ve (para poder editarlo)
       const bb = this.selBlock();
       if (bb && this.el != null && this.el !== 'cam' && this.isAuto(bb)) { this.push(); this.materialize(bb); }
@@ -585,10 +588,15 @@
     drawProps() {
       const b = this.blocks().find((x) => x.id === this.sel);
       const r = this.$('#edr');
+      if (!b && this.zone === 'header') { r.innerHTML = this.headerEditor(); return; }
+      if (!b && this.zone === 'dock') { r.innerHTML = this.dockEditor(); return; }
+      if (b && b.type === 'plan' && this.pz != null) { r.innerHTML = this.zoneEditor(this.pz); return; }
       if (!b) {
         r.innerHTML = `<div class="guide"><b>Cómo se edita</b><ol>
             <li><b style="display:inline">Tocá cualquier cosa</b> en la pantalla del medio: una tarjeta, un ambiente, un dato del resumen o un botón. Acá aparece para editarla.</li>
             <li>Tocá un <b style="display:inline">ambiente</b> para abrirlo por dentro: ordená, sacá o agregá sus equipos.</li>
+            <li>Tocá <b style="display:inline">la parte de arriba</b> (hora, clima…) o <b style="display:inline">la barra de abajo</b> para elegir qué muestran.</li>
+            <li>En el <b style="display:inline">plano</b>, tocá un ambiente para elegir sus luces y arrastrá su cartel para ubicarlo.</li>
             <li>Arrastrá las tarjetas para moverlas. Con <b style="display:inline">+ Agregar tarjeta</b> sumás una nueva.</li>
             <li><b style="display:inline">Guardar</b> (arriba a la derecha) se lo manda a los equipos al instante.</li></ol></div>
           <h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}"></label>
@@ -689,6 +697,7 @@
     onElem(id, act, i) {
       if (this.sel !== id) { this.sel = id; this.roomEd = null; this.rdraft = null; }
       const b = this.selBlock(); if (!b) return;
+      if (act === 'add' && b.type === 'plan') { this.planEditor().then(() => { this.drawing = []; this.zsel = null; return this.drawPlan(); }); return; }
       if (act === 'add') { this.elemAdd(b); return; }
       if (i == null || i === 'cam') return;
       this.change(() => {
@@ -780,6 +789,37 @@
       return `${back}<span>› ${esc(this.elemLabel(b, x))}</span></div><h4>${esc((ELEM[b.type] || ['Elemento'])[0] || 'Elemento')}</h4>${f}
         <div class="elnav"><button class="eb sm" data-elact2="up" data-i="${i}" ${i > 0 ? '' : 'disabled'}>↑ Subir</button><button class="eb sm" data-elact2="down" data-i="${i}" ${i < L.length - 1 ? '' : 'disabled'}>↓ Bajar</button>
           <button class="eb sm warn" data-elact2="del" data-i="${i}">Sacar de la tarjeta</button></div>`;
+    }
+    /* ───────── encabezado, barra de abajo y zonas del plano ───────── */
+    headerEditor() {
+      const H = this.lay().header || {};
+      return `<div class="crumb"><button class="eb sm" data-zback>‹ Dashboard</button><span>› Parte de arriba</span></div><h4>Qué se ve arriba</h4>
+        ${[['clock', 'Hora y fecha (al tocarla abre la agenda)'], ['weather', 'Clima (al tocarlo abre el pronóstico)'], ['bell', 'Campanita de avisos'], ['menu', 'Menú (opciones y soporte)']]
+          .map(([k, l]) => `<label class="chk"><input type="checkbox" data-hd="${k}" ${H[k] !== false ? 'checked' : ''}> ${l}</label>`).join('')}
+        <p class="hint">Vale para ${this.K === 'tablet' ? 'la tablet' : 'el celular'} de este dashboard. Si sacás el menú, las opciones siguen en la barra de abajo (si tiene «Menú»).</p>`;
+    }
+    dockKeys() { const l = this.lay(); return (l.dock && l.dock.length ? l.dock : window.MaeVista.DOCK_DEF[this.K]).slice(); }
+    dockEditor() {
+      const D = this.dockKeys(), ALL = window.MaeVista.DOCK, free = Object.keys(ALL).filter((k) => !D.includes(k));
+      const custom = !!(this.lay().dock && this.lay().dock.length);
+      return `<div class="crumb"><button class="eb sm" data-zback>‹ Dashboard</button><span>› Barra de abajo</span></div><h4>Botones (en este orden)</h4>
+        <div class="elist">${D.map((k, i) => `<div class="elr"><span class="tx"><b>${esc(ALL[k] ? ALL[k][1] : k)}</b><small>${k === 'voice' ? 'redondo, para hablarle a la casa' : k === 'top' ? 'vuelve arriba' : 'abre su pantalla'}</small></span>
+          <button data-dk="up" data-i="${i}" title="Subir">↑</button><button data-dk="down" data-i="${i}" title="Bajar">↓</button><button data-dk="del" data-i="${i}" title="Sacar">✕</button></div>`).join('')}</div>
+        ${free.length && D.length < 10 ? `<label class="fld"><span>Agregar un botón</span><select data-dkadd><option value="">Elegir…</option>${free.map((k) => `<option value="${k}">${esc(ALL[k][1])}</option>`).join('')}</select></label>` : ''}
+        ${custom ? '<button class="eb sm" data-dkreset>Volver a la barra de siempre</button>' : ''}
+        <p class="hint">Lo que la casa no tiene (cámaras, música, agenda) no aparece aunque esté en la lista. El micrófono queda lindo en el medio.</p>`;
+    }
+    zoneEditor(i) {
+      const P = this.v.plan || {}, z = (P.zones || [])[i];
+      if (!z) { this.pz = null; return '<p class="hint">Esa zona ya no está.</p>'; }
+      const m = this.model(), rooms = m ? m.rooms.map((x) => x.name) : [];
+      const lights = Object.keys(this.states()).filter((e) => /^(light|switch)\./.test(e)).sort((a, c) => this.fname(a).localeCompare(this.fname(c), 'es'));
+      return `<div class="crumb"><button class="eb sm" data-pzback>‹ Plano</button><span>› ${esc(z.name)}</span></div><h4>Ambiente del plano</h4>
+        <label class="fld"><span>Nombre del cartel</span><input data-pzf="name" value="${esc(z.name)}" maxlength="40"></label>
+        <label class="fld"><span>Ambiente que abre al mantener apretado</span><select data-pzf="room"><option value="">—</option>${rooms.map((r) => `<option ${z.room === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
+        <h4>Luces que lo iluminan (${z.lights.length})</h4><div class="ml">${lights.map((e) => `<label><input type="checkbox" data-pzl="${esc(e)}" ${z.lights.includes(e) ? 'checked' : ''}> ${esc(this.fname(e))}</label>`).join('')}</div>
+        <p class="hint">Arrastrá el cartel en la pantalla del medio para ubicarlo. ${z.pin ? '<button class="eb sm" data-pzpin>Volver a ponerlo en el centro</button>' : ''}</p>
+        <div class="elnav"><button class="eb sm" data-e="plan">Cambiar la forma o las imágenes</button><button class="eb sm warn" data-pzdel>Borrar este ambiente del plano</button></div>`;
     }
     /** «Mostrar sólo si…»: condiciones como la tarjeta condicional de Home Assistant (se cumplen todas). */
     condEditor(b) {
@@ -964,6 +1004,26 @@
       W.querySelectorAll('#edr [data-mk]').forEach((x) => { x.onchange = () => this.change(() => { const k = x.dataset.mk, m0 = this.model();
         if (k === 'rooms' && b.type === 'rooms' && !(b.cfg.rooms && b.cfg.rooms.length) && m0) b.cfg.rooms = m0.rooms.slice(0, 4).map((r) => r.name); // parte de lo que se ve
         const L = (b.cfg[k] = b.cfg[k] || []); if (x.checked) { if (!L.includes(x.value)) L.push(x.value); } else b.cfg[k] = L.filter((y) => y !== x.value); }); });
+      const back = () => { this.zone = null; this.pz = null; this.drawProps(); this.syncPreview(); this.bind(); };
+      W.querySelectorAll('#edr [data-zback],#edr [data-pzback]').forEach((x) => { x.onclick = back; });
+      W.querySelectorAll('#edr [data-hd]').forEach((x) => { x.onchange = () => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); if (x.checked) delete H[x.dataset.hd]; else H[x.dataset.hd] = false; l.header = Object.keys(H).length ? H : null; }); });
+      W.querySelectorAll('#edr [data-dk]').forEach((x) => { x.onclick = () => this.change(() => {
+        const D = this.dockKeys(), i = +x.dataset.i, a = x.dataset.dk;
+        if (a === 'del') D.splice(i, 1);
+        else { const j = i + (a === 'up' ? -1 : 1); if (j < 0 || j >= D.length) return; [D[i], D[j]] = [D[j], D[i]]; }
+        this.lay().dock = D;
+      }); });
+      W.querySelectorAll('#edr [data-dkadd]').forEach((x) => { x.onchange = () => { if (!x.value) return; this.change(() => { const D = this.dockKeys(); D.push(x.value); this.lay().dock = D; }); }; });
+      W.querySelectorAll('#edr [data-dkreset]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().dock = null; }); });
+      const Z = () => ((this.v.plan || {}).zones || [])[this.pz];
+      W.querySelectorAll('#edr [data-pzf]').forEach((x) => { x.onchange = () => this.change(() => {
+        const z = Z(); if (!z) return;
+        if (x.dataset.pzf === 'name') z.name = (x.value.trim() || 'Ambiente').slice(0, 40);
+        else { z.room = x.value || null; if (x.value && /^Ambiente \d+$/.test(z.name)) z.name = x.value; }
+      }); });
+      W.querySelectorAll('#edr [data-pzl]').forEach((x) => { x.onchange = () => this.change(() => { const z = Z(); if (!z) return; if (x.checked) { if (!z.lights.includes(x.dataset.pzl)) z.lights.push(x.dataset.pzl); } else z.lights = z.lights.filter((y) => y !== x.dataset.pzl); }); });
+      W.querySelectorAll('#edr [data-pzpin]').forEach((x) => { x.onclick = () => this.change(() => { const z = Z(); if (z) delete z.pin; }); });
+      W.querySelectorAll('#edr [data-pzdel]').forEach((x) => { x.onclick = () => { if (!confirm('¿Borrar este ambiente del plano? (Se puede deshacer)')) return; this.change(() => { this.v.plan.zones.splice(this.pz, 1); this.pz = null; }); }; });
       W.querySelectorAll('#edr [data-elback]').forEach((x) => { x.onclick = () => { this.el = null; this.drawProps(); this.syncPreview(); this.bind(); }; });
       W.querySelectorAll('#edr [data-elact2]').forEach((x) => { x.onclick = (e) => { e.stopPropagation(); this.onElem(this.sel, x.dataset.elact2, +x.dataset.i); }; });
       W.querySelectorAll('#edr [data-elpick]').forEach((x) => { x.onclick = () => {
@@ -1055,7 +1115,7 @@
     /** Lo que se guarda (o se prueba): los dos diseños, el plano y lo demás del dashboard. */
     payload() {
       const v = this.v, L = v.layouts || {};
-      const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null } : null);
+      const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null } : null);
       return { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
         plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
     }

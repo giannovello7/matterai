@@ -82,6 +82,10 @@
   const WX_TXT = { sunny: 'Despejado', 'clear-night': 'Despejado', partlycloudy: 'Algo nublado', cloudy: 'Nublado', rainy: 'Lluvia', pouring: 'Lluvia fuerte', lightning: 'Tormenta',
     'lightning-rainy': 'Tormenta', fog: 'Niebla', windy: 'Ventoso', 'windy-variant': 'Ventoso', snowy: 'Nieve', 'snowy-rainy': 'Aguanieve', hail: 'Granizo', exceptional: 'Alerta' };
   const MODE_TXT = { cool: 'Frío', heat: 'Calor', heat_cool: 'Automático', auto: 'Automático', dry: 'Seco', fan_only: 'Ventilación', off: 'Apagado' };
+  /* Botones de la barra de abajo: [ícono, texto]. «voice» es el micrófono (va redondo). */
+  const DOCK = { top: ['home', 'Inicio'], camaras: ['cam', 'Cámaras'], musica: ['music', 'Música'], actividad: ['list', 'Actividad'], voice: ['mic', 'Micrófono'],
+    agenda: ['cal', 'Agenda'], casa: ['grid', 'Casa'], menu: ['menu', 'Menú'], luces: ['bulb', 'Luces'], clima: ['sun', 'Clima'], seguridad: ['shield', 'Seguridad'], automatizaciones: ['robot', 'Rutinas'] };
+  const DOCK_DEF = { phone: ['top', 'camaras', 'voice', 'actividad', 'musica'], tablet: ['top', 'camaras', 'musica', 'actividad', 'voice', 'agenda', 'casa', 'menu'] };
   const SCREEN_NAMES = { agenda: 'Agenda', clima: 'Clima', musica: 'Música', actividad: 'Actividad', camaras: 'Cámaras', seguridad: 'Seguridad', avisos: 'Avisos',
     menu: 'Menú', casa: 'Toda la casa', luces: 'Luces prendidas', automatizaciones: 'Automatizaciones', aberturas: 'Puertas y ventanas' };
 
@@ -163,10 +167,11 @@
     /* layout: lo del editor, o el prearmado */
     function layout(m) {
       const v = X.view || {};
-      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape' };
+      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null };
       const cfg = card() && card()._config;
       const d = defaults(kind(), m, v, (hass() || {}).states, cfg && cfg.floorplan);
       if (v.plan) d.plan = v.plan;
+      d.header = v.header || null; d.dock = v.dock || null;
       return d;
     }
     const roomByName = (m, n) => m.rooms.find((r) => r.name.toLowerCase() === String(n).toLowerCase() || String(r.id).toLowerCase() === String(n).toLowerCase());
@@ -546,9 +551,9 @@
         <defs>${zones.map((z, i) => `<mask id="vz${i}" maskUnits="userSpaceOnUse"><polygon points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}" fill="#fff"/></mask>`).join('')}</defs>
         <image href="${esc(isDay ? day : off)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" data-planimg="1"/>
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
-        ${zones.map((z, i) => `<polygon class="v-hit" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
+        ${zones.map((z, i) => `<polygon class="v-hit${editing() && ctx.edit.pz === i && ctx.edit.selected === X.curB ? ' zsel' : ''}" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
         </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}">${ic('bulb')}<b>${esc(z.name)}</b></span>`; }).join('')}
-        ${editing() ? '' : '<span class="v-ptag">Tocá un ambiente · mantené para ver todo</span>'}</div>`;
+        ${editing() ? '' : '<span class="v-ptag">Tocá un ambiente · mantené para ver todo</span>'}</div>${elAdd('Dibujar un ambiente en el plano')}`;
     }
 
     /* ───────── avisos de la casa (campanita) ───────── */
@@ -572,11 +577,23 @@
     /* ───────── dibujo ───────── */
     function set(sel, html) { if (X.cache[sel] === html) return; X.cache[sel] = html; const e = X.el.querySelector(sel); if (e) e.innerHTML = html; }
     function head(m, compact) {
-      const d = new Date(), w = m.weather, ns = notes(m).length;
-      return `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>
-        ${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(w.state === 'sunny' || w.state === 'clear-night' ? 'Despejado' : w.state === 'rainy' || w.state === 'pouring' ? 'Lluvia' : 'Nublado')}</small>`}</button>` : ''}
-        <button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>
-        <button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`;
+      const d = new Date(), w = m.weather, ns = notes(m).length, H = (X.layout && X.layout.header) || {};
+      const on = (k) => H[k] !== false;
+      return `${on('clock') ? '' : '<span class="v-hsp"></span>'}${on('clock') ? `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>` : ''}
+        ${w && on('weather') ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(w.state === 'sunny' || w.state === 'clear-night' ? 'Despejado' : w.state === 'rainy' || w.state === 'pouring' ? 'Lluvia' : 'Nublado')}</small>`}</button>` : ''}
+        ${on('bell') ? `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>` : ''}
+        ${on('menu') ? `<button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>` : ''}`;
+    }
+    /** La barra de abajo: la del diseño (o la de siempre), sólo con lo que la casa tiene. */
+    function dockHTML(m, p) {
+      const L = (X.layout && X.layout.dock && X.layout.dock.length ? X.layout.dock : DOCK_DEF[kind()]);
+      const has = { camaras: m.f.cameras, musica: m.f.music, agenda: m.f.agenda, voice: voiceOn(), clima: !!m.weather };
+      return L.filter((k, i, a) => DOCK[k] && has[k] !== false && a.indexOf(k) === i).map((k, j) => {
+        const [i, t2] = DOCK[k];
+        if (k === 'voice') return `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>`;
+        if (k === 'musica') return `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`;
+        return `<button class="${j === 0 && k === 'top' ? 'on' : ''}" data-scr="${k}">${ic(i)}${t2}</button>`;
+      }).join('');
     }
     function wrapBlock(b, m) {
       const shown = visible(b, m);
@@ -678,19 +695,13 @@
         fit(vertical);
         const c = card();
         const p = drawPlayer();
-        set('#v-dock', [['home', 'Inicio', 'top'], ['cam', 'Cámaras', 'camaras', m.f.cameras], ['music', 'Música', 'musica', m.f.music], ['list', 'Actividad', 'actividad'],
-          ['mic', '', 'voice', voiceOn()], ['cal', 'Agenda', 'agenda', m.f.agenda], ['grid', 'Casa', 'casa'], ['menu', 'Menú', 'menu']]
-          .filter((x) => x[3] !== false).map(([i, t2, k], j) => (k === 'voice' ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>`
-            : k === 'musica' ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`
-            : `<button class="${j === 0 ? 'on' : ''}" data-scr="${k}">${ic(i)}${t2}</button>`)).join(''));
+        set('#v-dock', dockHTML(m, p));
       } else {
         setCol('#v-c1', bl, m, addSlot(0));
         set('#v-allb', `${ic('grid')}Toda la casa`);
         // reproductor: sólo con música; se esconde al botón Música
         const p = drawPlayer();
-        set('#v-nav', `<button class="on" data-scr="top">${ic('home')}Inicio</button>${m.f.cameras ? `<button data-scr="camaras">${ic('cam')}Cámaras</button>` : ''}
-          ${voiceOn() ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>` : ''}
-          <button data-scr="actividad">${ic('list')}Actividad</button>${m.f.music ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic('music')}Música</button>` : ''}`);
+        set('#v-nav', dockHTML(m, p));
       }
       // editor: el ambiente que se está editando se ve por dentro en la pantalla
       if (editing() && ctx.edit.room) { if (X.sheet !== 'roomedit') openSheet('roomedit'); }
@@ -698,6 +709,19 @@
       if (X.sheet) renderSheet();
       placeElTool();
       mountLive();
+      editMarks();
+    }
+    /** Editor: marca el encabezado o la barra si están elegidos, y trae a la vista la tarjeta elegida (columnas que se desplazan). */
+    function editMarks() {
+      if (!X.el.querySelector) return;
+      const z = editing() ? ctx.edit.zone : null;
+      [['#v-head', 'header'], ['#v-nav', 'dock'], ['#v-dock', 'dock']].forEach(([q, k]) => { const e = X.el.querySelector(q); if (e && e.classList) e.classList.toggle('zsel', z === k); });
+      const sel = editing() ? ctx.edit.selected : null;
+      if (sel && sel !== X.lastSel) {
+        const sec = X.el.querySelector(`[data-block="${String(sel).replace(/"/g, '')}"]`);
+        if (sec && sec.scrollIntoView) sec.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+      }
+      X.lastSel = sel;
     }
     /** Editor: barrita arriba del elemento elegido (subir, bajar, sacar). */
     function placeElTool() {
@@ -827,8 +851,11 @@
         const re = t.closest('[data-rme]'); if (re && ctx.edit.onRoom) return ctx.edit.onRoom(re.dataset.rme, +re.dataset.i);
         if (t.closest('[data-radd]') && ctx.edit.onRoom) return ctx.edit.onRoom('add');
         if (t.closest('#v-sheet')) { if (t.id === 'v-sheet' && ctx.edit.onRoom) ctx.edit.onRoom('close'); return; }
+        if (t.closest('#v-head')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'header' });
+        if (t.closest('#v-nav,#v-dock')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'dock' });
         const ea = t.closest('[data-eact]'), b = t.closest('[data-block]');
         if (ea && b && ctx.edit.onAction) return ctx.edit.onAction(b.dataset.block, ea.dataset.eact);
+        const pz = t.closest('[data-zone]'); if (pz && b) return ctx.edit.onSelect && ctx.edit.onSelect(b.dataset.block, { pz: +pz.dataset.zone });
         // la barra del elemento elegido y «+ Agregar …» de adentro de la tarjeta
         const ela = t.closest('[data-elact]'); if (ela && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, ela.dataset.elact, ctx.edit.el);
         if (t.closest('[data-eladd]') && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, 'add');
@@ -928,6 +955,27 @@
     });
     const endSlide = () => { if (X.sliding) { X.sliding = false; setTimeout(render, 400); } };
     ['pointerup', 'pointercancel'].forEach((ev) => { if (typeof addEventListener === 'function') addEventListener(ev, endSlide); });
+    // editor: los carteles del plano se arrastran a su lugar
+    let pinDrag = null;
+    el.addEventListener('pointerdown', (e) => {
+      if (!editing() || !ctx.edit.onPin) return;
+      const pin = e.target.closest && e.target.closest('.v-pin'); if (!pin) return;
+      const plan = pin.closest('.v-plan'); if (!plan) return;
+      pinDrag = { pin, plan, i: +pin.dataset.zone, x: e.clientX, y: e.clientY, moved: false };
+      try { pin.setPointerCapture(e.pointerId); } catch (_) { /* navegador viejo */ }
+    });
+    el.addEventListener('pointermove', (e) => {
+      if (!pinDrag) return;
+      if (Math.abs(e.clientX - pinDrag.x) + Math.abs(e.clientY - pinDrag.y) > 4) pinDrag.moved = true;
+      if (!pinDrag.moved) return;
+      const r = pinDrag.plan.getBoundingClientRect();
+      pinDrag.pos = [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))].map((v) => Math.round(v * 10000) / 10000);
+      pinDrag.pin.style.left = `${(pinDrag.pos[0] * 100).toFixed(2)}%`; pinDrag.pin.style.top = `${(pinDrag.pos[1] * 100).toFixed(2)}%`;
+    });
+    el.addEventListener('pointerup', () => {
+      const d = pinDrag; pinDrag = null;
+      if (d && d.moved && d.pos) { X.held = true; ctx.edit.onPin(d.i, d.pos); }
+    });
     // editor: las tarjetas se arrastran dentro de la vista previa (antes o después de otra, o a una columna vacía)
     let dragId = null;
     const colOfEl = (x) => {
@@ -982,5 +1030,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, CONDITIONS, ICONS, icon: ic, uid };
+  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid };
 })(typeof window !== 'undefined' ? window : globalThis);
