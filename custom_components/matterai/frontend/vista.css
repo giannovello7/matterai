@@ -267,6 +267,14 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .v-eltool button{width:26px;height:24px;display:grid;place-items:center;border:0;border-radius:7px;background:none;color:#1b1408;cursor:pointer;padding:0}
 .v-eltool button:hover{background:rgba(0,0,0,.14)}.v-eltool .i{width:15px;height:15px;stroke:#1b1408}
 .v-eladd{display:block;width:100%;margin-top:8px;padding:9px;border-radius:12px;border:1px dashed rgba(242,183,102,.5);background:none;color:var(--warm);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center}
+/* editor como Lovelace: ✎ y ⋮ arriba a la derecha de cada tarjeta; la tarjeta entera se arrastra */
+.v-ecard{position:absolute;z-index:5;top:-14px;right:-6px;display:none;gap:4px}
+.vista.editing .v-b:hover>.v-ecard,.vista.editing .v-b.sel>.v-ecard{display:flex}
+.vista.editing .v-b .v-ecard,.vista.editing .v-b .v-ecard *{pointer-events:auto}
+.v-ecard button{width:32px;height:32px;border-radius:50%!important;display:grid!important;place-items:center;background:var(--card2)!important;border:1px solid var(--line)!important;color:var(--fg);box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer}
+.v-ecard button:first-child{background:var(--warm)!important;color:#1b1408;border:0!important}.v-ecard .i{width:16px;height:16px}
+.vista.editing .v-b .v-btag{right:auto;left:8px}
+.vista.editing .v-b[draggable="true"]{cursor:grab}.vista.editing .v-b[draggable="true"]:active{cursor:grabbing}
 .vista.editing .v-b.hid{opacity:.4}.vista.editing .v-b.cond .v-btag{border-style:dashed}
 .vista.editing .v-b{position:relative;outline:1px dashed rgba(160,175,200,.35);outline-offset:4px;border-radius:14px;cursor:pointer;min-height:40px;margin-bottom:6px}
 .vista.editing .v-b:hover{outline-color:rgba(242,183,102,.6)}
@@ -298,3 +306,4 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .v-eadd{display:block;width:100%;margin:4px 0 10px;padding:12px;border-radius:14px;border:1px dashed rgba(160,175,200,.35);background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
 .v-eadd:hover{border-color:var(--warm);color:var(--warm)}
 .vista.editing .v-c0,.vista.editing .v-c1,.vista.editing .v-c2{min-height:120px}
+.vista.editing [data-ri]{cursor:grab}.vista.editing [data-ri].dragging{opacity:.35}.vista.editing [data-ri].dropb{box-shadow:0 -3px 0 var(--warm)}

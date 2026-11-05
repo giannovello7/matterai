@@ -109,6 +109,24 @@
   .it.focus{border-color:#f2b766;box-shadow:0 0 0 1px #f2b766}
   .guide{padding:14px;border-radius:14px;background:#1e242e;border:1px solid rgba(160,175,200,.15);margin-bottom:12px}.guide b{display:block;margin-bottom:6px}
   .guide ol{margin:0;padding-left:18px;color:#c4cad6;font-size:13px;line-height:1.6}
+  .ed{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto 1fr}
+  .ed-top{grid-column:1/-1!important;grid-row:1}.ed-c{grid-column:1!important;grid-row:2}.ed-l,.ed-r{display:none!important}
+  .ed-c{position:relative;transition:padding .2s}.ed.dlgon .ed-c{padding-right:calc(min(540px,46vw) + 24px)}
+  .ed-top .saved{font-size:12.5px;color:#7fd6a4;padding:0 6px}.ed-top .saved.dirty{color:#f2b766}
+  .ehint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:rgba(30,36,46,.92);border:1px solid rgba(160,175,200,.2);color:#c4cad6;font-size:12.5px;white-space:nowrap;pointer-events:none}
+  .ehint:empty{display:none}.ehint b{color:#f2b766}
+  .dlg{position:fixed;z-index:40;top:62px;right:12px;bottom:12px;width:min(540px,46vw);display:none;flex-direction:column;background:#161b21;border:1px solid rgba(160,175,200,.22);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);overflow:hidden}
+  .ed.dlgon .dlg{display:flex}
+  .dlg-h{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:14px 14px 0;border-bottom:1px solid rgba(160,175,200,.15)}
+  .dlg-t{flex:1;min-width:0}.dlg-t b{display:block;font-size:17px}.dlg-t small{color:#8f99ab;font-size:12.5px}
+  .tabs{flex-basis:100%;display:flex;gap:2px;margin-top:4px}.tabs button{border:0;background:none;padding:10px 14px;color:#8f99ab;font-weight:600;border-bottom:2px solid transparent}
+  .tabs button.on{color:#e9ecf2;border-bottom-color:#f2b766}
+  .dlg-b{flex:1;overflow:auto;padding:12px 16px}
+  .dlg-f{display:flex;align-items:center;gap:8px;padding:12px 14px;border-top:1px solid rgba(160,175,200,.15)}.dlg-f .sp{flex:1}
+  .elr .hd,.rme .hd{cursor:grab;color:#8f99ab;padding:0 4px 0 0;user-select:none;letter-spacing:-2px}
+  .elr.drag,.rme.drag{opacity:.4}.elr.over,.rme.over{box-shadow:0 -3px 0 #f2b766}
+  .mlist{display:flex;flex-direction:column;gap:4px}.mlist button{border:0;background:#1e242e;text-align:left;padding:12px 14px;border-radius:10px;font-weight:600}
+  .mlist button:hover{background:#262e3a}.mlist button.warn{color:#f08a7c}
   .autobox{padding:10px 12px;border-radius:10px;background:rgba(124,196,240,.08);border:1px solid rgba(124,196,240,.3);font-size:12.5px;color:#c4cad6;margin-bottom:10px}
   .elist{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
   .elr{display:flex;align-items:center;gap:4px;padding:8px 6px 8px 10px;border-radius:10px;background:#1e242e;border:1px solid transparent;cursor:pointer}
@@ -142,9 +160,7 @@
 
   class Editor {
     constructor(panel, viewId) {
-      this.p = panel; this.hass = panel._hass; this.viewId = viewId; this.sel = null; this.undo = []; this.redo = [];
-      // la lista de tarjetas de la izquierda viene escondida: se edita tocando la pantalla del medio (como en Home Assistant)
-      try { this.showList = localStorage.getItem('matterai.editor.list') === '1'; } catch (_) { this.showList = false; }
+      this.p = panel; this.hass = panel._hass; this.viewId = viewId; this.sel = null; this.undo = []; this.redo = []; this.tab = 'cfg';
     }
 
     async start() {
@@ -166,8 +182,9 @@
       this.host = document.createElement('div');
       root.appendChild(this.host);
       this.wrap = this.host.attachShadow({ mode: 'open' });
-      this.wrap.innerHTML = `<style>${CSS}</style><div class="ed" id="ed"><div class="ed-top" id="edt"></div><div class="ed-l" id="edl"></div>
-        <div class="ed-c" id="edc"><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div></div></div><div class="ed-r" id="edr"></div></div><div class="toastE" id="toastE"></div>`;
+      this.wrap.innerHTML = `<style>${CSS}</style><div class="ed" id="ed"><div class="ed-top" id="edt"></div>
+        <div class="ed-c" id="edc"><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div></div><div class="ehint" id="ehint"></div></div>
+        <aside class="dlg" id="dlg"><div class="dlg-h" id="dlgh"></div><div class="dlg-b" id="edr"></div><div class="dlg-f" id="dlgf"></div></aside></div><div class="toastE" id="toastE"></div>`;
       this.$ = (s) => this.wrap.querySelector(s);
       // el prearmado necesita el modelo de la casa (ambientes, cámaras, ausente, rutinas): igual que en la app
       for (let i = 0; i < 40 && !(this.model() && this.model().rooms && this.model().rooms.length); i++) await new Promise((res) => setTimeout(res, 100));
@@ -198,15 +215,15 @@
         if (this.cb) return this.closeCB();
         if (this.catBox) return this.closeCatalog();
         if (this.pe) return this.closePlan();
+        if (this.dlgOpen()) return this.dlgCancel();
         if (typing) return undefined;
-        if (this.sel) return this.pick(null);
         return this.close();
       }
       if (mod && k === 's') { e.preventDefault(); if (this.dirty()) this.cmd('save'); return undefined; }
       if (typing || this.pe) return undefined;
       if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); return this.cmd('undo'); }
       if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); return this.cmd('redo'); }
-      if (!this.sel) return undefined;
+      if (!this.sel || this.dlgOpen()) return undefined;
       if (mod && k === 'd') { e.preventDefault(); return this.blockAct(this.sel, 'dup'); }
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); return this.blockAct(this.sel, 'del'); }
       if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); return this.blockAct(this.sel, e.key === 'ArrowUp' ? 'up' : 'down'); }
@@ -320,6 +337,7 @@
     push() { this.undo.push(JSON.stringify(this.v)); if (this.undo.length > 80) this.undo.shift(); this.redo = []; }
     change(fn) {
       this.push(); fn(); this.draw();
+      if (!this.dlgOpen()) this.autosave();
       // probando en el equipo: cada cambio le llega solo (un momento después del último)
       if (this.trying) { clearTimeout(this.tryT); this.tryT = setTimeout(() => this.cmd('try', true), 900); }
     }
@@ -336,30 +354,69 @@
       else { this.sel = null; this.draw(); this.toast('Listo: el prearmado con los equipos de esta casa'); }
     }
 
+    /** Se guarda solo un momento después del último cambio (los equipos lo ven al instante). */
+    autosave() {
+      if (!this.wrap) return; // en las pruebas no hay pantalla
+      clearTimeout(this.saveT);
+      this.saveT = setTimeout(() => { if (this.dirty() && !this.dlgOpen()) this.cmd('save', true); }, 700);
+    }
+    dlgOpen() { return !!(this.sel || this.zone); }
+    /** Abre la ventana de una tarjeta (o de la parte de arriba / la barra): guarda cómo estaba para «Cancelar». */
+    dlgStart() { if (!this.dlgSnap) { this.dlgSnap = JSON.stringify(this.v); this.dlgUndo = this.undo.length; this.tab = 'cfg'; } }
+    dlgCancel() {
+      if (this.dlgSnap) { this.v = JSON.parse(this.dlgSnap); this.undo.length = Math.min(this.undo.length, this.dlgUndo); }
+      this.dlgClose();
+    }
+    async dlgOk() {
+      if (this.rdraft && this.roomDirty()) await this.saveRoom(false);
+      this.dlgClose();
+      this.autosave();
+    }
+    dlgClose() {
+      this.dlgSnap = null; this.sel = null; this.el = null; this.zone = null; this.pz = null; this.roomEd = null; this.rdraft = null; this.tab = 'cfg';
+      this.draw();
+    }
+    /** Encabezado, pestañas y botones de la ventana (como el editor de tarjetas de Lovelace). */
+    drawDlg() {
+      const d = this.$ && this.$('#dlg'); if (!d) return;
+      const open = this.dlgOpen();
+      this.$('#ed').classList.toggle('dlgon', open);
+      if (!open) { this.$('#dlgh').innerHTML = ''; this.$('#dlgf').innerHTML = ''; return; }
+      const b = this.selBlock(), CAT = window.MaeVista.CATALOG;
+      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo'
+        : b ? `${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : '';
+      const sub = this.roomEd != null || this.el != null || this.pz != null;
+      const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Configuración'], ['vis', 'Visibilidad'], ['lay', 'Diseño']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
+      this.$('#dlgh').innerHTML = `<div class="dlg-t"><b>${b ? 'Editar tarjeta' : 'Editar'}</b><small>${esc(title)}</small></div><button class="eb ico" data-dx="cancel" title="Cerrar sin guardar (Esc)">✕</button>${tabs}`;
+      this.$('#dlgf').innerHTML = `${b ? '<button class="eb warn" data-dx="del">Borrar</button>' : ''}<span class="sp"></span><button class="eb" data-dx="cancel">Cancelar</button><button class="eb pri" data-dx="ok">Guardar</button>`;
+    }
+
     /* ───────── dibujo ───────── */
     draw() {
       const v = this.v, K = this.K, ori = this.lay().orientation || 'landscape', dirty = this.dirty();
       const other = K === 'tablet' ? 'phone' : 'tablet', hasOther = !!(((v.layouts || {})[other] || {}).blocks || []).length;
-      this.$('#ed').classList.toggle('nolist', !this.showList);
-      this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver (Esc)">← Volver</button><button class="eb ico ${this.showList ? 'on' : ''}" data-e="list" title="Lista de tarjetas">☰</button><h2>${esc(v.name)}${dirty ? ' <span class="dirt" title="Hay cambios sin guardar">● sin guardar</span>' : ''}</h2>
+      this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver">← Volver</button><h2>${esc(v.name)}</h2>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
           <button class="eb pri2" data-e="add" title="Agregar una tarjeta">+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
           <span class="emenu"><button class="eb ${Object.values(this.sim || {}).some(Boolean) ? 'pri2' : ''}" data-e="simm" title="Ver cómo queda en otras situaciones (no toca la casa)">Simular${Object.values(this.sim || {}).filter(Boolean).length ? ` (${Object.values(this.sim || {}).filter(Boolean).length})` : ''} ▾</button>${this.simOpen ? `<span class="emenu-l" style="left:0;right:auto">
             ${[['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']].map(([k, l]) => `<button data-sim="${k}">${(this.sim || {})[k] ? '✓ ' : ''}${l}</button>`).join('')}</span>` : ''}</span>
           <span class="sp"></span>
-          ${this.trying ? `<button class="eb warn" data-e="tryend" title="Los equipos vuelven al diseño guardado">Terminar prueba</button>` : '<button class="eb" data-e="try" title="Los equipos con este dashboard muestran este diseño (sin guardar) por 15 minutos">Probar en el equipo</button>'}
           <button class="eb ico" data-e="undo" ${this.undo.length ? '' : 'disabled'} title="Deshacer (Ctrl+Z)">↶</button><button class="eb ico" data-e="redo" ${this.redo.length ? '' : 'disabled'} title="Rehacer (Ctrl+Y)">↷</button>
           <span class="emenu"><button class="eb" data-e="more" title="Más opciones">Más ▾</button>${this.moreOpen ? `<span class="emenu-l">
             <button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
             <button data-e="history">Historial de versiones…</button>
             <button data-e="export">Exportar como plantilla (archivo)</button><button data-e="import">Importar una plantilla…</button>
-            <button data-e="reset" ${dirty ? '' : 'disabled'}>Descartar los cambios</button></span>` : ''}</span>
-          <button class="eb pri" data-e="save" ${dirty ? '' : 'disabled'} title="Guardar (Ctrl+S)">Guardar</button>`;
-      this.drawList(); this.drawPreview(); this.drawProps(); this.bind();
+            </span>` : ''}</span>
+          <span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span>
+          <button class="eb pri" data-e="close" title="Terminar de editar">Listo</button>`;
+      const hint = this.$('#ehint');
+      if (hint) hint.innerHTML = this.dlgOpen() ? '' : 'Tocá una tarjeta para editarla · Arrastrala para moverla · <b>+ Agregar tarjeta</b> al final de cada columna · Tocá arriba o la barra de abajo para cambiarlas';
+      this.drawPreview(); this.drawProps(); this.drawDlg(); this.bind();
     }
     blocks() { const l = this.lay(); return l.blocks || (l.blocks = []); }
     drawList() {
+      if (!this.$('#edl')) return; // ya no hay lista a la izquierda: se edita en la pantalla (como Lovelace)
       const K = this.K, CAT = window.MaeVista.CATALOG;
       const row = (b) => `<div class="bl ${this.sel === b.id ? 'sel' : ''}" draggable="true" data-bl="${esc(b.id)}"><span class="h">⋮⋮</span>
         <span class="n">${esc((CAT[b.type] || {}).name || b.type)}<small>${esc(b.title || this.summary(b))}</small></span>
@@ -426,7 +483,7 @@
     editCtx() {
       const R = this.rdraft;
       return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
-        onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
+        onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col), onRoom: (a, i) => this.roomAct(a, i),
         room: R ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
@@ -434,6 +491,9 @@
     /** Tocar algo en la pantalla del medio: la tarjeta, y si fue un ambiente, se abre por dentro para editarlo. */
     pick(id, sub) {
       id = id || null;
+      if (!id && !(sub && sub.zone)) { if (this.dlgOpen()) this.dlgOk(); return; }
+      if (this.dlgOpen() && (id !== this.sel || ((sub && sub.zone) || null) !== (this.zone || null))) { this.dlgSnap = null; this.autosaveAfter = true; } // otra tarjeta: la anterior queda
+      this.dlgStart(); if (!sub || (sub.el == null && !sub.room && sub.pz == null)) this.tab = this.tab || 'cfg';
       if (id !== this.sel || !(sub && sub.room)) { this.roomEd = null; this.rdraft = null; }
       this.sel = id; this.focus = sub && sub.item != null ? sub.item : null;
       this.el = sub && sub.el != null ? sub.el : null;
@@ -446,8 +506,26 @@
         const r = (this.model() || { byId: {} }).byId[sub.room];
         if (r) { this.roomEd = r.name; this.rdraft = null; this.ensureDraft(); }
       }
-      this.drawList(); this.drawProps(); this.syncPreview(); this.bind();
-      const f = this.$('#edr .it.focus'); if (f && f.scrollIntoView) f.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      this.drawList(); this.drawProps(); this.drawDlg(); this.syncPreview(); this.bind();
+      if (this.$ && this.$('#ed')) this.draw();
+      if (this.autosaveAfter) { this.autosaveAfter = false; if (this.dirty()) this.cmd('save', true); }
+    }
+    /** ⋮ de una tarjeta: editar, duplicar, copiar a otro dashboard, columna y borrar. */
+    cardMenu(id) {
+      const b = this.blocks().find((x) => x.id === id); if (!b) return;
+      const K = this.K, CAT = window.MaeVista.CATALOG;
+      this.modal(`${(CAT[b.type] || {}).name || b.type}${b.title ? ` · ${b.title}` : ''}`, `<div class="mlist">
+        <button data-cm="edit">✎ Editar</button><button data-cm="dup">⧉ Duplicar</button><button data-cm="copy">↗ Copiar a otro dashboard…</button>
+        ${K === 'tablet' ? [[0, 'columna del plano'], [1, 'columna 1'], [2, 'columna 2']].filter(([c]) => c !== (b.col || 0)).map(([c, l]) => `<button data-cm="col" data-c="${c}">⇄ Pasar a la ${l}</button>`).join('') : ''}
+        <button data-cm="del" class="warn">✕ Borrar la tarjeta</button></div>`, (e) => {
+        const x = e.target.closest('[data-cm]'); if (!x) return;
+        this.closeCatalog();
+        const k = x.dataset.cm;
+        if (k === 'edit') this.pick(id);
+        else if (k === 'copy') this.copyTo(b);
+        else if (k === 'col') this.change(() => { b.col = +x.dataset.c; });
+        else this.blockAct(id, k);
+      });
     }
     syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.editCtx() }); }
     roomDirty() {
@@ -469,6 +547,7 @@
       const L = R.entities = R.entities || [];
       const redraw = () => { this.drawProps(); this.syncPreview(); this.bind(); };
       if (a === 'close') { this.roomEd = null; this.rdraft = null; return redraw(); }
+      if (a === 'move' && i && typeof i === 'object') { this.reorder('room', i.from, i.to); return undefined; }
       if (a === 'save') return this.saveRoom(false);
       if (a === 'del') { L.splice(i, 1); return redraw(); }
       if (a === 'up' || a === 'down') { const j = i + (a === 'up' ? -1 : 1); if (j < 0 || j >= L.length) return undefined; [L[i], L[j]] = [L[j], L[i]]; return redraw(); }
@@ -588,10 +667,12 @@
     drawProps() {
       const b = this.blocks().find((x) => x.id === this.sel);
       const r = this.$('#edr');
+      this.drawDlg(); // título, pestañas y botones de la ventana (al volver de un elemento o un ambiente también)
       if (!b && this.zone === 'header') { r.innerHTML = this.headerEditor(); return; }
       if (!b && this.zone === 'dock') { r.innerHTML = this.dockEditor(); return; }
       if (b && b.type === 'plan' && this.pz != null) { r.innerHTML = this.zoneEditor(this.pz); return; }
       if (!b) {
+        if (r.closest && r.closest('.dlg') && !this.$('#edl')) { r.innerHTML = ''; return; } // sin tarjeta elegida: la ventana está cerrada
         r.innerHTML = `<div class="guide"><b>Cómo se edita</b><ol>
             <li><b style="display:inline">Tocá cualquier cosa</b> en la pantalla del medio: una tarjeta, un ambiente, un dato del resumen o un botón. Acá aparece para editarla.</li>
             <li>Tocá un <b style="display:inline">ambiente</b> para abrirlo por dentro: ordená, sacá o agregá sus equipos.</li>
@@ -658,12 +739,12 @@
         default: h += '<p class="hint">Esta tarjeta no tiene opciones.</p>';
       }
       if (b.type === 'buttons') h += `<label class="fld"><span>Botones por fila</span><select data-f="cfg.cols"><option value="">Automático</option>${[1, 2, 3, 4].map((n) => `<option value="${n}" ${c.cols === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`;
-      h += '<h4>Diseño</h4>';
-      if (this.K === 'tablet') h += `<label class="fld"><span>Columna</span><select data-f="col">${[[0, 'Del plano'], [1, 'Columna 1'], [2, 'Columna 2']].map(([k, l]) => `<option value="${k}" ${(b.col || 0) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
-      h += `<label class="fld"><span>Ancho</span><select data-f="size"><option value="">Completo</option><option value="half" ${b.size === 'half' ? 'selected' : ''}>Media columna (van de a dos)</option></select></label>`;
-      h += this.condEditor(b);
-      h += '<h4>Más</h4><button class="eb sm" data-copyto>Copiar esta tarjeta a otro dashboard…</button>';
-      r.innerHTML = h;
+      let lay = '<h4>Diseño</h4>';
+      if (this.K === 'tablet') lay += `<label class="fld"><span>Columna</span><select data-f="col">${[[0, 'Del plano'], [1, 'Columna 1'], [2, 'Columna 2']].map(([k, l]) => `<option value="${k}" ${(b.col || 0) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+      lay += `<label class="fld"><span>Ancho</span><select data-f="size"><option value="">Completo</option><option value="half" ${b.size === 'half' ? 'selected' : ''}>Media columna (van de a dos)</option></select></label>
+        <p class="hint">Para moverla, arrastrala en la pantalla. Con ⋮ (en la tarjeta) se duplica, se copia a otro dashboard o se borra.</p>`;
+      const tab = this.$('#edl') ? 'all' : (this.tab || 'cfg');
+      r.innerHTML = tab === 'vis' ? this.condEditor(b) : tab === 'lay' ? lay : tab === 'all' ? h + lay + this.condEditor(b) : h;
       const ip = r.querySelector('[data-imgprev]'); if (ip) this.signed(ip.dataset.imgprev).then((u) => { ip.src = u; }).catch(() => {});
     }
     /* ───────── elementos de adentro de las tarjetas (como las filas de la tarjeta de entidades de Home Assistant) ───────── */
@@ -698,6 +779,15 @@
       if (!x) return '';
       if (b.type === 'kpis') return x.name || (x.kind === 'entity' ? this.fname(x.entity) : ((KPI_KINDS.find((k) => k[0] === x.kind) || [, x.kind])[1]));
       return x.name || (x.entity ? this.fname(x.entity) : 'Botón');
+    }
+    /** Ordenar arrastrando una fila: de la posición «from» a la de «to». */
+    reorder(g, from, to) {
+      if (from === to) return;
+      const mv = (L) => { if (!L || from < 0 || from >= L.length || to < 0 || to >= L.length) return; const [x] = L.splice(from, 1); L.splice(to, 0, x); };
+      if (g === 'room') { if (this.rdraft) { mv(this.rdraft.entities); this.drawProps(); this.syncPreview(); this.bind(); } return; }
+      if (g === 'dock') { this.change(() => { const D = this.dockKeys(); mv(D); this.lay().dock = D; }); return; }
+      const b = this.selBlock(); if (!b) return;
+      this.change(() => { this.materialize(b); mv(this.elemList(b)); if (this.el === from) this.el = to; });
     }
     /** Subir, bajar, sacar o agregar un elemento (desde la pantalla del medio o desde el panel). */
     onElem(id, act, i) {
@@ -752,8 +842,8 @@
       };
       return `<h4>${esc(E[1])}</h4>
         ${auto ? '<div class="autobox"><b>Automático:</b> la app elige qué mostrar según la casa. Tocá cualquiera (acá o en la pantalla) y queda armada a mano para cambiarla.</div>' : ''}
-        <div class="elist">${L.map((x, i) => `<div class="elr" data-elpick="${i}"><span class="tx"><b>${esc(this.elemLabel(b, x))}</b><small>${esc(sub(x))}</small></span>
-          <button data-elact2="up" data-i="${i}" title="Subir">↑</button><button data-elact2="down" data-i="${i}" title="Bajar">↓</button><button data-elact2="del" data-i="${i}" title="Sacar">✕</button><span class="go">›</span></div>`).join('') || `<p class="hint">Todavía no hay ${esc(E[1].toLowerCase())}.</p>`}</div>
+        <div class="elist">${L.map((x, i) => `<div class="elr" draggable="true" data-sr="el" data-i="${i}" data-elpick="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="tx"><b>${esc(this.elemLabel(b, x))}</b><small>${esc(sub(x))}</small></span>
+          <button data-elpick2="${i}" title="Editar">✎</button><button data-elact2="del" data-i="${i}" title="Sacar">✕</button></div>`).join('') || `<p class="hint">Todavía no hay ${esc(E[1].toLowerCase())}.</p>`}</div>
         <button class="eb sm addb" data-eladd2>+ Agregar ${esc(E[0])}</button>
         ${!auto && ['kpis', 'scenes', 'routines', 'covers', 'lights', 'rooms'].includes(b.type) ? '<button class="eb sm" data-toauto title="Que la app vuelva a elegir sola">Volver a automático</button>' : ''}`;
     }
@@ -793,13 +883,12 @@
         default: f = '';
       }
       return `${back}<span>› ${esc(this.elemLabel(b, x))}</span></div><h4>${esc((ELEM[b.type] || ['Elemento'])[0] || 'Elemento')}</h4>${f}
-        <div class="elnav"><button class="eb sm" data-elact2="up" data-i="${i}" ${i > 0 ? '' : 'disabled'}>↑ Subir</button><button class="eb sm" data-elact2="down" data-i="${i}" ${i < L.length - 1 ? '' : 'disabled'}>↓ Bajar</button>
-          <button class="eb sm warn" data-elact2="del" data-i="${i}">Sacar de la tarjeta</button></div>`;
+        <div class="elnav"><button class="eb sm warn" data-elact2="del" data-i="${i}">Sacar de la tarjeta</button></div>`;
     }
     /* ───────── encabezado, barra de abajo y zonas del plano ───────── */
     headerEditor() {
       const H = this.lay().header || {};
-      return `<div class="crumb"><button class="eb sm" data-zback>‹ Dashboard</button><span>› Parte de arriba</span></div><h4>Qué se ve arriba</h4>
+      return `<h4>Qué se ve arriba</h4>
         ${[['clock', 'Hora y fecha (al tocarla abre la agenda)'], ['weather', 'Clima (al tocarlo abre el pronóstico)'], ['bell', 'Campanita de avisos'], ['menu', 'Menú (opciones y soporte)']]
           .map(([k, l]) => `<label class="chk"><input type="checkbox" data-hd="${k}" ${H[k] !== false ? 'checked' : ''}> ${l}</label>`).join('')}
         <p class="hint">Vale para ${this.K === 'tablet' ? 'la tablet' : 'el celular'} de este dashboard. Si sacás el menú, las opciones siguen en la barra de abajo (si tiene «Menú»).</p>`;
@@ -808,9 +897,9 @@
     dockEditor() {
       const D = this.dockKeys(), ALL = window.MaeVista.DOCK, free = Object.keys(ALL).filter((k) => !D.includes(k));
       const custom = !!(this.lay().dock && this.lay().dock.length);
-      return `<div class="crumb"><button class="eb sm" data-zback>‹ Dashboard</button><span>› Barra de abajo</span></div><h4>Botones (en este orden)</h4>
-        <div class="elist">${D.map((k, i) => `<div class="elr"><span class="tx"><b>${esc(ALL[k] ? ALL[k][1] : k)}</b><small>${k === 'voice' ? 'redondo, para hablarle a la casa' : k === 'top' ? 'vuelve arriba' : 'abre su pantalla'}</small></span>
-          <button data-dk="up" data-i="${i}" title="Subir">↑</button><button data-dk="down" data-i="${i}" title="Bajar">↓</button><button data-dk="del" data-i="${i}" title="Sacar">✕</button></div>`).join('')}</div>
+      return `<h4>Botones (arrastralos para ordenarlos)</h4>
+        <div class="elist">${D.map((k, i) => `<div class="elr" draggable="true" data-sr="dock" data-i="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="tx"><b>${esc(ALL[k] ? ALL[k][1] : k)}</b><small>${k === 'voice' ? 'redondo, para hablarle a la casa' : k === 'top' ? 'vuelve arriba' : 'abre su pantalla'}</small></span>
+          <button data-dk="del" data-i="${i}" title="Sacar">✕</button></div>`).join('')}</div>
         ${free.length && D.length < 10 ? `<label class="fld"><span>Agregar un botón</span><select data-dkadd><option value="">Elegir…</option>${free.map((k) => `<option value="${k}">${esc(ALL[k][1])}</option>`).join('')}</select></label>` : ''}
         ${custom ? '<button class="eb sm" data-dkreset>Volver a la barra de siempre</button>' : ''}
         <p class="hint">Lo que la casa no tiene (cámaras, música, agenda) no aparece aunque esté en la lista. El micrófono queda lindo en el medio.</p>`;
@@ -857,17 +946,17 @@
       const R = this.rdraft, eid = (x) => (x && typeof x === 'object' ? x.entity : x), ICONS = window.MaeVista.ICONS;
       const manual = Array.isArray(this.cfg.rooms) && this.cfg.rooms.length;
       const b = this.selBlock(), inCard = b && b.type === 'rooms' && R._orig && ((b.cfg && b.cfg.rooms) || []).includes(R._orig);
-      return `<button class="eb sm" data-rx="back">‹ Volver a la tarjeta</button><h4>Ambiente</h4>
-        <p class="hint" style="margin-top:0">Lo ves abierto en la pantalla del medio: ordená, sacá o agregá equipos ahí o acá.</p>
+      return `<div class="crumb"><button class="eb sm" data-rx="back">‹ Ambientes</button><span>› ${esc(R.name)}</span></div>
+        <p class="hint" style="margin-top:0">Lo ves abierto en la pantalla: así lo ve el cliente. Ordená los equipos arrastrándolos (acá o en la pantalla).</p>
         ${manual ? '' : '<div class="warnbox">Hoy los ambientes salen solos de las Áreas de Home Assistant. Al guardar, quedan armados a mano (con lo mismo que se ve ahora) y desde ahí se editan acá.</div>'}
         ${inCard ? '<button class="eb sm" data-rx="unpin" style="margin-bottom:10px">Sacarlo de esta tarjeta (sigue en «Toda la casa»)</button>' : ''}
         <label class="fld"><span>Nombre</span><input data-rn="name" value="${esc(R.name)}" maxlength="40"></label>
         <label class="fld"><span>Ícono</span><select data-rn="icon"><option value="">Automático</option>${ICONS.map((n) => `<option ${R.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
-        <h4>Equipos (en este orden)</h4>
-        ${(R.entities || []).map((x, i) => { const id = eid(x), d = id.split('.')[0]; return `<div class="rme"><span class="dtag">${esc(DOM_NAME[d] || d)}</span><span class="tx"><b>${esc((x && x.name) || this.fname(id))}</b><small>${esc(id)}${this.states()[id] ? '' : ' · no existe'}</small></span>
-          <button data-rmv="${i}" data-d="-1" title="Subir">↑</button><button data-rmv="${i}" data-d="1" title="Bajar">↓</button><button data-rdel="${i}" title="Sacar">✕</button></div>`; }).join('') || '<p class="hint">Todavía no tiene equipos.</p>'}
+        <h4>Equipos (arrastralos para ordenarlos)</h4>
+        ${(R.entities || []).map((x, i) => { const id = eid(x), d = id.split('.')[0]; return `<div class="rme" draggable="true" data-sr="room" data-i="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="dtag">${esc(DOM_NAME[d] || d)}</span><span class="tx"><b>${esc((x && x.name) || this.fname(id))}</b><small>${esc(id)}${this.states()[id] ? '' : ' · no existe'}</small></span>
+          <button data-rdel="${i}" title="Sacar">✕</button></div>`; }).join('') || '<p class="hint">Todavía no tiene equipos.</p>'}
         <div class="fld">${this.cbBtn('', 'data-radd="1"').replace('Elegir un equipo…', '+ Agregar un equipo')}</div>
-        <div style="display:flex;gap:8px;margin-top:12px"><button class="eb pri" data-rx="save">Guardar ambiente</button>${R._orig ? '<button class="eb warn" data-rx="del">Borrar ambiente</button>' : ''}</div>
+        <div style="display:flex;gap:8px;margin-top:12px">${R._orig ? '<button class="eb warn sm" data-rx="del">Borrar este ambiente de la casa</button>' : ''}</div>
         <p class="hint">Los ambientes son de la casa: el cambio se ve en todos los dashboards y en la app al instante.</p>`;
     }
     async saveRoom(del) {
@@ -1010,6 +1099,23 @@
       W.querySelectorAll('#edr [data-mk]').forEach((x) => { x.onchange = () => this.change(() => { const k = x.dataset.mk, m0 = this.model();
         if (k === 'rooms' && b.type === 'rooms' && !(b.cfg.rooms && b.cfg.rooms.length) && m0) b.cfg.rooms = m0.rooms.slice(0, 4).map((r) => r.name); // parte de lo que se ve
         const L = (b.cfg[k] = b.cfg[k] || []); if (x.checked) { if (!L.includes(x.value)) L.push(x.value); } else b.cfg[k] = L.filter((y) => y !== x.value); }); });
+      W.querySelectorAll('[data-tab]').forEach((x) => { x.onclick = () => { this.tab = x.dataset.tab; this.drawProps(); this.drawDlg(); this.bind(); }; });
+      W.querySelectorAll('[data-dx]').forEach((x) => { x.onclick = () => {
+        const k = x.dataset.dx;
+        if (k === 'cancel') return this.dlgCancel();
+        if (k === 'ok') return this.dlgOk();
+        if (k === 'del' && this.sel) { const id = this.sel; this.dlgSnap = null; this.sel = null; this.blockAct(id, 'del'); this.dlgClose(); this.autosave(); }
+        return undefined;
+      }; });
+      W.querySelectorAll('#edr [data-elpick2]').forEach((x) => { x.onclick = (e) => { e.stopPropagation(); const r = x.closest('[data-elpick]'); if (r) r.click(); }; });
+      // filas que se ordenan arrastrando (elementos de la tarjeta, equipos del ambiente, botones de la barra)
+      W.querySelectorAll('#edr [data-sr]').forEach((row) => {
+        row.ondragstart = (e) => { this.srDrag = { g: row.dataset.sr, i: +row.dataset.i }; row.classList.add('drag'); try { e.dataTransfer.setData('text/plain', 'x'); e.dataTransfer.effectAllowed = 'move'; } catch (_) { /* navegador viejo */ } };
+        row.ondragend = () => { row.classList.remove('drag'); W.querySelectorAll('#edr .over').forEach((o) => o.classList.remove('over')); };
+        row.ondragover = (e) => { if (this.srDrag && this.srDrag.g === row.dataset.sr) { e.preventDefault(); row.classList.add('over'); } };
+        row.ondragleave = () => row.classList.remove('over');
+        row.ondrop = (e) => { e.preventDefault(); const d = this.srDrag; this.srDrag = null; if (d && d.g === row.dataset.sr) this.reorder(d.g, d.i, +row.dataset.i); };
+      });
       W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
       W.querySelectorAll('#edr [data-lt]').forEach((x) => { x.onchange = () => this.change(() => { this.lay()[x.dataset.lt] = x.value || null; }); });
       const back = () => { this.zone = null; this.pz = null; this.drawProps(); this.syncPreview(); this.bind(); };
@@ -1080,7 +1186,7 @@
       const B = this.blocks(), i = B.findIndex((b) => b.id === from); const [b] = B.splice(i, 1);
       const j = B.findIndex((x) => x.id === to); b.col = B[j].col || 0; B.splice(j, 0, b);
     }
-    async cmd(k) {
+    async cmd(k, quiet) {
       if (k !== 'more' && this.moreOpen) this.moreOpen = false;
       if (k !== 'simm' && this.simOpen) this.simOpen = false;
       if (k === 'close') return this.close();
@@ -1111,15 +1217,21 @@
       }
       if (k === 'tryend') { await this.endTry(); this.draw(); this.toast('Prueba terminada: los equipos vuelven al diseño guardado'); return; }
       if (k === 'save') {
+        this.saving = true;
         try {
+          const before = JSON.stringify(this.v);
           const res = await this.hass.callWS({ type: 'matterai/views/save', view: this.payload() });
-          this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = []; this.redo = [];
+          // si mientras se guardaba no se tocó nada, queda igual a lo guardado; si se siguió editando, eso va en el próximo guardado
+          if (JSON.stringify(this.v) === before) { this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = this.undo.slice(-80); }
+          else { this.saved = Editor.normalize(clone(res)); this.autosave(); }
           if (this.trying) await this.endTry();
-          this.draw();
-          this.toast('Guardado: los equipos con este dashboard lo ven al instante');
+          if (!quiet) this.toast('Guardado: los equipos con este dashboard lo ven al instante');
         } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
+        this.saving = false;
+        if (this.$ && this.$('#edt')) this.draw();
       }
     }
+    payloadAsView() { return Object.assign({}, this.payload(), { layouts: this.payload().layouts }); }
     /** Lo que se guarda (o se prueba): los dos diseños, el plano y lo demás del dashboard. */
     payload() {
       const v = this.v, L = v.layouts || {};
@@ -1254,8 +1366,11 @@
         } catch (err) { this.toast(`No se pudo copiar: ${err.message || err}`); }
       });
     }
-    close() {
-      if (this.dirty() && !confirm('Hay cambios sin guardar. ¿Salir igual?')) return;
+    async close() {
+      if (this.dlgOpen()) await this.dlgOk();
+      clearTimeout(this.saveT);
+      if (this.dirty()) await this.cmd('save', true);
+      if (this.dirty() && !confirm('No se pudieron guardar los últimos cambios. ¿Salir igual?')) return;
       window.removeEventListener('keydown', this.keyH);
       window.removeEventListener('resize', this.resH);
       window.removeEventListener('beforeunload', this.unloadH);

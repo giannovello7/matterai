@@ -40,7 +40,8 @@
     power: '<path d="M12 2v10M5.6 6.6a8 8 0 1 0 12.8 0"/>', cal: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
     robot: '<rect x="4" y="8" width="16" height="12" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9 17h6"/>', plug: '<path d="M9 2v6M15 2v6M6 8h12v4a6 6 0 0 1-12 0zM12 18v4"/>',
     fan: '<circle cx="12" cy="12" r="2"/><path d="M12 10c0-4 1-7 4-7s3 4-2 7M14 12c4 0 7 1 7 4s-4 3-7-2M12 14c0 4-1 7-4 7s-3-4 2-7M10 12c-4 0-7-1-7-4s4-3 7 2"/>',
-    tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/>', water: '<path d="M12 3c-4 5-6 8-6 11a6 6 0 0 0 12 0c0-3-2-6-6-11z"/>',
+    tv: '<rect x="3" y="5" width="18" height="12" rx="2"/><path d="M8 21h8"/>', edit: '<path d="M4 20h4L19 9l-4-4L4 16zM13.5 6.5l4 4"/>',
+    dots: '<circle cx="12" cy="5" r="1.3"/><circle cx="12" cy="12" r="1.3"/><circle cx="12" cy="19" r="1.3"/>', water: '<path d="M12 3c-4 5-6 8-6 11a6 6 0 0 0 12 0c0-3-2-6-6-11z"/>',
   };
   const ICONS = Object.keys(I);
   const ic = (n) => `<svg class="i" viewBox="0 0 24 24">${I[n] || I.home}</svg>`;
@@ -284,7 +285,7 @@
     }
     /* Editor: cada cosa de adentro de una tarjeta (un dato, una escena, un ambiente…) se toca, se elige y se edita sola */
     const EL = (i) => (editing() ? ` data-el="${i}"${ctx.edit.selected === X.curB && ctx.edit.el != null && String(ctx.edit.el) === String(i) ? ' data-elsel="1"' : ''}` : '');
-    const elAdd = (txt) => (editing() && ctx.edit.selected === X.curB ? `<button class="v-eladd" data-eladd="1">+ ${esc(txt)}</button>` : '');
+    const elAdd = () => ''; // lo de adentro se agrega en la ventana de la tarjeta (como en Lovelace)
     /** La lista de una tarjeta: la armada a mano (con nombre, ícono, modo) o la que elige la app sola. */
     function listOf(c, autoIds, max) {
       if (!c.auto && c.items && c.items.length) return c.items.filter((x) => x && x.entity);
@@ -609,13 +610,10 @@
       if (!inner && !editing()) return '';
       const sel = editing() && ctx.edit.selected === b.id;
       const cls = `${b.size === 'half' ? ' s-half' : ''}${!shown ? ' hid' : ''}${(b.show || []).length ? ' cond' : ''}`;
-      // en el editor, la tarjeta elegida tiene su barra (subir, bajar, duplicar, borrar) y todas se arrastran
-      const tool = sel ? `<span class="v-etool">${[['up', 'up', 'Subir'], ['down', 'down', 'Bajar'], ['dup', 'grid', 'Duplicar'], ['del', 'x', 'Borrar']]
-        .map(([k, i, t]) => `<button data-eact="${k}" title="${t}" aria-label="${t}">${ic(i)}</button>`).join('')}</span>` : '';
+      // en el editor, como Lovelace: la tarjeta entera se arrastra; ✎ la edita (o tocarla) y ⋮ tiene duplicar, copiar y borrar
+      const tool = `<span class="v-ecard"><button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
       const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
-      // se arrastra sólo desde la manija: tocar adentro elige lo de adentro y nunca mueve la tarjeta
-      const handle = editing() ? `<span class="v-ehandle" draggable="true" title="Arrastrar para mover la tarjeta">${ic('grid')}</span>` : '';
-      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}${sel && ctx.edit.el != null ? ' elsel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${handle}${tool}` : ''}${inner}</section>`;
+      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${editing() ? ' draggable="true"' : ''}>${editing() ? `<span class="v-btag">${tag}</span>${tool}` : ''}${inner}</section>`;
     }
     /** Una columna en partes: cada tarjeta (o par de medias columnas, una al lado de la otra) es una parte. */
     function colParts(list, m) {
@@ -718,7 +716,6 @@
       if (editing() && ctx.edit.room) { if (X.sheet !== 'roomedit') openSheet('roomedit'); }
       else if (X.sheet === 'roomedit') closeSheet();
       if (X.sheet) renderSheet();
-      placeElTool();
       mountLive();
       editMarks();
     }
@@ -830,14 +827,14 @@
         const id = x && typeof x === 'object' ? x.entity : x, k = kindOf(id), g = groups[groups.length - 1];
         if (g && g.k[0] === k[0]) g.items.push([x, id, i]); else groups.push({ k, items: [[x, id, i]] });
       });
-      const tools = (i) => `<span class="v-ret">${i > 0 ? `<button data-rme="up" data-i="${i}" title="Subir">${ic('up')}</button>` : ''}${i < L.length - 1 ? `<button data-rme="down" data-i="${i}" title="Bajar">${ic('down')}</button>` : ''}<button data-rme="del" data-i="${i}" title="Sacar del ambiente">${ic('x')}</button></span>`;
+      const tools = (i) => `<span class="v-ret"><button data-rme="del" data-i="${i}" title="Sacar del ambiente">${ic('x')}</button></span>`;
       const tile = ([x, id, i]) => {
         const s0 = st(id), s = s0 ? entState(id) : { on: false, txt: 'No existe en la casa' }, nm = (x && x.name) || fname(id);
-        if (id.startsWith('camera.')) return `<div class="v-rcam"><img alt="" src="${esc(camSrc(id))}"><span class="v-rcn">${esc(nm)}</span>${tools(i)}</div>`;
-        return `<div class="v-rer ${s.on ? 'on' : ''}"><span class="v-bic">${ic(defIcon(id))}</span><span class="v-tx"><b>${esc(nm)}</b><span>${esc(s.txt)}</span></span>${tools(i)}</div>`;
+        if (id.startsWith('camera.')) return `<div class="v-rcam" draggable="true" data-ri="${i}"><img alt="" src="${esc(camSrc(id))}"><span class="v-rcn">${esc(nm)}</span>${tools(i)}</div>`;
+        return `<div class="v-rer ${s.on ? 'on' : ''}" draggable="true" data-ri="${i}"><span class="v-bic">${ic(defIcon(id))}</span><span class="v-tx"><b>${esc(nm)}</b><span>${esc(s.txt)}</span></span>${tools(i)}</div>`;
       };
       const body = groups.map((g) => `<div class="v-rblk"><h4>${ic(g.k[1])}${g.k[2]}</h4><div class="${g.k[0] === 'cam' || g.k[0] === 'cover' || g.k[0] === 'clim' || g.k[0] === 'media' ? 'v-rlist' : 'v-rgrid'}">${g.items.map(tile).join('')}</div></div>`).join('');
-      return `<div class="v-grab"></div><div class="v-sh"><span class="v-ric on">${ic(roomIc(R))}</span><div><h2>${esc(R.name)}</h2><small>${L.length} equipo${L.length === 1 ? '' : 's'} · editando (así lo ve el cliente)</small></div><button class="v-x" data-rme="close" aria-label="Cerrar">${ic('x')}</button></div>
+      return `<div class="v-grab"></div><div class="v-sh"><span class="v-ric on">${ic(roomIc(R))}</span><div><h2>${esc(R.name)}</h2><small>${L.length} equipo${L.length === 1 ? '' : 's'} · arrastralos para ordenarlos</small></div><button class="v-x" data-rme="close" aria-label="Cerrar">${ic('x')}</button></div>
         ${body || '<p class="v-empty">Todavía no tiene equipos.</p>'}
         <button class="v-eadd" data-radd>+ Agregar un equipo</button>${R.dirty ? `<button class="v-rsave" data-rme="save">Guardar ambiente</button>` : ''}`;
     }
@@ -1002,6 +999,18 @@
       const d = pinDrag; pinDrag = null;
       if (d && d.moved && d.pos) { X.held = true; ctx.edit.onPin(d.i, d.pos); }
     });
+    // editor: los equipos del ambiente abierto se ordenan arrastrándolos
+    let riDrag = null;
+    el.addEventListener('dragstart', (e) => { const r = editing() && e.target.closest && e.target.closest('[data-ri]'); if (!r) return; riDrag = +r.dataset.ri; r.classList.add('dragging'); e.stopPropagation(); try { e.dataTransfer.setData('text/plain', 'r'); } catch (_) { /* viejo */ } }, true);
+    el.addEventListener('dragover', (e) => { if (riDrag == null) return; const r = e.target.closest('[data-ri]'); if (r) { e.preventDefault(); X.el.querySelectorAll('[data-ri].dropb').forEach((x) => x.classList.remove('dropb')); r.classList.add('dropb'); } }, true);
+    el.addEventListener('drop', (e) => {
+      if (riDrag == null) return;
+      e.preventDefault(); e.stopPropagation();
+      const r = e.target.closest('[data-ri]'), from = riDrag; riDrag = null;
+      X.el.querySelectorAll('[data-ri]').forEach((x) => x.classList.remove('dropb', 'dragging'));
+      if (r && ctx.edit.onRoom && +r.dataset.ri !== from) ctx.edit.onRoom('move', { from, to: +r.dataset.ri });
+    }, true);
+    el.addEventListener('dragend', () => { riDrag = null; }, true);
     // editor: las tarjetas se arrastran dentro de la vista previa (antes o después de otra, o a una columna vacía)
     let dragId = null;
     const colOfEl = (x) => {
