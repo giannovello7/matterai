@@ -94,6 +94,11 @@
   .slot{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px}.slot img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:#0d1116}.slot span{flex:1}
   .zl{padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px;border:1px solid transparent;cursor:pointer}.zl.sel{border-color:#f2b766}
   .toastE{position:fixed;z-index:70;left:50%;bottom:22px;transform:translateX(-50%);background:#262e3a;border:1px solid rgba(160,175,200,.2);padding:10px 16px;border-radius:12px;display:none}
+  .eseg.sim{align-items:center}.eseg.sim .lbl{padding:0 6px 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8f99ab}
+  .eseg.sim button.on{background:#f2b766;color:#1b1408}
+  .mbody{overflow:auto;padding:12px 16px 16px}
+  .hlist{display:flex;flex-direction:column;gap:6px}.hrow{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:12px;background:#1e242e}
+  .hrow>span{flex:1;min-width:0}.hrow b{display:block}.hrow small{color:#8f99ab;font-size:12px}
   .ed-top h2 .dirt{font-size:11.5px;font-weight:600;color:#f2b766;margin-left:6px;vertical-align:middle}
   .eb:disabled{opacity:.4;cursor:default}.eb.ico{padding:7px 11px;font-size:16px;line-height:1}
   .eb.pri2{border-color:rgba(242,183,102,.5);color:#f2b766;font-weight:700}
@@ -210,8 +215,8 @@
     /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
     addBlock(type, col) {
       const K = this.K, CAT = window.MaeVista.CATALOG;
-      const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] } }[type] || {};
-      const titled = ['rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away'];
+      const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
+      const titled = ['rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text'];
       const b = { id: this.newId(type), type, col: K === 'tablet' ? (col != null ? col : type === 'plan' ? 0 : 1) : 0, cfg };
       if (titled.includes(type)) b.title = CAT[type].name;
       this.change(() => { this.blocks().push(b); this.sel = b.id; this.roomEd = null; this.rdraft = null; });
@@ -219,7 +224,8 @@
     /** Catálogo de tarjetas (como «Agregar tarjeta» de Home Assistant), con buscador. */
     openCatalog(col) {
       this.closeCatalog();
-      const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun' };
+      const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
+        weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film' };
       const box = document.createElement('div');
       box.className = 'catp';
       box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' && col != null ? ` · ${col === 0 ? 'columna del plano' : `columna ${col}`}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
@@ -284,7 +290,11 @@
     toast(t) { const e = this.$('#toastE'); e.textContent = t; e.style.display = 'block'; clearTimeout(this.tt); this.tt = setTimeout(() => { e.style.display = 'none'; }, 2200); }
     dirty() { return JSON.stringify(this.v) !== JSON.stringify(this.saved); }
     push() { this.undo.push(JSON.stringify(this.v)); if (this.undo.length > 80) this.undo.shift(); this.redo = []; }
-    change(fn) { this.push(); fn(); this.draw(); }
+    change(fn) {
+      this.push(); fn(); this.draw();
+      // probando en el equipo: cada cambio le llega solo (un momento después del último)
+      if (this.trying) { clearTimeout(this.tryT); this.tryT = setTimeout(() => this.cmd('try', true), 900); }
+    }
 
     prearmado(silent) {
       const m = this.model();
@@ -305,10 +315,15 @@
       this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver (Esc)">← Volver</button><h2>${esc(v.name)}${dirty ? ' <span class="dirt" title="Hay cambios sin guardar">● sin guardar</span>' : ''}</h2>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
-          <button class="eb pri2" data-e="add" title="Agregar una tarjeta">+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button><span class="sp"></span>
+          <button class="eb pri2" data-e="add" title="Agregar una tarjeta">+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
+          <span class="eseg sim" title="Simular en la vista previa (no toca la casa)"><span class="lbl">Simular</span>${[['night', 'Noche'], ['alarm', 'Alarma'], ['music', 'Música'], ['gate', 'Portón']].map(([k, l]) => `<button data-sim="${k}" class="${(this.sim || {})[k] ? 'on' : ''}">${l}</button>`).join('')}</span>
+          <span class="sp"></span>
+          ${this.trying ? `<button class="eb warn" data-e="tryend" title="Los equipos vuelven al diseño guardado">Terminar prueba</button>` : '<button class="eb" data-e="try" title="Los equipos con este dashboard muestran este diseño (sin guardar) por 15 minutos">Probar en el equipo</button>'}
           <button class="eb ico" data-e="undo" ${this.undo.length ? '' : 'disabled'} title="Deshacer (Ctrl+Z)">↶</button><button class="eb ico" data-e="redo" ${this.redo.length ? '' : 'disabled'} title="Rehacer (Ctrl+Y)">↷</button>
           <span class="emenu"><button class="eb" data-e="more" title="Más opciones">Más ▾</button>${this.moreOpen ? `<span class="emenu-l">
             <button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
+            <button data-e="history">Historial de versiones…</button>
+            <button data-e="export">Exportar como plantilla (archivo)</button><button data-e="import">Importar una plantilla…</button>
             <button data-e="reset" ${dirty ? '' : 'disabled'}>Descartar los cambios</button></span>` : ''}</span>
           <button class="eb pri" data-e="save" ${dirty ? '' : 'disabled'} title="Guardar (Ctrl+S)">Guardar</button>`;
       this.drawList(); this.drawPreview(); this.drawProps(); this.bind();
@@ -355,7 +370,7 @@
      *  ancho se comportan como en el equipo, y los estilos del panel no la tocan. */
     drawPreview() {
       const size = this.sizeFrame(), fr = this.$('#frame');
-      const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: this.editCtx() });
+      const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: this.editCtx(), sim: this.sim || null });
       if (this.vista && this.ifr && this.ifr.isConnected) { this.vista.setCtx(ctx()); this.vista.setView(this.viewFor()); return; }
       if (!this.card) { fr.innerHTML = '<p style="padding:20px;color:#8f99ab">La vista previa necesita la tarjeta MatterAI (recargá la página).</p>'; return; }
       fr.innerHTML = '';
@@ -526,10 +541,52 @@
         case 'away': h += this.ent('Interruptor, escena o script', 'aw', c.entity, PICK.away, 'cfg.entity'); break;
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
         case 'plan': h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>'; break;
+        case 'weather': h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
+        case 'climate': h += this.ent('Aire o termostato', 'cl', c.entity, ['climate'], 'cfg.entity'); break;
+        case 'covers': case 'lights': {
+          const dom = b.type === 'covers' ? 'cover' : 'light';
+          h += '<p class="hint">Elegí equipos sueltos, o ambientes (se muestran todos los de esos ambientes). Sin nada: los de la casa.</p>';
+          h += this.multi(b.type === 'covers' ? 'Cortinas' : 'Luces', 'entities', c.entities, opts([dom]));
+          h += this.multi('O los de estos ambientes', 'rooms', c.rooms, (m ? m.rooms : []).map((x) => [x.name, x.name]));
+          break;
+        }
+        case 'energy': h += this.ent('Sensor de consumo (vacío: el de la casa)', 'en', c.entity, ['sensor'], 'cfg.entity'); break;
+        case 'sensor':
+          h += this.ent('Sensor', 'se', c.entity, ['sensor', 'input_number', 'number'], 'cfg.entity');
+          h += `<div style="display:flex;gap:8px"><label class="fld"><span>Mínimo</span><input type="number" data-f="cfg.min" value="${esc(c.min != null ? c.min : '')}" placeholder="0"></label>
+            <label class="fld"><span>Máximo</span><input type="number" data-f="cfg.max" value="${esc(c.max != null ? c.max : '')}" placeholder="100"></label></div>`;
+          break;
+        case 'people': h += '<p class="hint">Muestra las personas de la casa, con quién está y quién no.</p>'; break;
+        case 'text':
+          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="separator" ${c.style === 'separator' ? 'selected' : ''}>Separador (sólo el título)</option><option value="" ${c.style !== 'separator' ? 'selected' : ''}>Nota con texto</option></select></label>`;
+          if (c.style !== 'separator') h += `<label class="fld"><span>Texto</span><textarea data-f="cfg.text" maxlength="600" style="font-family:inherit;font-size:13px;min-height:90px">${esc(c.text || '')}</textarea></label>`;
+          break;
+        case 'image':
+          h += `<div class="slot">${c.image ? `<img data-imgprev="${esc(c.image)}" alt="">` : '<img alt="">'}<span><b>Imagen</b><br><small class="hint">${c.image ? 'Cargada' : 'Sin imagen'}</small></span>
+            <label class="eb sm">Subir<input type="file" accept="image/jpeg,image/png,image/webp" data-imgup hidden></label></div>
+            <label class="fld"><span>O una dirección de la casa (/local/…)</span><input data-f="cfg.image" value="${esc(c.image && c.image.startsWith('/local/') ? c.image : '')}" placeholder="/local/logo.png"></label>`;
+          h += this.action(c.tap, 'cfg.tap', 'Al tocar');
+          break;
         default: h += '<p class="hint">Esta tarjeta no tiene opciones.</p>';
       }
+      if (b.type === 'buttons') h += `<label class="fld"><span>Botones por fila</span><select data-f="cfg.cols"><option value="">Automático</option>${[1, 2, 3, 4].map((n) => `<option value="${n}" ${c.cols === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`;
+      h += '<h4>Diseño</h4>';
       if (this.K === 'tablet') h += `<label class="fld"><span>Columna</span><select data-f="col">${[[0, 'Del plano'], [1, 'Columna 1'], [2, 'Columna 2']].map(([k, l]) => `<option value="${k}" ${(b.col || 0) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
+      h += `<label class="fld"><span>Ancho</span><select data-f="size"><option value="">Completo</option><option value="half" ${b.size === 'half' ? 'selected' : ''}>Media columna (van de a dos)</option></select></label>`;
+      h += this.condEditor(b);
+      h += '<h4>Más</h4><button class="eb sm" data-copyto>Copiar esta tarjeta a otro dashboard…</button>';
       r.innerHTML = h;
+      const ip = r.querySelector('[data-imgprev]'); if (ip) this.signed(ip.dataset.imgprev).then((u) => { ip.src = u; }).catch(() => {});
+    }
+    /** «Mostrar sólo si…»: condiciones como la tarjeta condicional de Home Assistant (se cumplen todas). */
+    condEditor(b) {
+      const C = b.show || [], CO = window.MaeVista.CONDITIONS;
+      return `<h4>Mostrar sólo si…</h4>${C.map((q, i) => {
+        const s = q.entity && this.states()[q.entity];
+        return `<div class="it"><div class="row"><select data-f="show.${i}.type" style="flex:1">${Object.entries(CO).map(([k, l]) => `<option value="${k}" ${q.type === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select><button class="eb sm warn" data-cdel="${i}" title="Sacar">✕</button></div>
+          ${/state$/.test(q.type) ? `${this.ent('Equipo', 'ce', q.entity, null, `show.${i}.entity`)}<label class="fld"><span>Estado${s ? ` (ahora: ${esc(s.state)})` : ''}</span><input data-f="show.${i}.state" value="${esc(q.state || '')}" placeholder="on, off, open, home, armed_away…"></label>` : ''}</div>`;
+      }).join('')}<button class="eb sm" data-cadd>+ Agregar condición</button>
+        <p class="hint">${C.length ? 'Se ve sólo cuando se cumplen todas. En la vista previa, si ahora no se cumple, la tarjeta se ve transparente.' : 'Sin condiciones: se ve siempre.'}</p>`;
     }
 
     /* ───────── ambientes por dentro (son de la casa: valen para todos los dashboards y la app) ───────── */
@@ -605,6 +662,11 @@
         if (!this.blocks().length) this.prearmado(true); // todavía no tiene diseño para este tipo: arranca del prearmado
         this.draw();
       }; });
+      W.querySelectorAll('[data-sim]').forEach((x) => { x.onclick = () => {
+        this.sim = Object.assign({}, this.sim || {}, { [x.dataset.sim]: !(this.sim || {})[x.dataset.sim] });
+        if (this.vista) this.vista.setCtx({ sim: this.sim });
+        this.draw();
+      }; });
       W.querySelectorAll('[data-ori]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().orientation = x.dataset.ori; }); });
       W.querySelectorAll('[data-pf]').forEach((x) => { x.oninput = () => {
         const q = x.value.trim().toLowerCase(), sel = x.parentNode.querySelector('select');
@@ -667,6 +729,8 @@
           const path = x.dataset.f;
           let val = x.value;
           if (path === 'col') val = +val;
+          if (/^cfg\.(cols|min|max)$/.test(path)) val = val === '' ? '' : Number(val);
+          if (path === 'cfg.image' && val && !/^\/local\/[\w./-]{1,160}$/.test(val)) { this.toast('La imagen tiene que estar en la casa: /local/archivo.png (o subila)'); return; }
           if (/\.entity$/.test(path) || path === 'cfg.entity' || path === 'cfg.gate') { val = val.trim(); if (val && !this.states()[val]) { this.toast('Ese equipo no existe en la casa'); return; } }
           this.change(() => {
             this.setPath(b, path, val);
@@ -690,8 +754,16 @@
       W.querySelectorAll('#edr [data-idel]').forEach((x) => { x.onclick = () => this.change(() => b.cfg.items.splice(+x.dataset.idel, 1)); });
       W.querySelectorAll('#edr [data-imv]').forEach((x) => { x.onclick = () => this.change(() => { const i = +x.dataset.imv, j = i + +x.dataset.d, L = b.cfg.items; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; }); });
       W.querySelectorAll('#edr [data-mk]').forEach((x) => { x.onchange = () => this.change(() => { const k = x.dataset.mk, m0 = this.model();
-        if (k === 'rooms' && !(b.cfg.rooms && b.cfg.rooms.length) && m0) b.cfg.rooms = m0.rooms.slice(0, 4).map((r) => r.name); // parte de lo que se ve
+        if (k === 'rooms' && b.type === 'rooms' && !(b.cfg.rooms && b.cfg.rooms.length) && m0) b.cfg.rooms = m0.rooms.slice(0, 4).map((r) => r.name); // parte de lo que se ve
         const L = (b.cfg[k] = b.cfg[k] || []); if (x.checked) { if (!L.includes(x.value)) L.push(x.value); } else b.cfg[k] = L.filter((y) => y !== x.value); }); });
+      W.querySelectorAll('#edr [data-cadd]').forEach((x) => { x.onclick = () => this.change(() => { b.show = b.show || []; if (b.show.length < 6) b.show.push({ type: 'night' }); }); });
+      W.querySelectorAll('#edr [data-cdel]').forEach((x) => { x.onclick = () => this.change(() => { b.show.splice(+x.dataset.cdel, 1); if (!b.show.length) delete b.show; }); });
+      W.querySelectorAll('#edr [data-copyto]').forEach((x) => { x.onclick = () => this.copyTo(b); });
+      W.querySelectorAll('#edr [data-imgup]').forEach((x) => { x.onchange = async () => {
+        const f = x.files[0]; if (!f) return;
+        this.toast('Subiendo…');
+        try { const p = await this.upload(f); this.change(() => { b.cfg.image = p; }); this.toast('Imagen subida'); } catch (e) { this.toast(`No se pudo subir: ${e.message || e}`); }
+      }; });
       W.querySelectorAll('#edr [data-omv]').forEach((x) => { x.onclick = () => this.change(() => { const L = b.cfg[x.dataset.omv], i = +x.dataset.i, j = i + +x.dataset.d; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; }); });
     }
     /** «Automático» → manual: arranca con lo que la app está mostrando (así se puede cambiar lo que ya está). */
@@ -728,17 +800,145 @@
       if (k === 'pre') { if (confirm('¿Reemplazar las tarjetas por el prearmado con los equipos de esta casa?')) this.prearmado(false); else this.draw(); return; }
       if (k === 'reset') { if (!confirm('¿Descartar todos los cambios sin guardar?')) { this.draw(); return; } this.push(); this.v = clone(this.saved); fix(); return; }
       if (k === 'plan') return this.planEditor();
-      if (k === 'save') {
-        const v = this.v, L = v.layouts || {};
-        const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null } : null);
-        const out = { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
-          plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
+      if (k === 'history') return this.historyDlg();
+      if (k === 'export') return this.exportDesign();
+      if (k === 'import') return this.importDesign();
+      if (k === 'try') {
         try {
-          const res = await this.hass.callWS({ type: 'matterai/views/save', view: out });
-          this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = []; this.redo = []; this.draw();
+          const r = await this.hass.callWS({ type: 'matterai/views/preview', view: this.payload() });
+          const first = !this.trying; this.trying = r.until;
+          if (first) {
+            this.draw();
+            this.toast(r.devices === 0 ? 'Ningún equipo tiene este dashboard todavía: asignáselo en la página Dashboards' : `Listo: ${r.devices > 0 ? `${r.devices} equipo${r.devices > 1 ? 's' : ''}` : 'todos los equipos'} muestran este diseño (sin guardar) por ${r.minutes} min. Lo que cambies les llega solo.`);
+          }
+        } catch (e) { this.toast(`No se pudo probar: ${e.message || e}`); }
+        return;
+      }
+      if (k === 'tryend') { await this.endTry(); this.draw(); this.toast('Prueba terminada: los equipos vuelven al diseño guardado'); return; }
+      if (k === 'save') {
+        try {
+          const res = await this.hass.callWS({ type: 'matterai/views/save', view: this.payload() });
+          this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = []; this.redo = [];
+          if (this.trying) await this.endTry();
+          this.draw();
           this.toast('Guardado: los equipos con este dashboard lo ven al instante');
         } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
       }
+    }
+    /** Lo que se guarda (o se prueba): los dos diseños, el plano y lo demás del dashboard. */
+    payload() {
+      const v = this.v, L = v.layouts || {};
+      const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null } : null);
+      return { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
+        plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
+    }
+    async endTry() {
+      clearTimeout(this.tryT); this.trying = null;
+      try { await this.hass.callWS({ type: 'matterai/views/preview_end', view_id: this.v.id }); } catch (_) { /* vence solo a los 15 min */ }
+    }
+    /** Ventana genérica del editor (historial, copiar a otro dashboard). */
+    modal(title, body, onClick) {
+      this.closeCatalog();
+      const box = document.createElement('div');
+      box.className = 'catp';
+      box.innerHTML = `<div class="catin"><div class="cath"><b>${esc(title)}</b><button class="eb sm" data-cx>✕</button></div><div class="mbody">${body}</div></div>`;
+      this.wrap.appendChild(box);
+      this.catBox = box;
+      box.onclick = (e) => { if (e.target === box || e.target.closest('[data-cx]')) return this.closeCatalog(); return onClick && onClick(e); };
+      return box;
+    }
+    /** Historial: las últimas versiones guardadas; se puede cargar una (queda como cambio sin guardar). */
+    async historyDlg() {
+      let vers = [];
+      try { vers = (await this.hass.callWS({ type: 'matterai/views/history', view_id: this.v.id })).versions || []; } catch (e) { this.toast(`No se pudo: ${e.message || e}`); return; }
+      const when = (t) => (t ? new Date(t * 1000).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : '');
+      this.modal('Historial de versiones', vers.length ? `<div class="hlist">${vers.map((x) => `<div class="hrow"><span><b>${esc(when(x.t))}</b><small>${esc(x.by || '')} · celular ${x.phone} tarjetas · tablet ${x.tablet}</small></span><button class="eb sm" data-hv="${x.index}">Ver y usar</button></div>`).join('')}</div>
+        <p class="hint">Al cargar una versión queda como cambio sin guardar: mirala en la vista previa y guardá si te sirve (o Deshacer).</p>` : '<p class="hint">Todavía no hay versiones anteriores: se guardan solas cada vez que guardás.</p>', async (e) => {
+        const hv = e.target.closest('[data-hv]'); if (!hv) return;
+        try {
+          const snap = await this.hass.callWS({ type: 'matterai/views/history_get', view_id: this.v.id, index: +hv.dataset.hv });
+          const n = Editor.normalize(clone(snap));
+          this.closeCatalog();
+          this.change(() => { this.v.layouts = n.layouts || {}; this.v.plan = n.plan || null; if (n.name) this.v.name = n.name; this.sel = null; });
+          this.toast('Versión cargada: guardá para quedarte con ella (o Deshacer)');
+        } catch (err) { this.toast(`No se pudo: ${err.message || err}`); }
+      });
+    }
+    /** Los equipos que usa una tarjeta (para avisar los que no existen al importar). */
+    static entitiesIn(blocks) {
+      const out = new Set(), walk = (o) => {
+        if (Array.isArray(o)) return o.forEach(walk);
+        if (!o || typeof o !== 'object') return undefined;
+        Object.entries(o).forEach(([k, val]) => {
+          if ((k === 'entity' || k === 'gate') && typeof val === 'string') out.add(val);
+          else if (k === 'entities' && Array.isArray(val)) val.forEach((x) => typeof x === 'string' && out.add(x));
+          else walk(val);
+        });
+        return undefined;
+      };
+      walk(blocks);
+      return [...out];
+    }
+    /** Plantilla: el diseño (celular y tablet) en un archivo, para usarlo en otra casa. El plano no va (es de esta casa). */
+    exportDesign() {
+      const L = this.v.layouts || {}, keep = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: L[k].orientation || null } : null);
+      const data = { format: 'matterai-dashboard', version: 1, name: this.v.name, exported: new Date().toISOString(), layouts: { phone: keep('phone'), tablet: keep('tablet') } };
+      const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
+      const a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = `dashboard-${String(this.v.name || 'matterai').toLowerCase().normalize('NFD').replace(/[^\w]+/g, '-').replace(/^-|-$/g, '')}.json`;
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+      this.toast('Plantilla exportada (sin el plano, que es de esta casa)');
+    }
+    importDesign() {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'application/json,.json';
+      inp.onchange = async () => {
+        const f = inp.files[0]; if (!f) return;
+        let d = null;
+        try { d = JSON.parse(await f.text()); } catch (_) { d = null; }
+        if (!d || d.format !== 'matterai-dashboard' || !d.layouts) { this.toast('Ese archivo no es una plantilla de MatterAI'); return; }
+        const CAT = window.MaeVista.CATALOG, L = {};
+        ['phone', 'tablet'].forEach((k) => {
+          const l = d.layouts[k];
+          if (l && Array.isArray(l.blocks)) L[k] = { blocks: l.blocks.filter((b) => b && CAT[b.type]).slice(0, 30).map((b) => Object.assign(clone(b), { id: this.newId(b.type) })), orientation: l.orientation || null };
+        });
+        if (!L.phone && !L.tablet) { this.toast('La plantilla no tiene tarjetas'); return; }
+        if (!confirm(`¿Reemplazar el diseño por la plantilla «${d.name || 'sin nombre'}»? (Se puede deshacer)`)) return;
+        this.change(() => { this.v.layouts = Object.assign({}, this.v.layouts, L); this.sel = null; });
+        const miss = Editor.entitiesIn(L).filter((id) => !this.states()[id]);
+        this.toast(miss.length ? `Plantilla cargada. ${miss.length} equipo${miss.length > 1 ? 's' : ''} no existe${miss.length > 1 ? 'n' : ''} en esta casa: elegilos de nuevo en cada tarjeta` : 'Plantilla cargada: revisala y guardá');
+      };
+      inp.click();
+    }
+    /** Copia la tarjeta elegida al diseño de celular o tablet de otro dashboard (se guarda al toque). */
+    async copyTo(b) {
+      let lst;
+      try { lst = await this.hass.callWS({ type: 'matterai/views/list' }); } catch (e) { this.toast(`No se pudo: ${e.message || e}`); return; }
+      const CAT = window.MaeVista.CATALOG, kinds = (CAT[b.type] || { kinds: [] }).kinds;
+      const others = (lst.views || []).filter((x) => x.id !== this.v.id);
+      const rows = others.map((x) => `<div class="hrow"><span><b>${esc(x.name)}</b></span>${['phone', 'tablet'].filter((k) => kinds.includes(k)).map((k) => `<button class="eb sm" data-ct="${esc(x.id)}" data-k="${k}">${k === 'phone' ? 'Celular' : 'Tablet'}</button>`).join(' ')}</div>`).join('');
+      this.modal(`Copiar «${(CAT[b.type] || {}).name || b.type}» a…`, rows ? `<div class="hlist">${rows}</div><p class="hint">Se agrega al final del diseño elegido y se guarda en ese dashboard.</p>` : '<p class="hint">No hay otros dashboards en esta casa.</p>', async (e) => {
+        const ct = e.target.closest('[data-ct]'); if (!ct) return;
+        const tgt = Editor.normalize(clone(others.find((x) => x.id === ct.dataset.ct))), k = ct.dataset.k;
+        const L = tgt.layouts[k] = tgt.layouts[k] || {};
+        if (!(L.blocks && L.blocks.length)) {
+          // ese diseño usaba el prearmado: se parte de él para no dejarlo con una sola tarjeta
+          const m = this.model() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] };
+          const d = window.MaeVista.defaults(k, m, tgt, this.states(), this.cfg.floorplan);
+          L.blocks = d.blocks; if (k === 'tablet') L.orientation = L.orientation || 'landscape';
+        }
+        const nb = clone(b); nb.id = this.newId(nb.type); nb.col = k === 'tablet' ? (this.K === 'tablet' ? b.col || 1 : (b.type === 'plan' ? 0 : 1)) : 0;
+        L.blocks.push(nb);
+        const keep = (q) => (tgt.layouts[q] && tgt.layouts[q].blocks && tgt.layouts[q].blocks.length ? { blocks: tgt.layouts[q].blocks, orientation: q === 'tablet' ? tgt.layouts[q].orientation || 'landscape' : null } : null);
+        try {
+          await this.hass.callWS({ type: 'matterai/views/save', view: { id: tgt.id, name: tgt.name, kind: tgt.kind || 'phone', layouts: { phone: keep('phone'), tablet: keep('tablet') }, blocks: null, orientation: null,
+            plan: tgt.plan || null, pinned: tgt.pinned || [], featured: tgt.featured || {}, scenes: tgt.scenes || null } });
+          this.closeCatalog();
+          this.toast(`Copiada a «${tgt.name}» (${k === 'phone' ? 'celular' : 'tablet'})`);
+        } catch (err) { this.toast(`No se pudo copiar: ${err.message || err}`); }
+      });
     }
     close() {
       if (this.dirty() && !confirm('Hay cambios sin guardar. ¿Salir igual?')) return;
@@ -746,6 +946,7 @@
       window.removeEventListener('resize', this.resH);
       window.removeEventListener('beforeunload', this.unloadH);
       clearInterval(this.liveT);
+      if (this.trying) this.endTry();
       this.closeCB(); this.closeCatalog();
       if (this.vista) this.vista.destroy();
       this.host.remove();

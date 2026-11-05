@@ -184,7 +184,40 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-min .t{padding:16px 18px 4px;font-weight:700;font-size:16px}.v-min p{margin:0;padding:0 18px 12px;color:var(--muted);font-size:12.5px}
 .v-min button{display:flex!important;align-items:center;gap:10px;width:100%;padding:14px 18px!important;border-top:1px solid var(--line)!important;font-weight:600}
 .v-min button.del{color:var(--red)}
+/* ───── tarjetas de la 2.16 ───── */
+.v-halfs{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px;align-items:start}
+.v-halfs>.v-b>h3:first-child{margin-top:0}
+.v-big{font-size:28px!important;font-weight:600!important;letter-spacing:-.01em;line-height:1.1}.v-big small{font-size:13px;color:var(--muted);font-weight:500}
+.v-wx{cursor:pointer}.v-wxi{width:52px;height:52px;border-radius:16px;display:grid;place-items:center;background:var(--warm-s);color:var(--warm);flex:none}.v-wxi svg.i{width:28px;height:28px}
+.v-chev{color:var(--muted);flex:none}
+.v-bic{width:38px;height:38px;border-radius:12px;display:grid;place-items:center;background:var(--card2);color:var(--muted);flex:none}
+.v-clim.on .v-bic{background:var(--cool-s);color:var(--cool)}
+.v-cset{display:flex;align-items:center;justify-content:center;gap:22px;margin-top:12px}.v-cset b{font:600 30px/1 var(--f-mono);min-width:96px;text-align:center}
+.v-cb{width:40px;height:40px;border-radius:12px!important;display:grid!important;place-items:center;background:var(--card2)!important;font-size:22px!important;font-weight:600;flex:none}
+.v-cb:active{background:var(--warm)!important;color:#1b1408}
+.v-list2{display:flex;flex-direction:column;gap:12px}
+.v-cov{display:flex;align-items:center;gap:6px}.v-cov .v-cb{width:36px;height:36px}
+.v-pos{display:block;height:3px;border-radius:3px;background:var(--off);margin-top:6px;overflow:hidden}.v-pos i{display:block;height:100%;background:var(--cool)}
+.v-lt.on .v-bic{background:var(--warm-s);color:var(--warm)}
+.v-bri{width:100%;margin:10px 0 0;accent-color:var(--warm);height:22px}
+.v-en .v-bic{background:var(--warm-s);color:var(--warm)}
+.v-spark{display:block;width:100%;height:60px;margin-top:10px}.v-spark polyline{fill:none;stroke:var(--warm);stroke-width:2;vector-effect:non-scaling-stroke;stroke-linejoin:round}
+.v-spark.none{height:20px}
+.v-gauge{text-align:center;cursor:pointer}.v-gauge svg{width:100%;max-width:200px;display:block;margin:0 auto}
+.v-gauge path{fill:none;stroke-width:9;stroke-linecap:round}.v-gauge .g0{stroke:var(--off)}.v-gauge .g1{stroke:var(--cool)}
+.v-gauge>b{display:block;font:600 24px/1.1 var(--f-mono);margin-top:-14px}.v-gauge>b small{font-size:12px;color:var(--muted)}.v-gauge>span{display:block;color:var(--muted);font-size:12px;margin-top:2px}
+.v-ppl{display:flex;flex-wrap:wrap;gap:14px}
+.v-pp{display:flex;flex-direction:column;align-items:center;gap:3px;min-width:62px;opacity:.6}.v-pp.home{opacity:1}
+.v-av{width:46px;height:46px;border-radius:50%;background:var(--card2) center/cover;display:grid;place-items:center;font-weight:700;border:2px solid var(--off)}
+.v-pp.home .v-av{border-color:var(--green)}.v-pp b{font-size:13px;font-weight:600}.v-pp span{font-size:11px;color:var(--muted)}
+.v-sep{display:flex;align-items:center;gap:10px;margin:14px 2px 2px;color:var(--muted);font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase}
+.v-sep::after{content:"";flex:1;height:1px;background:var(--line)}
+.v-text b{display:block;font-size:15px;margin-bottom:6px}.v-text p{margin:0;color:var(--muted);font-size:13.5px;line-height:1.5}
+.v-imgc{position:relative;border-radius:18px;overflow:hidden;background:var(--card)}.v-imgc img{display:block;width:100%;height:auto}
+.v-imgc span{position:absolute;left:12px;bottom:10px;padding:4px 10px;border-radius:10px;background:rgba(10,12,16,.6);font-size:12.5px;font-weight:600}
+.v-imgc[data-btap]{cursor:pointer}
 /* ───── modo edición (vista previa del editor) ───── */
+.vista.editing .v-b.hid{opacity:.4}.vista.editing .v-b.cond .v-btag{border-style:dashed}
 .vista.editing .v-b{position:relative;outline:1px dashed rgba(160,175,200,.35);outline-offset:4px;border-radius:14px;cursor:pointer;min-height:40px;margin-bottom:6px}
 .vista.editing .v-b:hover{outline-color:rgba(242,183,102,.6)}
 .vista.editing .v-b.sel{outline:2px solid var(--warm)}

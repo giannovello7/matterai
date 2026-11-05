@@ -308,3 +308,69 @@ async def test_assign_to_linked_equipo_without_mobile_app(hass, hass_ws_client, 
     await ws.send_json({"id": 7, "type": "matterai/views/delete", "view_id": v["id"]})
     await ws.receive_json()
     assert p["user_id"] not in hass.data[DOMAIN]["views"].users
+
+
+NEW_CARDS = [
+    {"id": "w", "type": "weather", "size": "half", "cfg": {"tap": {"type": "screen", "screen": "clima"}}},
+    {"id": "c", "type": "climate", "size": "half", "cfg": {"entity": "climate.living"}},
+    {"id": "cv", "type": "covers", "cfg": {"rooms": ["Living"]}},
+    {"id": "l", "type": "lights", "cfg": {"entities": ["light.living"]}, "show": [{"type": "night"}, {"type": "state", "entity": "input_boolean.fiesta", "state": "on"}]},
+    {"id": "e", "type": "energy", "cfg": {"entity": "sensor.consumo"}},
+    {"id": "s", "type": "sensor", "cfg": {"entity": "sensor.tanque", "min": 0, "max": 1000}},
+    {"id": "p", "type": "people", "cfg": {}},
+    {"id": "t", "type": "text", "title": "Planta alta", "cfg": {"style": "separator"}},
+    {"id": "i", "type": "image", "cfg": {"image": "/local/logo.png", "tap": {"type": "room", "room": "Living"}}},
+    {"id": "b", "type": "buttons", "cfg": {"cols": 3, "items": []}},
+]
+
+
+async def test_new_cards_sizes_and_conditions(hass, hass_ws_client) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Nuevas", "layouts": {"phone": {"blocks": NEW_CARDS}}}})
+    msg = await ws.receive_json()
+    assert msg["success"], msg
+    saved = msg["result"]["layouts"]["phone"]["blocks"]
+    assert saved[0]["size"] == "half" and saved[3]["show"][1]["state"] == "on" and saved[5]["cfg"]["max"] == 1000 and saved[9]["cfg"]["cols"] == 3
+    # NEGATIVO: condición desconocida, tamaño raro o imagen de afuera
+    for i, bad in enumerate([{"id": "x", "type": "text", "show": [{"type": "hackear"}]}, {"id": "x", "type": "text", "size": "gigante"},
+                             {"id": "x", "type": "image", "cfg": {"image": "https://malo.com/x.png"}}]):
+        await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": [bad]}}}})
+        assert not (await ws.receive_json())["success"]
+
+
+async def test_try_on_device_and_history(hass, hass_ws_client, hass_client_no_auth) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    gian = await _phone(hass, hass_ws_client, client, "Celu Gianfranco", "dev-g")
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Gianfranco", "layouts": {"phone": {"blocks": PHONE}}}})
+    v = (await ws.receive_json())["result"]
+    await ws.send_json({"id": 2, "type": "matterai/views/assign_user", "user_id": gian["user_id"], "view_id": v["id"]})
+    await ws.receive_json()
+    # probar en el equipo: el celular ve el diseño sin guardar, y lo guardado no cambia
+    trial = {"id": v["id"], "name": "Gianfranco", "layouts": {"phone": {"blocks": [{"id": "t", "type": "text", "title": "Prueba", "cfg": {}}]}}}
+    await ws.send_json({"id": 3, "type": "matterai/views/preview", "view": trial})
+    res = await ws.receive_json()
+    assert res["success"] and res["result"]["minutes"] > 0
+    got = await _ws(hass_ws_client, hass, gian["token"], 4, {"type": "matterai/app/view", "device_id": "dev-g", "kind": "phone"})
+    assert got["result"]["preview"] is True and got["result"]["view"]["blocks"][0]["type"] == "text"
+    assert hass.data[DOMAIN]["views"].views[v["id"]]["layouts"]["phone"]["blocks"][0]["type"] == "kpis"
+    await ws.send_json({"id": 5, "type": "matterai/views/preview_end", "view_id": v["id"]})
+    await ws.receive_json()
+    got = await _ws(hass_ws_client, hass, gian["token"], 6, {"type": "matterai/app/view", "device_id": "dev-g", "kind": "phone"})
+    assert got["result"]["preview"] is False and got["result"]["view"]["blocks"][0]["type"] == "kpis"
+    # NEGATIVO: el celular no puede mandar pruebas
+    msg = await _ws(hass_ws_client, hass, gian["token"], 7, {"type": "matterai/views/preview", "view": trial})
+    assert not msg["success"]
+    # historial: cada guardado deja la versión anterior para volver a ella
+    await ws.send_json({"id": 8, "type": "matterai/views/save", "view": trial})
+    await ws.receive_json()
+    await ws.send_json({"id": 9, "type": "matterai/views/history", "view_id": v["id"]})
+    vers = (await ws.receive_json())["result"]["versions"]
+    assert len(vers) == 1 and vers[0]["phone"] == len(PHONE)
+    await ws.send_json({"id": 10, "type": "matterai/views/history_get", "view_id": v["id"], "index": 0})
+    old = (await ws.receive_json())["result"]
+    assert old["layouts"]["phone"]["blocks"][0]["type"] == "kpis"
+    await ws.send_json({"id": 11, "type": "matterai/views/history_get", "view_id": v["id"], "index": 5})
+    assert not (await ws.receive_json())["success"]

@@ -234,6 +234,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             frontend.remove_extra_js_url(hass, rt["card_url"])
         except (KeyError, ValueError):  # ya no estaba (frontend recién iniciado o quitado antes)
             pass
+    if rt.get("views") is not None:  # pruebas de diseño pendientes en los equipos: se cancelan
+        for unsub in rt["views"].preview_timers.values():
+            unsub()
+        rt["views"].preview_timers.clear()
     for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy", "views"):
         rt.pop(key, None)
     return True

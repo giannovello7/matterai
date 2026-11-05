@@ -20,6 +20,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
@@ -32,6 +33,9 @@ KINDS = ("phone", "tablet")
 MAX_VIEWS = 50
 MAX_PINNED = 20
 MAX_BLOCKS = 30
+MAX_HISTORY = 12      # versiones anteriores que se guardan de cada dashboard
+PREVIEW_MIN = 15      # «Probar en el equipo»: cuánto dura el diseño sin guardar en los equipos
+DESIGN_KEYS = ("name", "kind", "layouts", "blocks", "orientation", "plan", "pinned", "featured", "scenes")
 
 VIEW_SCHEMA = vol.Schema({
     vol.Optional("id"): vol.All(str, vol.Length(max=32)),
@@ -69,6 +73,9 @@ class Views:
         self.assign: dict[str, str] = {}  # device_id de mobile_app → id del dashboard
         self.users: dict[str, str] = {}   # usuario de un equipo vinculado → id del dashboard (anda aunque no haya mobile_app)
         self.default: str | None = None
+        self.history: dict[str, list[dict[str, Any]]] = {}  # versiones anteriores de cada dashboard (la más nueva primero)
+        self.previews: dict[str, dict[str, Any]] = {}       # «Probar en el equipo»: diseño sin guardar (sólo en memoria)
+        self.preview_timers: dict[str, Any] = {}
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
@@ -76,9 +83,10 @@ class Views:
         self.assign = data.get("assign") or {}
         self.users = data.get("users") or {}
         self.default = data.get("default")
+        self.history = data.get("history") or {}
 
     def _save(self) -> None:
-        self._store.async_delay_save(lambda: {"views": self.views, "assign": self.assign, "users": self.users, "default": self.default}, 2)
+        self._store.async_delay_save(lambda: {"views": self.views, "assign": self.assign, "users": self.users, "default": self.default, "history": self.history}, 2)
 
     def put(self, view: dict[str, Any], by: str = "instalador") -> dict[str, Any]:
         vid = view.get("id") or uuid.uuid4().hex[:10]
@@ -87,14 +95,28 @@ class Views:
         old = self.views.get(vid, {})
         out = {**old, **view, "id": vid, "updated": time.time(), "by": by}
         out["pinned"] = list(dict.fromkeys(out.get("pinned") or []))  # sin repetidos, en orden
+        if old and any(old.get(k) != out.get(k) for k in DESIGN_KEYS):
+            # la versión anterior queda en el historial (se puede volver a ella desde el editor)
+            snap = {k: old.get(k) for k in DESIGN_KEYS if old.get(k) is not None}
+            snap.update(t=old.get("updated") or time.time(), by=old.get("by") or "")
+            self.history[vid] = ([snap] + self.history.get(vid, []))[:MAX_HISTORY]
         self.views[vid] = out
         self._save()
         return out
+
+    def preview(self, vid: str) -> dict[str, Any] | None:
+        p = self.previews.get(vid)
+        if p and p["until"] < time.time():
+            self.previews.pop(vid, None)
+            return None
+        return p["view"] if p else None
 
     def delete(self, vid: str) -> bool:
         if vid not in self.views:
             return False
         self.views.pop(vid)
+        self.history.pop(vid, None)
+        self.previews.pop(vid, None)
         self.assign = {d: v for d, v in self.assign.items() if v != vid}
         self.users = {u: v for u, v in self.users.items() if v != vid}
         if self.default == vid:
@@ -297,6 +319,82 @@ def ws_views_default(hass: HomeAssistant, connection: websocket_api.ActiveConnec
     connection.send_result(msg["id"], {"ok": True})
 
 
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/views/preview", vol.Required("view"): dict})
+@websocket_api.require_admin
+@callback
+def ws_views_preview(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """«Probar en el equipo»: los equipos con ese dashboard muestran el diseño sin guardar por unos minutos."""
+    v = _rt(hass).get("views")
+    try:
+        view = VIEW_SCHEMA(msg["view"])
+    except vol.Invalid as err:
+        connection.send_error(msg["id"], "invalid", str(err))
+        return
+    vid = view.get("id")
+    if not vid or vid not in v.views:
+        connection.send_error(msg["id"], "not_found", "Guardá el dashboard una vez antes de probarlo")
+        return
+    until = time.time() + PREVIEW_MIN * 60
+    v.previews[vid] = {"view": {**v.views[vid], **view, "id": vid}, "until": until}
+    targets = _targets(hass, v, vid)
+    _notify(hass, targets)
+
+    @callback
+    def _expired(_now: Any) -> None:  # al vencer, los equipos vuelven solos al diseño guardado
+        v.preview_timers.pop(vid, None)
+        p = v.previews.get(vid)
+        if p and p["until"] <= time.time() + 1:
+            v.previews.pop(vid, None)
+            _notify(hass, _targets(hass, v, vid))
+
+    old = v.preview_timers.pop(vid, None)
+    if old:
+        old()
+    v.preview_timers[vid] = async_call_later(hass, PREVIEW_MIN * 60 + 1, _expired)
+    connection.send_result(msg["id"], {"until": until, "minutes": PREVIEW_MIN, "devices": len(targets) if targets != ["all"] else -1})
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/views/preview_end", vol.Required("view_id"): str})
+@websocket_api.require_admin
+@callback
+def ws_views_preview_end(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    v = _rt(hass).get("views")
+    unsub = v.preview_timers.pop(msg["view_id"], None)
+    if unsub:
+        unsub()
+    if v.previews.pop(msg["view_id"], None) is not None:
+        _notify(hass, _targets(hass, v, msg["view_id"]))
+    connection.send_result(msg["id"], {"ok": True})
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/views/history", vol.Required("view_id"): str})
+@websocket_api.require_admin
+@callback
+def ws_views_history(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Las versiones anteriores de un dashboard (resumen: cuándo, quién y cuántas tarjetas)."""
+    v = _rt(hass).get("views")
+
+    def count(s: dict, k: str) -> int:
+        lay = (s.get("layouts") or {}).get(k) or {}
+        return len(lay.get("blocks") or (s.get("blocks") if s.get("kind", "phone") == k else None) or [])
+
+    out = [{"index": i, "t": s.get("t"), "by": s.get("by"), "name": s.get("name"), "phone": count(s, "phone"), "tablet": count(s, "tablet")}
+           for i, s in enumerate(v.history.get(msg["view_id"], []))]
+    connection.send_result(msg["id"], {"versions": out})
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/views/history_get", vol.Required("view_id"): str, vol.Required("index"): vol.All(int, vol.Range(min=0, max=MAX_HISTORY))})
+@websocket_api.require_admin
+@callback
+def ws_views_history_get(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    v = _rt(hass).get("views")
+    hist = v.history.get(msg["view_id"], [])
+    if msg["index"] >= len(hist):
+        connection.send_error(msg["id"], "not_found", "Esa versión ya no está")
+        return
+    connection.send_result(msg["id"], {**hist[msg["index"]], "id": msg["view_id"]})
+
+
 # ---------------------------------------------------------------- la app
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/view", vol.Required("device_id"): str, vol.Optional("kind"): vol.In(KINDS)})
 @callback
@@ -310,7 +408,8 @@ def ws_app_view(hass: HomeAssistant, connection: websocket_api.ActiveConnection,
     mine = v.assign.get(msg["device_id"]) if _owns_device(hass, connection.user.id, msg["device_id"]) else None
     mine = (mine if mine in v.views else None) or (v.users.get(connection.user.id) if house.is_device_user(connection.user.id) else None)
     view = v.views.get(mine) if mine else (v.views.get(v.default) if v.default else None)
-    connection.send_result(msg["id"], {"view": resolve(view, msg.get("kind")), "personal": bool(mine)})
+    trial = v.preview(view["id"]) if view else None  # el instalador está probando un diseño sin guardar
+    connection.send_result(msg["id"], {"view": resolve(trial or view, msg.get("kind")), "personal": bool(mine), "preview": bool(trial)})
 
 
 @websocket_api.websocket_command({
@@ -370,4 +469,5 @@ def ws_app_view_pin(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     connection.send_result(msg["id"], view)
 
 
-WS_COMMANDS = (ws_views_list, ws_views_save, ws_views_delete, ws_views_assign, ws_views_assign_user, ws_views_default, ws_app_view, ws_app_view_pin)
+WS_COMMANDS = (ws_views_list, ws_views_save, ws_views_delete, ws_views_assign, ws_views_assign_user, ws_views_default, ws_views_preview,
+               ws_views_preview_end, ws_views_history, ws_views_history_get, ws_app_view, ws_app_view_pin)

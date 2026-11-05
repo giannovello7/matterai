@@ -30,7 +30,19 @@ BLOCK_TYPES = (
     "lock",       # cerradura con su historial
     "plan",       # el plano o render de la casa (tablet)
     "clock",      # hora, fecha y clima grandes (tablet)
+    # desde la 2.16
+    "weather",    # clima grande con su pronóstico
+    "climate",    # termostato de un aire (temperatura, modo, prender/apagar)
+    "covers",     # cortinas / persianas con su posición
+    "lights",     # luces con su brillo
+    "energy",     # consumo con el gráfico de las últimas 24 h
+    "sensor",     # un sensor con medidor
+    "people",     # quién está en casa
+    "text",       # texto o separador
+    "image",      # una imagen (con acción al tocar)
 )
+SIZES = ("full", "half")
+COND_TYPES = ("state", "not_state", "night", "day", "music", "alarm_armed", "alarm_off", "someone_home", "nobody_home")
 SCREENS = ("agenda", "clima", "musica", "actividad", "camaras", "seguridad", "avisos", "menu", "casa", "luces", "automatizaciones", "aberturas")
 ACTIONS = ("none", "toggle", "more_info", "room", "screen", "service")
 KPI_KINDS = ("alarm", "lights", "temp", "acs", "power", "curtains", "entity", "people")
@@ -75,7 +87,20 @@ CFG = vol.Schema({
     vol.Optional("rooms"): vol.All([_name], vol.Length(max=24)),
     vol.Optional("items"): vol.All([ITEM], vol.Length(max=24)),  # botones, resumen
     vol.Optional("auto"): bool,                                 # true: que lo elija la app según la casa
-    vol.Optional("style"): vol.Any(None, vol.In(["list", "grid", "big", "compact"])),
+    vol.Optional("style"): vol.Any(None, vol.In(["list", "grid", "big", "compact", "separator"])),
+    # desde la 2.16
+    vol.Optional("cols"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=4))),  # botones por fila
+    vol.Optional("text"): vol.Any(None, vol.All(str, vol.Length(max=600))),               # tarjeta de texto
+    vol.Optional("image"): vol.Any(None, lambda v: _media(v)),                            # tarjeta de imagen
+    vol.Optional("min"): vol.Any(None, vol.Coerce(float)),                                # medidor del sensor
+    vol.Optional("max"): vol.Any(None, vol.Coerce(float)),
+    vol.Optional("tap"): ACTION,                                                          # acción de la tarjeta
+}, extra=vol.REMOVE_EXTRA)
+
+COND = vol.Schema({
+    vol.Required("type"): vol.In(COND_TYPES),
+    vol.Optional("entity"): vol.Any(None, cv.entity_id),
+    vol.Optional("state"): vol.Any(None, vol.All(str, vol.Length(max=40))),
 }, extra=vol.REMOVE_EXTRA)
 
 BLOCK = vol.Schema({
@@ -83,6 +108,8 @@ BLOCK = vol.Schema({
     vol.Required("type"): vol.In(BLOCK_TYPES),
     vol.Optional("title"): vol.Any(None, vol.All(str, vol.Length(max=40))),
     vol.Optional("col", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=2)),
+    vol.Optional("size"): vol.Any(None, vol.In(SIZES)),                 # ancho completo o media columna
+    vol.Optional("show"): vol.Any(None, vol.All([COND], vol.Length(max=6))),  # se ve sólo si se cumple todo
     vol.Optional("cfg", default=dict): CFG,
 }, extra=vol.REMOVE_EXTRA)
 

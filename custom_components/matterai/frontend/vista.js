@@ -66,7 +66,22 @@
     lock: { name: 'Cerradura', desc: 'Abrir o cerrar, con su estado', kinds: ['phone', 'tablet'] },
     plan: { name: 'Plano', desc: 'El render de la casa que se ilumina', kinds: ['tablet', 'phone'] },
     clock: { name: 'Reloj y clima', desc: 'Hora, fecha y clima grandes', kinds: ['tablet'] },
+    weather: { name: 'Clima', desc: 'Temperatura, cielo, humedad y viento', kinds: ['phone', 'tablet'] },
+    climate: { name: 'Aire / termostato', desc: 'Temperatura con − y +, modo y prender', kinds: ['phone', 'tablet'] },
+    covers: { name: 'Cortinas', desc: 'Subir, parar y bajar, con su posición', kinds: ['phone', 'tablet'] },
+    lights: { name: 'Luces', desc: 'Prender y apagar con el brillo', kinds: ['phone', 'tablet'] },
+    energy: { name: 'Consumo', desc: 'Lo que gasta la casa y el gráfico del día', kinds: ['phone', 'tablet'] },
+    sensor: { name: 'Sensor', desc: 'Un valor con su medidor (tanque, humedad…)', kinds: ['phone', 'tablet'] },
+    people: { name: 'Personas', desc: 'Quién está en casa', kinds: ['phone', 'tablet'] },
+    text: { name: 'Texto', desc: 'Un título, un separador o una nota', kinds: ['phone', 'tablet'] },
+    image: { name: 'Imagen', desc: 'Una foto o logo, con acción al tocar', kinds: ['phone', 'tablet'] },
   };
+  /* Condiciones para mostrar una tarjeta (como la tarjeta condicional de Home Assistant) */
+  const CONDITIONS = { state: 'Un equipo está en un estado', not_state: 'Un equipo NO está en un estado', night: 'Es de noche (20 a 7 h)', day: 'Es de día (7 a 20 h)',
+    music: 'Hay música sonando', alarm_armed: 'La alarma está armada', alarm_off: 'La alarma está desarmada', someone_home: 'Hay alguien en casa', nobody_home: 'No hay nadie en casa' };
+  const WX_TXT = { sunny: 'Despejado', 'clear-night': 'Despejado', partlycloudy: 'Algo nublado', cloudy: 'Nublado', rainy: 'Lluvia', pouring: 'Lluvia fuerte', lightning: 'Tormenta',
+    'lightning-rainy': 'Tormenta', fog: 'Niebla', windy: 'Ventoso', 'windy-variant': 'Ventoso', snowy: 'Nieve', 'snowy-rainy': 'Aguanieve', hail: 'Granizo', exceptional: 'Alerta' };
+  const MODE_TXT = { cool: 'Frío', heat: 'Calor', heat_cool: 'Automático', auto: 'Automático', dry: 'Seco', fan_only: 'Ventilación', off: 'Apagado' };
   const SCREEN_NAMES = { agenda: 'Agenda', clima: 'Clima', musica: 'Música', actividad: 'Actividad', camaras: 'Cámaras', seguridad: 'Seguridad', avisos: 'Avisos',
     menu: 'Menú', casa: 'Toda la casa', luces: 'Luces prendidas', automatizaciones: 'Automatizaciones', aberturas: 'Puertas y ventanas' };
 
@@ -113,11 +128,15 @@
 
   /* ───────── una instancia por pantalla ───────── */
   function create(el, ctx) {
-    const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, dismissed: new Set(load('matterai.vista.dismissed', [])) };
+    const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, hist: {}, simOver: null,
+      dismissed: new Set(load('matterai.vista.dismissed', [])) };
     const card = () => ctx.card;
     const hass = () => ctx.hass && ctx.hass();
     const M = () => { const c = card(); return c && c.model ? c.model() : null; };
-    const st = (id) => { const h = hass(); return (id && h && h.states && h.states[id]) || null; };
+    // en el editor se pueden simular estados (noche, alarma disparada, música, portón abierto) sin tocar la casa
+    const st = (id) => { if (id && X.simOver && X.simOver[id]) return X.simOver[id]; const h = hass(); return (id && h && h.states && h.states[id]) || null; };
+    const now = () => { if (ctx.sim && ctx.sim.night) { const d = new Date(); d.setHours(23, 30, 0, 0); return d; } return new Date(); };
+    const isNight = () => { const h = now().getHours(); return h < 7 || h >= 20; };
     const fname = (id) => { const s = st(id); return (s && s.attributes.friendly_name) || id || ''; };
     const url = (u) => (u && u.charAt(0) === '/' && !u.startsWith('/api/matterai/media/') ? (ctx.base() || '').replace(/\/+$/, '') + u : u);
     const toast = (t) => ctx.toast && ctx.toast(t);
@@ -267,6 +286,70 @@
       return `<div class="v-tile ${n ? 'lit' : ''}" data-room="${esc(r.id)}"><span class="v-tic">${ic(roomIc(r))}</span><b>${esc(r.name)}</b><span>${n ? `${n} prendida${n > 1 ? 's' : ''}` : 'Apagado'}</span></div>`;
     }
     const camSrc = (id) => { const s = st(id); return s && s.attributes.entity_picture ? url(s.attributes.entity_picture) + (s.attributes.entity_picture.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 10000) : ''; };
+    /** Equipos de una tarjeta: los elegidos, o los de los ambientes elegidos, o los de la casa (hasta 8). */
+    function entsOf(c, m, dom, roomKey) {
+      if (c.entities && c.entities.length) return c.entities.filter((id) => st(id));
+      const S = (hass() || {}).states || {};
+      const rooms = c.rooms && c.rooms.length ? c.rooms.map((n) => roomByName(m, n)).filter(Boolean) : null;
+      const out = rooms ? rooms.flatMap((r) => r[roomKey] || []) : (m.rooms || []).flatMap((r) => r[roomKey] || []);
+      const ids = (out.length || rooms ? out : Object.keys(S)).filter((id, i, a) => id.startsWith(`${dom}.`) && st(id) && a.indexOf(id) === i);
+      return ids.slice(0, rooms ? 24 : 8);
+    }
+    /** Historial de las últimas 24 h de un sensor (para el gráfico); se pide a la casa cada 5 minutos. */
+    function hist(id) {
+      const h = X.hist[id];
+      if (h && h.until > Date.now()) return h.pts;
+      const H = hass();
+      if ((!h || !h.pending) && H && typeof H.callWS === 'function') {
+        X.hist[id] = { pts: h ? h.pts : null, until: 0, pending: true };
+        H.callWS({ type: 'history/history_during_period', start_time: new Date(Date.now() - 864e5).toISOString(), entity_ids: [id], minimal_response: true, no_attributes: true, significant_changes_only: false })
+          .then((r) => {
+            const L = (r && r[id]) || [];
+            const pts = L.map((x) => [x.lu ? x.lu * 1000 : Date.parse(x.last_updated || x.last_changed || 0), Number(x.s != null ? x.s : x.state)]).filter((p) => Number.isFinite(p[0]) && Number.isFinite(p[1]));
+            X.hist[id] = { pts, until: Date.now() + 300e3 }; X.cache = {}; render();
+          })
+          .catch(() => { X.hist[id] = { pts: [], until: Date.now() + 60e3 }; });
+      }
+      return h ? h.pts : null;
+    }
+    function spark(pts) {
+      if (!pts || pts.length < 2) return '<div class="v-spark none"></div>';
+      const t0 = Date.now() - 864e5, t1 = Date.now(), vs = pts.map((p) => p[1]), lo = Math.min(...vs), hi = Math.max(...vs), r = hi - lo || 1;
+      const xy = pts.map(([t, v]) => `${(((Math.max(t, t0) - t0) / (t1 - t0)) * 300).toFixed(1)},${(56 - ((v - lo) / r) * 50).toFixed(1)}`);
+      xy.push(`300,${xy[xy.length - 1].split(',')[1]}`);
+      return `<svg class="v-spark" viewBox="0 0 300 60" preserveAspectRatio="none" aria-hidden="true"><polyline points="${xy.join(' ')}"/></svg>`;
+    }
+    /** ¿Se ve esta tarjeta ahora? (todas sus condiciones se cumplen) */
+    function visible(b, m) {
+      return (b.show || []).every((q) => {
+        const s = st(q.entity), al = m.alarm && st(m.alarm.entity_id);
+        switch (q.type) {
+          case 'state': return !!s && s.state === q.state;
+          case 'not_state': return !s || s.state !== q.state;
+          case 'night': return isNight();
+          case 'day': return !isNight();
+          case 'music': return !!player();
+          case 'alarm_armed': return !!al && (al.state.startsWith('armed') || al.state === 'triggered');
+          case 'alarm_off': return !!al && al.state === 'disarmed';
+          case 'someone_home': return (m.people || []).some((p) => (st(p.entity_id) || p).state === 'home');
+          case 'nobody_home': return (m.people || []).length > 0 && (m.people || []).every((p) => (st(p.entity_id) || p).state !== 'home');
+          default: return true;
+        }
+      });
+    }
+    /** Simulación del editor: cambia el estado que se muestra (nunca el de la casa). */
+    function buildSim(m) {
+      const s = ctx.sim || {}, H = (hass() || {}).states || {}, o = {};
+      const patch = (id, state, attrs) => { const b = H[id]; if (b) o[id] = Object.assign({}, b, { state, attributes: Object.assign({}, b.attributes, attrs || {}), last_changed: new Date().toISOString() }); };
+      if (s.alarm && m.alarm) patch(m.alarm.entity_id, 'triggered');
+      if (s.gate && m.access && m.access[0]) patch(m.access[0], m.access[0].startsWith('lock.') ? 'unlocked' : 'open');
+      if (s.music) {
+        const c = card(), ids = c && c.players ? c.players() : [];
+        if (ids[0]) patch(ids[0], 'playing', { media_title: 'Canción de prueba', media_artist: 'MatterAI', media_duration: 200, media_position: 70, media_position_updated_at: new Date().toISOString() });
+      }
+      X.simOver = Object.keys(o).length ? o : null;
+      return X.simOver && m.alarm && X.simOver[m.alarm.entity_id] ? Object.assign({}, m, { alarm: X.simOver[m.alarm.entity_id] }) : m;
+    }
     function player() {
       const c = card(); if (!c || !c.players) return null;
       const live = c.players().map(st).filter(Boolean);
@@ -308,7 +391,8 @@
         case 'buttons': {
           const items = c.items || [];
           if (!items.length) return editing() ? `${t}<p class="v-empty">Agregá botones en las propiedades de la tarjeta.</p>` : '';
-          return `${t}<div class="v-btns ${c.style === 'list' ? 'list' : ''}">${items.map((it, i) => {
+          const cols = c.style !== 'list' && c.cols ? ` style="grid-template-columns:repeat(${Math.max(1, Math.min(4, +c.cols))},minmax(0,1fr))"` : '';
+          return `${t}<div class="v-btns ${c.style === 'list' ? 'list' : ''}"${cols}>${items.map((it, i) => {
             const s = it.entity ? entState(it.entity) : { on: false, txt: it.tap && it.tap.type === 'screen' ? SCREEN_NAMES[it.tap.screen] || '' : '' };
             return `<button class="v-btn ${s.on ? 'on' : ''}" data-it="${i}"><span class="v-bic">${ic(it.icon || (it.entity ? defIcon(it.entity) : 'spark'))}</span><span class="v-tx"><b>${esc(it.name || fname(it.entity) || 'Botón')}</b><span>${esc(s.txt)}</span></span></button>`;
           }).join('')}</div>`;
@@ -349,6 +433,74 @@
           return `<div class="v-clock" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || 'sun')}${esc(Math.round(Number(w.attributes.temperature)))}°</button>` : ''}</div>`;
         }
         case 'plan': return planHTML(m);
+        case 'weather': {
+          const w = (c.entity && st(c.entity)) || m.weather;
+          if (!w) return editing() ? `${t}<p class="v-empty">La casa no tiene clima: agregá una integración del clima (Met.no).</p>` : '';
+          const a = w.attributes, bits = [WX_TXT[w.state] || w.state];
+          if (a.humidity != null) bits.push(`humedad ${Math.round(a.humidity)}%`);
+          if (a.wind_speed != null) bits.push(`viento ${Math.round(a.wind_speed)} ${a.wind_speed_unit || 'km/h'}`);
+          return `<div class="v-card v-wx" ${c.tap ? 'data-btap="1"' : 'data-scr="clima"'}>${t}<div class="v-row"><span class="v-wxi">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}</span>
+            <span class="v-tx"><b class="v-big">${esc(Math.round(Number(a.temperature)))}°</b><span>${esc(bits.join(' · '))}</span></span><span class="v-chev">${ic('chev')}</span></div></div>`;
+        }
+        case 'climate': {
+          const S = (hass() || {}).states || {};
+          const id = c.entity && st(c.entity) ? c.entity : Object.keys(S).find((x) => x.startsWith('climate.'));
+          if (!id) return editing() ? `${t}<p class="v-empty">Elegí el aire en las propiedades.</p>` : '';
+          const s = st(id), a = s.attributes, on = s.state !== 'off';
+          return `<div class="v-card v-clim ${on ? 'on' : ''}">${t}<div class="v-row"><span class="v-bic">${ic('snow')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(fname(id))}</b>
+            <span>${esc(on ? MODE_TXT[s.state] || s.state : 'Apagado')}${a.current_temperature != null ? ` · adentro ${dec(a.current_temperature)}°` : ''}</span></span><button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
+            <div class="v-cset"><button class="v-cb" data-ctemp="${esc(id)}" data-d="-1" aria-label="Bajar">−</button><b>${a.temperature != null ? `${dec(a.temperature)}°` : '—'}</b><button class="v-cb" data-ctemp="${esc(id)}" data-d="1" aria-label="Subir">+</button></div></div>`;
+        }
+        case 'covers': {
+          const ids = entsOf(c, m, 'cover', 'covers').filter((id) => (c.entities && c.entities.length) || !['gate', 'garage', 'door'].includes((st(id) || { attributes: {} }).attributes.device_class));
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">Elegí las cortinas (o un ambiente) en las propiedades.</p>` : '';
+          return `<div class="v-card">${t}<div class="v-list2">${ids.map((id) => {
+            const s = st(id), p = s.attributes.current_position, mv = ['opening', 'closing'].includes(s.state);
+            return `<div class="v-cov"><span class="v-tx" data-more="${esc(id)}"><b>${esc(fname(id))}</b><span>${esc(mv ? (s.state === 'opening' ? 'Subiendo…' : 'Bajando…') : s.state === 'open' ? (p != null && p < 100 ? `Abierta ${p}%` : 'Abierta') : s.state === 'closed' ? 'Cerrada' : s.state)}</span>
+              ${p != null ? `<i class="v-pos"><i style="width:${Math.max(0, Math.min(100, p))}%"></i></i>` : ''}</span>
+              <button class="v-cb" data-cov="open_cover" data-id="${esc(id)}" aria-label="Subir">${ic('up')}</button><button class="v-cb" data-cov="stop_cover" data-id="${esc(id)}" aria-label="Parar">${ic('pause')}</button><button class="v-cb" data-cov="close_cover" data-id="${esc(id)}" aria-label="Bajar">${ic('down')}</button></div>`;
+          }).join('')}</div></div>`;
+        }
+        case 'lights': {
+          const ids = entsOf(c, m, 'light', 'lightsCtl');
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">Elegí las luces (o un ambiente) en las propiedades.</p>` : '';
+          return `<div class="v-card">${t}<div class="v-list2">${ids.map((id) => {
+            const s = st(id), on = s.state === 'on', a = s.attributes, dim = id.startsWith('light.') && (a.brightness != null || (a.supported_color_modes || []).some((x) => x !== 'onoff'));
+            const pct = on && a.brightness != null ? Math.max(1, Math.round((a.brightness / 255) * 100)) : 0;
+            return `<div class="v-lt ${on ? 'on' : ''}"><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(fname(id))}</b><span>${on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
+              <button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
+              ${dim ? `<input class="v-bri" type="range" min="1" max="100" value="${pct || 50}" data-bri="${esc(id)}" aria-label="Brillo de ${esc(fname(id))}">` : ''}</div>`;
+          }).join('')}</div></div>`;
+        }
+        case 'energy': {
+          const id = c.entity && st(c.entity) ? c.entity : m.power && m.power.entity_id;
+          if (!id) return editing() ? `${t}<p class="v-empty">Elegí el sensor de consumo en las propiedades.</p>` : '';
+          const s = st(id), pts = hist(id);
+          return `<div class="v-card v-en" data-more="${esc(id)}">${t}<div class="v-row"><span class="v-bic">${ic('bolt')}</span><span class="v-tx"><b class="v-big">${esc(s.state)}<small> ${esc(s.attributes.unit_of_measurement || '')}</small></b><span>${esc(fname(id))} · últimas 24 h</span></span></div>${spark(pts)}</div>`;
+        }
+        case 'sensor': {
+          const id = c.entity && st(c.entity) ? c.entity : null;
+          if (!id) return editing() ? `${t}<p class="v-empty">Elegí el sensor en las propiedades.</p>` : '';
+          const s = st(id), v = Number(s.state), lo = c.min != null ? Number(c.min) : 0, hi = c.max != null ? Number(c.max) : (s.attributes.unit_of_measurement === '%' ? 100 : Math.max(100, Number.isFinite(v) ? v : 0));
+          const pct = Number.isFinite(v) && hi > lo ? Math.max(0, Math.min(1, (v - lo) / (hi - lo))) : 0;
+          return `<div class="v-card v-gauge" data-more="${esc(id)}">${t}<svg viewBox="0 0 100 56" aria-hidden="true"><path d="M8 50a42 42 0 0 1 84 0" class="g0"/><path d="M8 50a42 42 0 0 1 84 0" class="g1" style="stroke-dasharray:${(pct * 131.95).toFixed(1)} 200"/></svg>
+            <b>${esc(Number.isFinite(v) ? dec(v) : s.state)}<small> ${esc(s.attributes.unit_of_measurement || '')}</small></b><span>${esc(fname(id))}</span></div>`;
+        }
+        case 'people': {
+          const P = (m.people || []).map((p) => st(p.entity_id) || p);
+          if (!P.length) return editing() ? `${t}<p class="v-empty">La casa no tiene personas configuradas.</p>` : '';
+          return `<div class="v-card">${t}<div class="v-ppl">${P.map((p) => { const home = p.state === 'home', pic = p.attributes.entity_picture;
+            return `<div class="v-pp ${home ? 'home' : ''}"><span class="v-av" ${pic ? `style="background-image:url('${esc(url(pic))}')"` : ''}>${pic ? '' : esc(String(p.attributes.friendly_name || '?').charAt(0))}</span><b>${esc(String(p.attributes.friendly_name || p.entity_id).split(' ')[0])}</b><span>${home ? 'En casa' : p.state === 'not_home' ? 'Afuera' : esc(p.state)}</span></div>`; }).join('')}</div></div>`;
+        }
+        case 'text': {
+          if (c.style === 'separator' || !c.text) return `<div class="v-sep"><span>${esc(b.title || '')}</span></div>`;
+          return `<div class="v-card v-text">${b.title ? `<b>${esc(b.title)}</b>` : ''}<p>${esc(c.text).replace(/\n/g, '<br>')}</p></div>`;
+        }
+        case 'image': {
+          const src = img(c.image);
+          if (!c.image) return editing() ? `${t}<p class="v-empty">Subí o elegí la imagen en las propiedades.</p>` : '';
+          return `<div class="v-imgc" ${c.tap && c.tap.type !== 'none' ? 'data-btap="1"' : ''}>${src ? `<img src="${esc(src)}" alt="${esc(b.title || '')}">` : ''}${b.title ? `<span>${esc(b.title)}</span>` : ''}</div>`;
+        }
         default: return editing() ? `<p class="v-empty">Tarjeta «${esc(b.type)}» (la app todavía no la conoce)</p>` : '';
       }
     }
@@ -358,7 +510,7 @@
       const p = X.layout.plan;
       if (!p || !p.image) return editing() ? '<div class="v-plan empty"><p>Subí el render de la casa en «Plano» para verlo acá.</p></div>' : '';
       const off = img(p.image), on = img(p.image_on || p.image), day = p.image_day ? img(p.image_day) : '';
-      const h = new Date().getHours(), isDay = day && h >= 7 && h < 20;
+      const isDay = day && !isNight();
       const zones = p.zones || [];
       const pts = (poly) => poly.map(([x, y]) => `${(x * 1000).toFixed(1)},${(y * 1000).toFixed(1)}`).join(' ');
       const ar = p.aspect || X.aspect || 0.6;
@@ -397,25 +549,41 @@
     function head(m, compact) {
       const d = new Date(), w = m.weather, ns = notes(m).length;
       return `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>
-        ${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (d.getHours() >= 7 && d.getHours() < 20 ? 'sun' : 'moon'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(w.state === 'sunny' || w.state === 'clear-night' ? 'Despejado' : w.state === 'rainy' || w.state === 'pouring' ? 'Lluvia' : 'Nublado')}</small>`}</button>` : ''}
+        ${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(w.state === 'sunny' || w.state === 'clear-night' ? 'Despejado' : w.state === 'rainy' || w.state === 'pouring' ? 'Lluvia' : 'Nublado')}</small>`}</button>` : ''}
         <button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>
         <button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`;
     }
     function wrapBlock(b, m) {
+      const shown = visible(b, m);
+      if (!shown && !editing()) return '';
       const inner = block(b, m);
       if (!inner && !editing()) return '';
       const sel = editing() && ctx.edit.selected === b.id;
+      const cls = `${b.size === 'half' ? ' s-half' : ''}${!shown ? ' hid' : ''}${(b.show || []).length ? ' cond' : ''}`;
       // en el editor, la tarjeta elegida tiene su barra (subir, bajar, duplicar, borrar) y todas se arrastran
       const tool = sel ? `<span class="v-etool">${[['up', 'up', 'Subir'], ['down', 'down', 'Bajar'], ['dup', 'grid', 'Duplicar'], ['del', 'x', 'Borrar']]
         .map(([k, i, t]) => `<button data-eact="${k}" title="${t}" aria-label="${t}">${ic(i)}</button>`).join('')}</span>` : '';
-      return `<section class="v-b t-${b.type}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${editing() ? ' draggable="true"' : ''}>${editing() ? `<span class="v-btag">${esc((CATALOG[b.type] || {}).name || b.type)}</span>${tool}` : ''}${inner}</section>`;
+      const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
+      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${editing() ? ' draggable="true"' : ''}>${editing() ? `<span class="v-btag">${tag}</span>${tool}` : ''}${inner}</section>`;
+    }
+    /** Una columna: las tarjetas de media columna seguidas van de a dos, una al lado de la otra. */
+    function colHTML(list, m) {
+      let out = '', buf = [];
+      const flush = () => { if (buf.length) { out += `<div class="v-halfs">${buf.join('')}</div>`; buf = []; } };
+      list.forEach((b) => {
+        const h = wrapBlock(b, m); if (!h) return;
+        if (b.size === 'half') { buf.push(h); if (buf.length === 2) flush(); } else { flush(); out += h; }
+      });
+      flush();
+      return out;
     }
     /** En el editor: al final de cada columna, «+ Agregar tarjeta» (como en Home Assistant). */
     const addSlot = (col) => (editing() && ctx.edit.onAdd ? `<button class="v-eadd" data-eadd="${col}">+ Agregar tarjeta</button>` : '');
     function render() {
-      if (!X.el || X.el.hidden) return;
-      const m = M();
-      if (!m) { if (X.el.innerHTML === '') X.el.innerHTML = '<p class="v-empty">Conectando con tu casa…</p>'; return; }
+      if (!X.el || X.el.hidden || X.sliding) return; // mientras se arrastra un brillo no se redibuja (si no, se suelta solo)
+      const m0 = M();
+      if (!m0) { if (X.el.innerHTML === '') X.el.innerHTML = '<p class="v-empty">Conectando con tu casa…</p>'; return; }
+      const m = buildSim(m0);
       const L = X.layout = layout(m), K = kind(), ori = ctx.orientation || L.orientation || 'landscape';
       const vertical = K === 'tablet' && (ori === 'portrait' || (ori === 'auto' && typeof innerHeight !== 'undefined' && innerHeight > innerWidth));
       const sig = `${K}|${vertical}|${editing()}`;
@@ -430,12 +598,12 @@
       const bl = L.blocks;
       if (K === 'tablet') {
         // columna del plano (0), y las dos columnas de tarjetas
-        set('#v-c0', bl.filter((b) => (b.col || 0) === 0).map((b) => wrapBlock(b, m)).join('') + addSlot(0));
+        set('#v-c0', colHTML(bl.filter((b) => (b.col || 0) === 0), m) + addSlot(0));
         // el resumen va de lado a lado sobre las dos columnas (como en el diseño)
         const top = (b) => b.type === 'kpis' && (b.col || 0) !== 0;
-        set('#v-top', bl.filter(top).map((b) => wrapBlock(b, m)).join(''));
-        set('#v-c1', bl.filter((b) => b.col === 1 && !top(b)).map((b) => wrapBlock(b, m)).join('') + addSlot(1));
-        set('#v-c2', bl.filter((b) => b.col === 2 && !top(b)).map((b) => wrapBlock(b, m)).join('') + addSlot(2));
+        set('#v-top', colHTML(bl.filter(top), m));
+        set('#v-c1', colHTML(bl.filter((b) => b.col === 1 && !top(b)), m) + addSlot(1));
+        set('#v-c2', colHTML(bl.filter((b) => b.col === 2 && !top(b)), m) + addSlot(2));
         fit(vertical);
         const c = card();
         const p = drawPlayer();
@@ -445,7 +613,7 @@
             : k === 'musica' ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`
             : `<button class="${j === 0 ? 'on' : ''}" data-scr="${k}">${ic(i)}${t2}</button>`)).join(''));
       } else {
-        set('#v-c1', bl.map((b) => wrapBlock(b, m)).join('') + addSlot(0));
+        set('#v-c1', colHTML(bl, m) + addSlot(0));
         set('#v-allb', `${ic('grid')}Toda la casa`);
         // reproductor: sólo con música; se esconde al botón Música
         const p = drawPlayer();
@@ -576,6 +744,16 @@
       const mp = t.closest('[data-mp]'); if (mp) { vib(); return c.call('media_player', 'media_play_pause', { entity_id: mp.dataset.mp }); }
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
       const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, 1);
+      if (t.closest('[data-bri]')) return undefined; // el brillo se maneja al soltar (change)
+      const ct = t.closest('[data-ctemp]'); if (ct) {
+        const s = st(ct.dataset.ctemp); if (!s) return undefined;
+        const a = s.attributes, step = Number(a.target_temp_step) || 1, cur = Number(a.temperature != null ? a.temperature : a.current_temperature || 24);
+        const v = Math.max(Number(a.min_temp) || 10, Math.min(Number(a.max_temp) || 32, Math.round((cur + step * +ct.dataset.d) * 10) / 10));
+        vib(); return c.call('climate', 'set_temperature', { entity_id: ct.dataset.ctemp, temperature: v });
+      }
+      const cv = t.closest('[data-cov]'); if (cv) { vib(); return c.call('cover', cv.dataset.cov, { entity_id: cv.dataset.id }); }
+      const bt = t.closest('[data-btap]'); if (bt) { const b = blockOf(bt); if (b && b.cfg && b.cfg.tap) run(b.cfg.tap, { entity: b.cfg.entity, name: b.title }); return undefined; }
+      const mo = t.closest('[data-more]'); if (mo) return ctx.openEntity(mo.dataset.more);
       const cam = t.closest('[data-cam]'); if (cam) return openCam(cam.dataset.cam);
       const z = t.closest('[data-zone]'); if (z) { const zz = X.zonePolys[+z.dataset.zone]; if (zz && zz.lights.length) { const any = zz.lights.some((id) => (st(id) || {}).state === 'on'); vib(); c.call('homeassistant', any ? 'turn_off' : 'turn_on', { entity_id: zz.lights }); toast(`${zz.name}: ${any ? 'apagado' : 'prendido'}`); } else if (zz && zz.room) { const r = roomByName(m, zz.room); if (r) c.openRoom(r.id); } return; }
       const room = t.closest('[data-room]'); if (room) { if (X.sheet === 'casa') closeSheet(); return c.openRoom(room.dataset.room); }
@@ -623,6 +801,15 @@
     el.addEventListener('pointerdown', onDown);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, onUp));
     el.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-room],[data-zone],[data-it]')) e.preventDefault(); });
+    // brillo de las luces: se manda al soltar el deslizador
+    el.addEventListener('pointerdown', (e) => { if (!editing() && e.target.closest && e.target.closest('[data-bri]')) X.sliding = true; }, true);
+    el.addEventListener('change', (e) => {
+      const r = e.target.closest && e.target.closest('[data-bri]'); X.sliding = false;
+      if (!r || editing()) return;
+      const c = card(); if (c) { vib(); c.call('light', 'turn_on', { entity_id: r.dataset.bri, brightness_pct: Math.max(1, Math.min(100, +r.value || 1)) }); }
+    });
+    const endSlide = () => { if (X.sliding) { X.sliding = false; setTimeout(render, 400); } };
+    ['pointerup', 'pointercancel'].forEach((ev) => { if (typeof addEventListener === 'function') addEventListener(ev, endSlide); });
     // editor: las tarjetas se arrastran dentro de la vista previa (antes o después de otra, o a una columna vacía)
     let dragId = null;
     const colOfEl = (x) => {
@@ -675,5 +862,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, ICONS, icon: ic, uid };
+  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, CONDITIONS, ICONS, icon: ic, uid };
 })(typeof window !== 'undefined' ? window : globalThis);
