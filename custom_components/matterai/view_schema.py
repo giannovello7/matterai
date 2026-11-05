@@ -76,6 +76,7 @@ ITEM = vol.Schema({
     vol.Optional("icon"): vol.Any(None, _icon),
     vol.Optional("entity"): vol.Any(None, cv.entity_id),
     vol.Optional("kind"): vol.Any(None, vol.In(KPI_KINDS)),
+    vol.Optional("mode"): vol.Any(None, vol.In(["toggle", "run"])),  # rutinas: interruptor o «Ejecutar»
     vol.Optional("tap"): ACTION,
     vol.Optional("hold"): ACTION,
 }, extra=vol.REMOVE_EXTRA)

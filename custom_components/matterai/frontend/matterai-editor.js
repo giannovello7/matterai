@@ -31,6 +31,12 @@
     camera: ['camera'], gate: ['cover', 'lock'], alarm: ['alarm_control_panel'], lock: ['lock'], away: ['input_boolean', 'switch', 'scene', 'script'],
     scenes: ['scene', 'script'], routines: ['automation'], any: null,
   };
+  /* Tarjetas con elementos adentro: [singular, plural, dominios que se ofrecen al agregar] */
+  const ELEM = {
+    kpis: ['dato', 'Datos', null], scenes: ['escena', 'Escenas', ['scene', 'script']], routines: ['rutina', 'Rutinas', ['automation', 'script']],
+    covers: ['cortina', 'Cortinas', ['cover']], lights: ['luz', 'Luces', ['light', 'switch']], buttons: ['botón', 'Botones', null],
+    rooms: ['ambiente', 'Ambientes', null], camera: ['botón', 'Botones', null], featured: [null, null, null],
+  };
   const CSS = `
   .ed{position:fixed;inset:0;z-index:50;display:grid;grid-template-columns:290px 1fr 340px;grid-template-rows:auto 1fr;background:#11151a;color:#e9ecf2;font:14px/1.4 "Red Hat Display",system-ui,sans-serif}
   .ed *{box-sizing:border-box}.ed button{font:inherit;color:inherit;cursor:pointer}
@@ -103,6 +109,15 @@
   .it.focus{border-color:#f2b766;box-shadow:0 0 0 1px #f2b766}
   .guide{padding:14px;border-radius:14px;background:#1e242e;border:1px solid rgba(160,175,200,.15);margin-bottom:12px}.guide b{display:block;margin-bottom:6px}
   .guide ol{margin:0;padding-left:18px;color:#c4cad6;font-size:13px;line-height:1.6}
+  .autobox{padding:10px 12px;border-radius:10px;background:rgba(124,196,240,.08);border:1px solid rgba(124,196,240,.3);font-size:12.5px;color:#c4cad6;margin-bottom:10px}
+  .elist{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
+  .elr{display:flex;align-items:center;gap:4px;padding:8px 6px 8px 10px;border-radius:10px;background:#1e242e;border:1px solid transparent;cursor:pointer}
+  .elr:hover{border-color:rgba(242,183,102,.5)}.elr .tx{flex:1;min-width:0}.elr b{display:block;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .elr small{display:block;color:#8f99ab;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .elr button{flex:none;border:0;background:none;color:#8f99ab;padding:3px 6px;border-radius:6px}.elr button:hover{background:#262e3a;color:#e9ecf2}.elr .go{color:#8f99ab;padding:0 4px}
+  .addb{margin-right:6px;border-color:rgba(242,183,102,.5);color:#f2b766}
+  .crumb{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:13px;color:#8f99ab;min-width:0}.crumb span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .elnav{display:flex;gap:6px;flex-wrap:wrap;margin-top:14px}
   .eseg.sim{align-items:center}.eseg.sim .lbl{padding:0 6px 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8f99ab}
   .eseg.sim button.on{background:#f2b766;color:#1b1408}
   .mbody{overflow:auto;padding:12px 16px 16px}
@@ -205,7 +220,7 @@
       if (act === 'dup') return this.change(() => { const nb = clone(B[i]); nb.id = this.newId(nb.type); B.splice(i + 1, 0, nb); this.sel = nb.id; });
       if (act === 'del') {
         const name = (window.MaeVista.CATALOG[B[i].type] || {}).name || B[i].type;
-        this.change(() => { B.splice(i, 1); if (this.sel === id) { this.sel = null; this.roomEd = null; this.rdraft = null; } });
+        this.change(() => { B.splice(i, 1); if (this.sel === id) { this.sel = null; this.el = null; this.roomEd = null; this.rdraft = null; } });
         this.toast(`Tarjeta «${name}» borrada · Ctrl+Z para deshacer`);
       }
       return undefined;
@@ -410,7 +425,8 @@
     /** Lo que la vista previa puede hacer en el editor: elegir, la barra de la tarjeta, arrastrar y agregar. */
     editCtx() {
       const R = this.rdraft;
-      return { selected: this.sel, onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
+      return { selected: this.sel, el: this.el != null ? this.el : null, onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
+        onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col), onRoom: (a, i) => this.roomAct(a, i),
         room: R ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
     }
@@ -419,6 +435,10 @@
       id = id || null;
       if (id !== this.sel || !(sub && sub.room)) { this.roomEd = null; this.rdraft = null; }
       this.sel = id; this.focus = sub && sub.item != null ? sub.item : null;
+      this.el = sub && sub.el != null ? sub.el : null;
+      // tocar algo de adentro de una tarjeta automática la arma a mano con lo mismo que se ve (para poder editarlo)
+      const bb = this.selBlock();
+      if (bb && this.el != null && this.el !== 'cam' && this.isAuto(bb)) { this.push(); this.materialize(bb); }
       if (sub && sub.room) {
         const r = (this.model() || { byId: {} }).byId[sub.room];
         if (r) { this.roomEd = r.name; this.rdraft = null; this.ensureDraft(); }
@@ -578,41 +598,32 @@
       b.cfg = b.cfg || {};
       const c = b.cfg, CAT = window.MaeVista.CATALOG, m = this.model();
       const S = this.states(), opts = (doms) => Object.keys(S).filter((e) => doms.includes(e.split('.')[0])).sort().map((e) => [e, this.fname(e)]);
+      if (this.el != null && b.type !== 'rooms') { r.innerHTML = this.elemEditor(b, this.el, opts); return; }
       let h = `<h4>${esc((CAT[b.type] || {}).name || b.type)}</h4><label class="fld"><span>Título (vacío: sin título)</span><input data-f="title" value="${esc(b.title || '')}"></label>`;
       const autoChk = (txt) => `<label class="chk"><input type="checkbox" data-fb="cfg.auto" ${c.auto ? 'checked' : ''}> ${txt}</label>`;
       switch (b.type) {
-        case 'kpis': h += autoChk('Automático (lo elige la app según la casa)') + (c.auto ? '' : this.items(b, { title: 'Datos', kpi: true, hold: false })); break;
+        case 'kpis': h += this.elemSection(b); break;
         case 'featured': case 'camera':
-          h += this.ent('Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate');
-          h += this.multi('Más cámaras (se pasan con «Otra cámara» o deslizando)', 'entities', c.entities, opts(PICK.camera).filter(([e]) => e !== c.entity));
-          if (b.type === 'camera') h += this.items(b, { title: 'Botones extra', hold: true });
+          h += this.camFields(b, opts);
+          if (b.type === 'camera') h += this.elemSection(b);
           break;
         case 'rooms':
           h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="list" ${c.style !== 'grid' ? 'selected' : ''}>Lista</option><option value="grid" ${c.style === 'grid' ? 'selected' : ''}>Grilla</option></select></label>`;
           if (this.roomEd != null) { r.innerHTML = this.roomEditor(); return; }
-          h += this.multi('Ambientes (en este orden)', 'rooms', (c.rooms && c.rooms.length) ? c.rooms : (m ? m.rooms.slice(0, 4).map((x) => x.name) : []), (m ? m.rooms : []).map((x) => [x.name, x.name]));
+          h += this.elemSection(b);
           h += '<p class="hint">Cada persona también puede fijar o sacar ambientes desde su celular (mantener apretado).</p>';
-          h += `<h4>Qué hay adentro de cada ambiente</h4><div class="rlist">${(m ? m.rooms : []).map((x) => `<button class="eb sm" data-red="${esc(x.name)}"><span>${esc(x.name)}</span><span class="hint">Editar ›</span></button>`).join('')}
-            <button class="eb sm" data-red="">+ Ambiente nuevo</button></div>`;
           break;
-        case 'scenes': h += autoChk('Todas las escenas de la casa') + (c.auto ? '' : this.multi('Escenas (en este orden)', 'entities', c.entities, opts(PICK.scenes))); break;
-        case 'routines': h += autoChk('Las primeras automatizaciones') + (c.auto ? '' : this.multi('Automatizaciones', 'entities', c.entities, opts(PICK.routines))); break;
+        case 'scenes': case 'routines': h += this.elemSection(b); break;
         case 'buttons':
           h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="grid" ${c.style !== 'list' ? 'selected' : ''}>Grilla</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Lista</option></select></label>`;
-          h += this.items(b, { title: 'Botones', hold: true }); break;
+          h += this.elemSection(b); break;
         case 'alarm': h += this.ent('Alarma (vacío: la de la casa)', 'al', c.entity, PICK.alarm, 'cfg.entity'); break;
         case 'away': h += this.ent('Interruptor, escena o script', 'aw', c.entity, PICK.away, 'cfg.entity'); break;
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
         case 'plan': h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>'; break;
         case 'weather': h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
         case 'climate': h += this.ent('Aire o termostato', 'cl', c.entity, ['climate'], 'cfg.entity'); break;
-        case 'covers': case 'lights': {
-          const dom = b.type === 'covers' ? 'cover' : 'light';
-          h += '<p class="hint">Elegí equipos sueltos, o ambientes (se muestran todos los de esos ambientes). Sin nada: los de la casa.</p>';
-          h += this.multi(b.type === 'covers' ? 'Cortinas' : 'Luces', 'entities', c.entities, opts([dom]));
-          h += this.multi('O los de estos ambientes', 'rooms', c.rooms, (m ? m.rooms : []).map((x) => [x.name, x.name]));
-          break;
-        }
+        case 'covers': case 'lights': h += this.elemSection(b); break;
         case 'energy': h += this.ent('Sensor de consumo (vacío: el de la casa)', 'en', c.entity, ['sensor'], 'cfg.entity'); break;
         case 'sensor':
           h += this.ent('Sensor', 'se', c.entity, ['sensor', 'input_number', 'number'], 'cfg.entity');
@@ -640,6 +651,133 @@
       h += '<h4>Más</h4><button class="eb sm" data-copyto>Copiar esta tarjeta a otro dashboard…</button>';
       r.innerHTML = h;
       const ip = r.querySelector('[data-imgprev]'); if (ip) this.signed(ip.dataset.imgprev).then((u) => { ip.src = u; }).catch(() => {});
+    }
+    /* ───────── elementos de adentro de las tarjetas (como las filas de la tarjeta de entidades de Home Assistant) ───────── */
+    /** ¿La tarjeta muestra lo que elige la app sola? (todavía no está armada a mano) */
+    isAuto(b) {
+      const c = b.cfg || {};
+      if (b.type === 'rooms') return !(c.rooms && c.rooms.length);
+      if (['kpis', 'scenes', 'routines', 'covers', 'lights'].includes(b.type)) return !!c.auto || !((c.items && c.items.length) || (c.entities && c.entities.length));
+      return false;
+    }
+    /** Automática → armada a mano con lo mismo que se está viendo (nada cambia en la pantalla). */
+    materialize(b) {
+      const c = b.cfg = b.cfg || {};
+      const shown = this.vista && this.vista.shown ? this.vista.shown(b.id) : null;
+      if (b.type === 'rooms') { if (!(c.rooms && c.rooms.length)) c.rooms = (shown || (this.model() || { rooms: [] }).rooms.slice(0, 4).map((x) => x.name)).slice(0, 24); c.auto = false; return; }
+      if (b.type === 'kpis') { if (c.auto || !(c.items && c.items.length)) { c.auto = false; c.items = null; this.fromAuto(b); if (shown && shown.length) c.items = clone(shown); } c.auto = false; return; }
+      if (!['scenes', 'routines', 'covers', 'lights'].includes(b.type)) return;
+      if (!(c.items && c.items.length) || c.auto) {
+        const base = !c.auto && c.entities && c.entities.length ? c.entities.map((e) => ({ entity: e })) : (shown || []);
+        c.items = base.slice(0, 24).map((x) => Object.assign({ entity: x.entity }, x.name ? { name: x.name } : {}, x.icon ? { icon: x.icon } : {}, x.mode ? { mode: x.mode } : {}));
+      }
+      delete c.entities; delete c.rooms; c.auto = false;
+    }
+    /** La lista de elementos de la tarjeta (la de verdad, para cambiarla). */
+    elemList(b) {
+      const c = b.cfg = b.cfg || {};
+      if (b.type === 'rooms') return (c.rooms = c.rooms || []);
+      return (c.items = c.items || []);
+    }
+    elemLabel(b, x) {
+      if (b.type === 'rooms') return String(x);
+      if (!x) return '';
+      if (b.type === 'kpis') return x.name || (x.kind === 'entity' ? this.fname(x.entity) : ((KPI_KINDS.find((k) => k[0] === x.kind) || [, x.kind])[1]));
+      return x.name || (x.entity ? this.fname(x.entity) : 'Botón');
+    }
+    /** Subir, bajar, sacar o agregar un elemento (desde la pantalla del medio o desde el panel). */
+    onElem(id, act, i) {
+      if (this.sel !== id) { this.sel = id; this.roomEd = null; this.rdraft = null; }
+      const b = this.selBlock(); if (!b) return;
+      if (act === 'add') { this.elemAdd(b); return; }
+      if (i == null || i === 'cam') return;
+      this.change(() => {
+        this.materialize(b);
+        const L = this.elemList(b);
+        if (act === 'up' || act === 'down') { const j = i + (act === 'up' ? -1 : 1); if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; this.el = j; }
+        if (act === 'del') { L.splice(i, 1); this.el = null; this.roomEd = null; this.rdraft = null; }
+      });
+    }
+    /** «+ Agregar …» de cada tarjeta: el buscador con lo que tiene sentido para esa tarjeta. */
+    elemAdd(b) {
+      const E = ELEM[b.type]; if (!E) return;
+      const addItem = (it) => this.change(() => { this.materialize(b); const L = this.elemList(b); L.push(it); this.el = L.length - 1; });
+      if (b.type === 'kpis') return addItem({ kind: 'lights' });
+      if (b.type === 'buttons' || b.type === 'camera') return addItem({ tap: { type: 'toggle' } });
+      if (b.type === 'rooms') return this.roomAddDlg(b);
+      return this.openCB(null, E[2], (eid) => {
+        if (!eid) return;
+        const L = (b.cfg.items || []);
+        if (!this.isAuto(b) && L.some((x) => x && x.entity === eid)) { this.toast('Ya está en esta tarjeta'); return; }
+        addItem({ entity: eid });
+      }, false);
+    }
+    roomAddDlg(b) {
+      const m = this.model() || { rooms: [] }, cur = new Set(this.isAuto(b) ? ((this.vista && this.vista.shown && this.vista.shown(b.id)) || []) : (b.cfg.rooms || []));
+      const free = m.rooms.filter((x) => !cur.has(x.name));
+      this.modal('Agregar un ambiente', `<div class="hlist">${free.map((x) => `<div class="hrow"><span><b>${esc(x.name)}</b><small>${x.count || 0} equipos</small></span><button class="eb sm" data-ra="${esc(x.name)}">Agregar</button></div>`).join('') || '<p class="hint">Todos los ambientes de la casa ya están en esta tarjeta.</p>'}
+        <div class="hrow"><span><b>Ambiente nuevo</b><small>Lo creás y elegís sus equipos</small></span><button class="eb sm" data-ra="">Crear</button></div></div>`, (e) => {
+        const ra = e.target.closest('[data-ra]'); if (!ra) return;
+        this.closeCatalog();
+        if (!ra.dataset.ra) { this.roomEd = ''; this.rdraft = null; this.el = null; this.ensureDraft(); this.newRoomFor = b.id; this.drawProps(); this.syncPreview(); this.bind(); return; }
+        this.change(() => { this.materialize(b); const L = this.elemList(b); L.push(ra.dataset.ra); this.el = L.length - 1; });
+      });
+    }
+    /** Panel de la tarjeta: su lista de elementos (como el editor de la tarjeta de entidades). */
+    elemSection(b) {
+      const E = ELEM[b.type]; if (!E || !E[0]) return '';
+      const auto = this.isAuto(b);
+      const L = auto ? ((this.vista && this.vista.shown && this.vista.shown(b.id)) || []) : this.elemList(b);
+      const m = this.model();
+      const sub = (x) => {
+        if (b.type === 'rooms') { const r = m && m.rooms.find((y) => y.name === x); return r ? `${r.count || 0} equipos` : 'no existe en la casa'; }
+        if (x && x.entity) return `${x.entity}${this.states()[x.entity] ? '' : ' · no existe'}`;
+        if (b.type === 'kpis') return 'dato del resumen';
+        return x && x.tap ? (ACTION_TYPES.find((a) => a[0] === x.tap.type) || [, ''])[1] : '';
+      };
+      return `<h4>${esc(E[1])}</h4>
+        ${auto ? '<div class="autobox"><b>Automático:</b> la app elige qué mostrar según la casa. Tocá cualquiera (acá o en la pantalla) y queda armada a mano para cambiarla.</div>' : ''}
+        <div class="elist">${L.map((x, i) => `<div class="elr" data-elpick="${i}"><span class="tx"><b>${esc(this.elemLabel(b, x))}</b><small>${esc(sub(x))}</small></span>
+          <button data-elact2="up" data-i="${i}" title="Subir">↑</button><button data-elact2="down" data-i="${i}" title="Bajar">↓</button><button data-elact2="del" data-i="${i}" title="Sacar">✕</button><span class="go">›</span></div>`).join('') || `<p class="hint">Todavía no hay ${esc(E[1].toLowerCase())}.</p>`}</div>
+        <button class="eb sm addb" data-eladd2>+ Agregar ${esc(E[0])}</button>
+        ${!auto && ['kpis', 'scenes', 'routines', 'covers', 'lights', 'rooms'].includes(b.type) ? '<button class="eb sm" data-toauto title="Que la app vuelva a elegir sola">Volver a automático</button>' : ''}`;
+    }
+    /** Campos de la cámara (la cámara principal, el botón grande y las demás cámaras). */
+    camFields(b, opts) {
+      const c = b.cfg;
+      return this.ent('Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate')
+        + this.multi('Más cámaras (se pasan con «Otra cámara» o deslizando)', 'entities', c.entities, opts(PICK.camera).filter(([e]) => e !== c.entity));
+    }
+    /** Campos de un dato del resumen o de un botón. */
+    itemFields(b, i, o) {
+      const it = (b.cfg.items || [])[i] || {}, ICONS = window.MaeVista.ICONS;
+      return `${o.kpi ? `<label class="fld"><span>Qué muestra</span><select data-f="cfg.items.${i}.kind">${KPI_KINDS.map(([k, l]) => `<option value="${k}" ${it.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+        ${!o.kpi || it.kind === 'entity' ? this.ent(o.kpi ? 'Equipo' : 'Equipo (opcional)', 'it', it.entity, o.doms || null, `cfg.items.${i}.entity`) : ''}
+        <label class="fld"><span>Nombre (vacío: el del equipo)</span><input data-f="cfg.items.${i}.name" value="${esc(it.name || '')}" maxlength="60"></label>
+        ${o.icon === false ? '' : `<label class="fld"><span>Ícono</span><select data-f="cfg.items.${i}.icon"><option value="">Automático</option>${ICONS.map((n) => `<option ${it.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`}
+        ${o.mode ? `<label class="fld"><span>Cómo se muestra</span><select data-f="cfg.items.${i}.mode"><option value="">Interruptor (activar o desactivar)</option><option value="run" ${it.mode === 'run' ? 'selected' : ''}>Botón «Ejecutar» (la hace ahora)</option></select></label>` : ''}
+        ${o.tap === false ? '' : this.action(it.tap, `cfg.items.${i}.tap`, 'Al tocar')}${o.hold ? this.action(it.hold, `cfg.items.${i}.hold`, 'Al mantener apretado') : ''}`;
+    }
+    /** Panel de un elemento: «Tarjeta › elemento», sus campos y moverlo o sacarlo. */
+    elemEditor(b, i, opts) {
+      const CAT = window.MaeVista.CATALOG, cardName = b.title || (CAT[b.type] || {}).name || b.type;
+      const back = `<div class="crumb"><button class="eb sm" data-elback>‹ ${esc(cardName)}</button>`;
+      if (i === 'cam') return `${back}<span>› Cámara</span></div><h4>Cámara</h4>${this.camFields(b, opts)}`;
+      const L = this.elemList(b), x = L[i];
+      if (x == null) { this.el = null; return `${back}</div><p class="hint">Ese elemento ya no está.</p>`; }
+      let f = '';
+      switch (b.type) {
+        case 'kpis': f = this.itemFields(b, i, { kpi: true }); break;
+        case 'buttons': case 'camera': f = this.itemFields(b, i, { hold: true }); break;
+        case 'scenes': f = this.itemFields(b, i, { doms: ['scene', 'script'], tap: false }); break;
+        case 'routines': f = this.itemFields(b, i, { doms: ['automation', 'script'], tap: false, icon: false, mode: true }); break;
+        case 'covers': f = this.itemFields(b, i, { doms: ['cover'], tap: false, icon: false }); break;
+        case 'lights': f = this.itemFields(b, i, { doms: ['light', 'switch'], tap: false, icon: false }); break;
+        default: f = '';
+      }
+      return `${back}<span>› ${esc(this.elemLabel(b, x))}</span></div><h4>${esc((ELEM[b.type] || ['Elemento'])[0] || 'Elemento')}</h4>${f}
+        <div class="elnav"><button class="eb sm" data-elact2="up" data-i="${i}" ${i > 0 ? '' : 'disabled'}>↑ Subir</button><button class="eb sm" data-elact2="down" data-i="${i}" ${i < L.length - 1 ? '' : 'disabled'}>↓ Bajar</button>
+          <button class="eb sm warn" data-elact2="del" data-i="${i}">Sacar de la tarjeta</button></div>`;
     }
     /** «Mostrar sólo si…»: condiciones como la tarjeta condicional de Home Assistant (se cumplen todas). */
     condEditor(b) {
@@ -700,6 +838,11 @@
           Object.values(this.v.layouts || {}).forEach((l) => (l && l.blocks || []).forEach((b) => { if (b.cfg && Array.isArray(b.cfg.rooms)) b.cfg.rooms = b.cfg.rooms.map((n) => (n === orig ? R.name : n)); if (b.cfg && b.cfg.tap && b.cfg.tap.room === orig) b.cfg.tap.room = R.name; (b.cfg && b.cfg.items || []).forEach((it) => { ['tap', 'hold'].forEach((k) => { if (it[k] && it[k].room === orig) it[k].room = R.name; }); }); }));
           ((this.v.plan || {}).zones || []).forEach((z) => { if (z.room === orig) z.room = R.name; });
         }
+        if (!del && orig == null && this.newRoomFor) {
+          const bb = this.blocks().find((x) => x.id === this.newRoomFor);
+          if (bb) { this.push(); this.materialize(bb); this.elemList(bb).push(R.name); }
+        }
+        this.newRoomFor = null;
         this.toast(del ? 'Ambiente borrado' : 'Ambiente guardado: ya se ve en la app');
         this.roomEd = null; this.rdraft = null; setTimeout(() => this.draw(), 150); this.syncPreview();
       } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
@@ -819,6 +962,22 @@
       W.querySelectorAll('#edr [data-mk]').forEach((x) => { x.onchange = () => this.change(() => { const k = x.dataset.mk, m0 = this.model();
         if (k === 'rooms' && b.type === 'rooms' && !(b.cfg.rooms && b.cfg.rooms.length) && m0) b.cfg.rooms = m0.rooms.slice(0, 4).map((r) => r.name); // parte de lo que se ve
         const L = (b.cfg[k] = b.cfg[k] || []); if (x.checked) { if (!L.includes(x.value)) L.push(x.value); } else b.cfg[k] = L.filter((y) => y !== x.value); }); });
+      W.querySelectorAll('#edr [data-elback]').forEach((x) => { x.onclick = () => { this.el = null; this.drawProps(); this.syncPreview(); this.bind(); }; });
+      W.querySelectorAll('#edr [data-elact2]').forEach((x) => { x.onclick = (e) => { e.stopPropagation(); this.onElem(this.sel, x.dataset.elact2, +x.dataset.i); }; });
+      W.querySelectorAll('#edr [data-elpick]').forEach((x) => { x.onclick = () => {
+        const i = +x.dataset.elpick, bb = this.selBlock();
+        if (bb && bb.type === 'rooms') {
+          const nm = this.isAuto(bb) ? ((this.vista && this.vista.shown && this.vista.shown(bb.id)) || [])[i] : (bb.cfg.rooms || [])[i];
+          const rr = (this.model() || { rooms: [] }).rooms.find((y) => y.name === nm);
+          return this.pick(bb.id, rr ? { el: i, room: rr.id } : { el: i });
+        }
+        return this.pick(this.sel, { el: i });
+      }; });
+      W.querySelectorAll('#edr [data-eladd2]').forEach((x) => { x.onclick = () => { const bb = this.selBlock(); if (bb) this.elemAdd(bb); }; });
+      W.querySelectorAll('#edr [data-toauto]').forEach((x) => { x.onclick = () => this.change(() => {
+        const c = b.cfg; delete c.items; delete c.entities; delete c.rooms; c.auto = true; this.el = null;
+        if (b.type === 'rooms') delete c.auto;
+      }); });
       W.querySelectorAll('#edr [data-cadd]').forEach((x) => { x.onclick = () => this.change(() => { b.show = b.show || []; if (b.show.length < 6) b.show.push({ type: 'night' }); }); });
       W.querySelectorAll('#edr [data-cdel]').forEach((x) => { x.onclick = () => this.change(() => { b.show.splice(+x.dataset.cdel, 1); if (!b.show.length) delete b.show; }); });
       W.querySelectorAll('#edr [data-copyto]').forEach((x) => { x.onclick = () => this.copyTo(b); });
@@ -945,6 +1104,24 @@
       walk(blocks);
       return [...out];
     }
+    /** Una plantilla de otra casa se adapta a esta: lo que no existe se saca, y la tarjeta que queda vacía vuelve a
+     *  automático (se arma sola con los equipos, ambientes, escenas y rutinas de ESTA casa). */
+    adaptBlocks(blocks) {
+      const S = this.states(), has = (id) => !!(id && S[id]), m = this.model() || { rooms: [] };
+      const rooms = new Set(m.rooms.map((r) => r.name));
+      (blocks || []).forEach((b) => {
+        const c = b.cfg = b.cfg || {};
+        ['entity', 'gate'].forEach((k) => { if (c[k] && !has(c[k])) delete c[k]; });
+        if (Array.isArray(c.entities)) c.entities = c.entities.filter(has);
+        if (Array.isArray(c.items)) c.items = c.items.filter((x) => !x || !x.entity || has(x.entity) || (b.type === 'kpis' && x.kind !== 'entity'));
+        if (Array.isArray(c.rooms)) c.rooms = c.rooms.filter((n) => rooms.has(n));
+        if (Array.isArray(b.show)) { b.show = b.show.filter((q) => !q.entity || has(q.entity)); if (!b.show.length) delete b.show; }
+        const empty = (k) => !(Array.isArray(c[k]) && c[k].length);
+        if (['kpis', 'scenes', 'routines', 'covers', 'lights'].includes(b.type) && empty('items') && empty('entities')) { delete c.items; delete c.entities; c.auto = true; }
+        if (b.type === 'rooms' && empty('rooms')) delete c.rooms;
+      });
+      return blocks;
+    }
     /** Plantilla: el diseño (celular y tablet) en un archivo, para usarlo en otra casa. El plano no va (es de esta casa). */
     exportDesign() {
       const L = this.v.layouts || {}, keep = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: L[k].orientation || null } : null);
@@ -972,9 +1149,10 @@
         });
         if (!L.phone && !L.tablet) { this.toast('La plantilla no tiene tarjetas'); return; }
         if (!confirm(`¿Reemplazar el diseño por la plantilla «${d.name || 'sin nombre'}»? (Se puede deshacer)`)) return;
-        this.change(() => { this.v.layouts = Object.assign({}, this.v.layouts, L); this.sel = null; });
         const miss = Editor.entitiesIn(L).filter((id) => !this.states()[id]);
-        this.toast(miss.length ? `Plantilla cargada. ${miss.length} equipo${miss.length > 1 ? 's' : ''} no existe${miss.length > 1 ? 'n' : ''} en esta casa: elegilos de nuevo en cada tarjeta` : 'Plantilla cargada: revisala y guardá');
+        Object.values(L).forEach((l) => this.adaptBlocks(l.blocks));
+        this.change(() => { this.v.layouts = Object.assign({}, this.v.layouts, L); this.sel = null; this.el = null; });
+        this.toast(miss.length ? `Plantilla adaptada a esta casa: ${miss.length} equipo${miss.length > 1 ? 's' : ''} de la otra casa no estaba${miss.length > 1 ? 'n' : ''}; esas tarjetas quedaron en automático o para elegir` : 'Plantilla cargada: revisala y guardá');
       };
       inp.click();
     }

@@ -225,6 +225,18 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-ret{display:flex;gap:2px;flex:none}.v-ret button{width:30px;height:30px;border-radius:9px!important;display:grid!important;place-items:center;color:var(--muted)}
 .v-ret button:hover{background:var(--card2)!important;color:var(--fg)}.v-ret .i{width:16px;height:16px}
 .v-rsave{display:block;width:100%;margin-top:4px;padding:13px!important;border-radius:14px;background:var(--warm)!important;color:#1b1408!important;font-weight:700!important;text-align:center!important}
+.vista.editing .v-b [data-el],.vista.editing .v-b .v-ehandle,.vista.editing .v-b .v-ehandle *,.vista.editing .v-b .v-eltool,.vista.editing .v-b .v-eltool *,.vista.editing .v-b .v-eladd{pointer-events:auto}
+.vista.editing .v-b [data-el]{cursor:pointer}
+.vista.editing .v-b [data-el]:hover{box-shadow:0 0 0 2px rgba(242,183,102,.55)}
+.vista.editing .v-b [data-elsel]{box-shadow:0 0 0 2px var(--warm)!important}
+.vista.editing .v-b.elsel{outline-style:dashed}
+.v-ehandle{position:absolute;z-index:4;top:-12px;left:-10px;width:26px;height:26px;border-radius:8px;display:none;place-items:center;background:var(--card2);border:1px solid var(--line);color:var(--muted);cursor:grab}
+.vista.editing .v-b:hover>.v-ehandle,.vista.editing .v-b.sel>.v-ehandle{display:grid}.v-ehandle .i{width:14px;height:14px}
+.vista.editing .v-b.sel .v-etool{left:22px}
+.v-eltool{position:absolute;z-index:6;display:flex;gap:2px;padding:2px;border-radius:9px;background:var(--warm);box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.v-eltool button{width:26px;height:24px;display:grid;place-items:center;border:0;border-radius:7px;background:none;color:#1b1408;cursor:pointer;padding:0}
+.v-eltool button:hover{background:rgba(0,0,0,.14)}.v-eltool .i{width:15px;height:15px;stroke:#1b1408}
+.v-eladd{display:block;width:100%;margin-top:8px;padding:9px;border-radius:12px;border:1px dashed rgba(242,183,102,.5);background:none;color:var(--warm);font:inherit;font-size:12.5px;font-weight:600;cursor:pointer;text-align:center}
 .vista.editing .v-b.hid{opacity:.4}.vista.editing .v-b.cond .v-btag{border-style:dashed}
 .vista.editing .v-b{position:relative;outline:1px dashed rgba(160,175,200,.35);outline-offset:4px;border-radius:14px;cursor:pointer;min-height:40px;margin-bottom:6px}
 .vista.editing .v-b:hover{outline-color:rgba(242,183,102,.6)}

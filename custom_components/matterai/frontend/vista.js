@@ -128,7 +128,7 @@
 
   /* ───────── una instancia por pantalla ───────── */
   function create(el, ctx) {
-    const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, hist: {}, simOver: null,
+    const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, hist: {}, simOver: null, shown: {}, curB: null,
       dismissed: new Set(load('matterai.vista.dismissed', [])) };
     const card = () => ctx.card;
     const hass = () => ctx.hass && ctx.hass();
@@ -274,20 +274,31 @@
         ico = it.icon || defIcon(it.entity); lbl = it.name || fname(it.entity).split(' ').slice(0, 2).join(' '); val = s.txt;
         cls = g ? (g.open ? 'r' : 'g') : s.on ? 'w' : ''; alert = !!(g && g.open); tap = tap || { type: 'toggle', entity: it.entity };
       } else return '';
-      return `<button class="v-kpi ${alert ? 'alert' : ''}" data-kt="${i}"><span class="l">${ic(it.icon || ico)}<span>${esc(lbl)}</span></span><span class="v ${cls}">${esc(val)}</span></button>`;
+      return `<button class="v-kpi ${alert ? 'alert' : ''}" data-kt="${i}"${EL(i)}><span class="l">${ic(it.icon || ico)}<span>${esc(lbl)}</span></span><span class="v ${cls}">${esc(val)}</span></button>`;
     }
-    function roomRow(r, mark) {
+    /* Editor: cada cosa de adentro de una tarjeta (un dato, una escena, un ambiente…) se toca, se elige y se edita sola */
+    const EL = (i) => (editing() ? ` data-el="${i}"${ctx.edit.selected === X.curB && ctx.edit.el != null && String(ctx.edit.el) === String(i) ? ' data-elsel="1"' : ''}` : '');
+    const elAdd = (txt) => (editing() && ctx.edit.selected === X.curB ? `<button class="v-eladd" data-eladd="1">+ ${esc(txt)}</button>` : '');
+    /** La lista de una tarjeta: la armada a mano (con nombre, ícono, modo) o la que elige la app sola. */
+    function listOf(c, autoIds, max) {
+      if (!c.auto && c.items && c.items.length) return c.items.filter((x) => x && x.entity);
+      if (!c.auto && c.entities && c.entities.length) return c.entities.map((e) => ({ entity: e }));
+      return autoIds.filter((id) => st(id)).slice(0, max || 24).map((e) => ({ entity: e }));
+    }
+    const nameIn = (c, id) => { const x = (c.items || []).find((y) => y && y.entity === id); return (x && x.name) || ''; };
+    function roomRow(r, mark, i) {
       const n = r.lightsOn.length, hasL = r.lightsCtl.length > 0, bits = [n ? `${n} prendida${n > 1 ? 's' : ''}` : (r.count ? 'Apagado' : '')];
       if (r.temp != null) bits.push(`${dec(r.temp)}°`);
-      return `<div class="v-room${mark ? ' mark' : ''}" data-room="${esc(r.id)}"><span class="v-ric ${n ? 'on' : ''}">${ic(roomIc(r))}</span><span class="v-tx"><b>${esc(r.name)}</b><span>${esc(bits.filter(Boolean).join(' · ') || 'Ver')}</span></span>${hasL ? `<button class="v-pw ${n ? 'on' : ''}" data-tog="${esc(r.id)}" aria-label="Luces de ${esc(r.name)}"></button>` : `<span class="v-chev">${ic('chev')}</span>`}</div>`;
+      return `<div class="v-room${mark ? ' mark' : ''}" data-room="${esc(r.id)}"${i != null ? EL(i) : ''}><span class="v-ric ${n ? 'on' : ''}">${ic(roomIc(r))}</span><span class="v-tx"><b>${esc(r.name)}</b><span>${esc(bits.filter(Boolean).join(' · ') || 'Ver')}</span></span>${hasL ? `<button class="v-pw ${n ? 'on' : ''}" data-tog="${esc(r.id)}" aria-label="Luces de ${esc(r.name)}"></button>` : `<span class="v-chev">${ic('chev')}</span>`}</div>`;
     }
-    function roomTile(r) {
+    function roomTile(r, i) {
       const n = r.lightsOn.length;
-      return `<div class="v-tile ${n ? 'lit' : ''}" data-room="${esc(r.id)}"><span class="v-tic">${ic(roomIc(r))}</span><b>${esc(r.name)}</b><span>${n ? `${n} prendida${n > 1 ? 's' : ''}` : 'Apagado'}</span></div>`;
+      return `<div class="v-tile ${n ? 'lit' : ''}" data-room="${esc(r.id)}"${i != null ? EL(i) : ''}><span class="v-tic">${ic(roomIc(r))}</span><b>${esc(r.name)}</b><span>${n ? `${n} prendida${n > 1 ? 's' : ''}` : 'Apagado'}</span></div>`;
     }
     const camSrc = (id) => { const s = st(id); return s && s.attributes.entity_picture ? url(s.attributes.entity_picture) + (s.attributes.entity_picture.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 10000) : ''; };
     /** Equipos de una tarjeta: los elegidos, o los de los ambientes elegidos, o los de la casa (hasta 8). */
     function entsOf(c, m, dom, roomKey) {
+      if (!c.auto && c.items && c.items.length) return c.items.map((x) => x && x.entity).filter((id) => id && st(id));
       if (c.entities && c.entities.length) return c.entities.filter((id) => st(id));
       const S = (hass() || {}).states || {};
       const rooms = c.rooms && c.rooms.length ? c.rooms.map((n) => roomByName(m, n)).filter(Boolean) : null;
@@ -362,40 +373,44 @@
       switch (b.type) {
         case 'kpis': {
           const items = (c.items && c.items.length && !c.auto) ? c.items : kpiAuto(m, K);
-          X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items;
-          return `${t}<div class="v-kpis n${Math.min(items.length, K === 'tablet' ? 6 : 3)}">${items.map((it, i) => kpi(m, it, i)).join('')}</div>`;
+          X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items; X.shown[b.id] = items;
+          return `${t}<div class="v-kpis n${Math.min(items.length, K === 'tablet' ? 6 : 3)}">${items.map((it, i) => kpi(m, it, i)).join('')}</div>${elAdd('Agregar un dato')}`;
         }
         case 'featured': case 'camera': {
           const list = [c.entity].concat(c.entities || [], m.cams || []).filter((id, i, a) => id && st(id) && a.indexOf(id) === i);
           X.camIdx = X.camIdx || {}; const ci = (X.camIdx[b.id] || 0) % Math.max(list.length, 1); X.camList = X.camList || {}; X.camList[b.id] = list;
           const cam = list[ci] || null, gate = c.gate && st(c.gate) ? c.gate : null;
           const g = gate ? gateState(gate) : null;
-          const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}">${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
-          return `${t}<div class="v-cam">${cam ? `<img class="v-feed" data-cam="${esc(cam)}" alt="" src="${esc(camSrc(cam))}"><span class="v-live"><i></i>EN VIVO</span>` : '<div class="v-feed none"></div>'}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
-            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>`;
+          const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}"${EL(i)}>${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
+          X.shown[b.id] = c.items || [];
+          return `${t}<div class="v-cam">${cam ? `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}"><span class="v-live"><i></i>EN VIVO</span>` : '<div class="v-feed none"></div>'}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
+            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>${elAdd('Agregar un botón')}`;
         }
         case 'rooms': {
           const names = (c.rooms && c.rooms.length) ? c.rooms : m.rooms.slice(0, 4).map((r) => r.name);
-          const list = names.map((n) => roomByName(m, n)).filter(Boolean);
-          X.roomNames = names;
+          const pairs = names.map((n, i) => [roomByName(m, n), i]).filter((p) => p[0]);
+          X.roomNames = names; X.shown[b.id] = names;
           const grid = c.style === 'grid' || (K === 'tablet' && c.style !== 'list');
-          if (!list.length) return `${t}<p class="v-empty">${editing() ? 'Elegí los ambientes en las propiedades de la tarjeta.' : 'Mantené apretado un ambiente en «Toda la casa» para fijarlo acá.'}</p>`;
-          return `${t}<div class="${grid ? 'v-tiles' : 'v-rooms'}">${list.map((r) => (grid ? roomTile(r) : roomRow(r))).join('')}</div>`;
+          if (!pairs.length) return `${t}<p class="v-empty">${editing() ? 'Esta tarjeta no tiene ambientes todavía.' : 'Mantené apretado un ambiente en «Toda la casa» para fijarlo acá.'}</p>${elAdd('Agregar un ambiente')}`;
+          return `${t}<div class="${grid ? 'v-tiles' : 'v-rooms'}">${pairs.map(([r, i]) => (grid ? roomTile(r, i) : roomRow(r, false, i))).join('')}</div>${elAdd('Agregar un ambiente')}`;
         }
         case 'scenes': {
-          const ids = ((c.entities && c.entities.length && !c.auto) ? c.entities : m.scenes).filter((id) => st(id)).slice(0, 12);
-          if (!ids.length) return editing() ? `${t}<p class="v-empty">La casa no tiene escenas: elegilas en las propiedades.</p>` : '';
-          const icn = (id) => (/noche|dormir|night/i.test(fname(id)) ? 'moon' : /cine|pel[ií]cula|tv/i.test(fname(id)) ? 'film' : /sal|me voy|ausen/i.test(fname(id)) ? 'car' : /bienven|lleg/i.test(fname(id)) ? 'home' : /apag/i.test(fname(id)) ? 'power' : 'spark');
-          return `${t}<div class="${K === 'tablet' ? 'v-sgrid' : 'v-scenes'}">${ids.map((id) => `<button class="v-scene" data-scene="${esc(id)}"><span class="v-sic">${ic(icn(id))}</span>${esc(fname(id))}</button>`).join('')}</div>`;
+          const list = listOf(c, m.scenes || [], 12).filter((x) => st(x.entity) || editing());
+          X.shown[b.id] = list;
+          if (!list.length) return editing() ? `${t}<p class="v-empty">La casa no tiene escenas todavía.</p>${elAdd('Agregar una escena')}` : '';
+          const icn = (n) => (/noche|dormir|night/i.test(n) ? 'moon' : /cine|pel[ií]cula|tv/i.test(n) ? 'film' : /sal|me voy|ausen/i.test(n) ? 'car' : /bienven|lleg/i.test(n) ? 'home' : /apag/i.test(n) ? 'power' : 'spark');
+          return `${t}<div class="${K === 'tablet' ? 'v-sgrid' : 'v-scenes'}">${list.map((x, i) => { const n = x.name || fname(x.entity);
+            return `<button class="v-scene" data-scene="${esc(x.entity)}" data-n="${esc(n)}"${EL(i)}><span class="v-sic">${ic(x.icon || icn(n))}</span>${esc(n)}</button>`; }).join('')}</div>${elAdd('Agregar una escena')}`;
         }
         case 'buttons': {
           const items = c.items || [];
-          if (!items.length) return editing() ? `${t}<p class="v-empty">Agregá botones en las propiedades de la tarjeta.</p>` : '';
+          X.shown[b.id] = items;
+          if (!items.length) return editing() ? `${t}<p class="v-empty">Esta tarjeta no tiene botones todavía.</p>${elAdd('Agregar un botón')}` : '';
           const cols = c.style !== 'list' && c.cols ? ` style="grid-template-columns:repeat(${Math.max(1, Math.min(4, +c.cols))},minmax(0,1fr))"` : '';
           return `${t}<div class="v-btns ${c.style === 'list' ? 'list' : ''}"${cols}>${items.map((it, i) => {
             const s = it.entity ? entState(it.entity) : { on: false, txt: it.tap && it.tap.type === 'screen' ? SCREEN_NAMES[it.tap.screen] || '' : '' };
-            return `<button class="v-btn ${s.on ? 'on' : ''}" data-it="${i}"><span class="v-bic">${ic(it.icon || (it.entity ? defIcon(it.entity) : 'spark'))}</span><span class="v-tx"><b>${esc(it.name || fname(it.entity) || 'Botón')}</b><span>${esc(s.txt)}</span></span></button>`;
-          }).join('')}</div>`;
+            return `<button class="v-btn ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}><span class="v-bic">${ic(it.icon || (it.entity ? defIcon(it.entity) : 'spark'))}</span><span class="v-tx"><b>${esc(it.name || fname(it.entity) || 'Botón')}</b><span>${esc(s.txt)}</span></span></button>`;
+          }).join('')}</div>${elAdd('Agregar un botón')}`;
         }
         case 'alarm': {
           const a = (c.entity && st(c.entity)) || m.alarm; if (!a) return editing() ? `${t}<p class="v-empty">La casa no tiene alarma.</p>` : '';
@@ -410,9 +425,12 @@
         }
         case 'routines': {
           const S = (hass() || {}).states || {};
-          const ids = ((c.entities && c.entities.length && !c.auto) ? c.entities : Object.keys(S).filter((x) => x.startsWith('automation.')).slice(0, 4)).filter((x) => S[x]);
-          if (!ids.length) return editing() ? `${t}<p class="v-empty">Elegí las automatizaciones a mostrar.</p>` : '';
-          return `<div class="v-card">${t}<div class="v-rt">${ids.map((id) => `<div class="v-rti"><span class="v-tx"><b>${esc(fname(id))}</b><span>${S[id].attributes.last_triggered ? 'Última: ' + new Date(S[id].attributes.last_triggered).toLocaleString('es-AR', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Nunca se ejecutó'}</span></span><button class="v-pw ${S[id].state === 'on' ? 'on' : ''}" data-auto="${esc(id)}"></button></div>`).join('')}</div></div>`;
+          const list = listOf(c, Object.keys(S).filter((x) => x.startsWith('automation.')), 4).filter((x) => S[x.entity] || editing());
+          X.shown[b.id] = list;
+          if (!list.length) return editing() ? `${t}<p class="v-empty">Esta tarjeta no tiene rutinas todavía.</p>${elAdd('Agregar una rutina')}` : '';
+          const last = (s) => (s && s.attributes.last_triggered ? 'Última: ' + new Date(s.attributes.last_triggered).toLocaleString('es-AR', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Nunca se ejecutó');
+          return `<div class="v-card">${t}<div class="v-rt">${list.map((x, i) => { const s = S[x.entity], run = x.mode === 'run' || x.entity.startsWith('script.');
+            return `<div class="v-rti"${EL(i)}><span class="v-tx"><b>${esc(x.name || fname(x.entity))}</b><span>${esc(s ? last(s) : 'No existe en la casa')}</span></span>${run ? `<button class="v-btn1" data-run="${esc(x.entity)}">Ejecutar</button>` : `<button class="v-pw ${s && s.state === 'on' ? 'on' : ''}" data-auto="${esc(x.entity)}" aria-label="Activar o desactivar"></button>`}</div>`; }).join('')}</div>${elAdd('Agregar una rutina')}</div>`;
         }
         case 'music': {
           const p = player();
@@ -453,24 +471,26 @@
         }
         case 'covers': {
           const ids = entsOf(c, m, 'cover', 'covers').filter((id) => (c.entities && c.entities.length) || !['gate', 'garage', 'door'].includes((st(id) || { attributes: {} }).attributes.device_class));
-          if (!ids.length) return editing() ? `${t}<p class="v-empty">Elegí las cortinas (o un ambiente) en las propiedades.</p>` : '';
-          return `<div class="v-card">${t}<div class="v-list2">${ids.map((id) => {
+          X.shown[b.id] = ids.map((id) => ({ entity: id, name: nameIn(c, id) }));
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">Esta tarjeta no tiene cortinas todavía.</p>${elAdd('Agregar una cortina')}` : '';
+          return `<div class="v-card">${t}<div class="v-list2">${ids.map((id, i) => {
             const s = st(id), p = s.attributes.current_position, mv = ['opening', 'closing'].includes(s.state);
-            return `<div class="v-cov"><span class="v-tx" data-more="${esc(id)}"><b>${esc(fname(id))}</b><span>${esc(mv ? (s.state === 'opening' ? 'Subiendo…' : 'Bajando…') : s.state === 'open' ? (p != null && p < 100 ? `Abierta ${p}%` : 'Abierta') : s.state === 'closed' ? 'Cerrada' : s.state)}</span>
+            return `<div class="v-cov"${EL(i)}><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${esc(mv ? (s.state === 'opening' ? 'Subiendo…' : 'Bajando…') : s.state === 'open' ? (p != null && p < 100 ? `Abierta ${p}%` : 'Abierta') : s.state === 'closed' ? 'Cerrada' : s.state)}</span>
               ${p != null ? `<i class="v-pos"><i style="width:${Math.max(0, Math.min(100, p))}%"></i></i>` : ''}</span>
               <button class="v-cb" data-cov="open_cover" data-id="${esc(id)}" aria-label="Subir">${ic('up')}</button><button class="v-cb" data-cov="stop_cover" data-id="${esc(id)}" aria-label="Parar">${ic('pause')}</button><button class="v-cb" data-cov="close_cover" data-id="${esc(id)}" aria-label="Bajar">${ic('down')}</button></div>`;
-          }).join('')}</div></div>`;
+          }).join('')}</div>${elAdd('Agregar una cortina')}</div>`;
         }
         case 'lights': {
           const ids = entsOf(c, m, 'light', 'lightsCtl');
-          if (!ids.length) return editing() ? `${t}<p class="v-empty">Elegí las luces (o un ambiente) en las propiedades.</p>` : '';
-          return `<div class="v-card">${t}<div class="v-list2">${ids.map((id) => {
+          X.shown[b.id] = ids.map((id) => ({ entity: id, name: nameIn(c, id) }));
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">Esta tarjeta no tiene luces todavía.</p>${elAdd('Agregar una luz')}` : '';
+          return `<div class="v-card">${t}<div class="v-list2">${ids.map((id, i) => {
             const s = st(id), on = s.state === 'on', a = s.attributes, dim = id.startsWith('light.') && (a.brightness != null || (a.supported_color_modes || []).some((x) => x !== 'onoff'));
             const pct = on && a.brightness != null ? Math.max(1, Math.round((a.brightness / 255) * 100)) : 0;
-            return `<div class="v-lt ${on ? 'on' : ''}"><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(fname(id))}</b><span>${on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
+            return `<div class="v-lt ${on ? 'on' : ''}"${EL(i)}><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
               <button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
               ${dim ? `<input class="v-bri" type="range" min="1" max="100" value="${pct || 50}" data-bri="${esc(id)}" aria-label="Brillo de ${esc(fname(id))}">` : ''}</div>`;
-          }).join('')}</div></div>`;
+          }).join('')}</div>${elAdd('Agregar una luz')}</div>`;
         }
         case 'energy': {
           const id = c.entity && st(c.entity) ? c.entity : m.power && m.power.entity_id;
@@ -556,6 +576,7 @@
     function wrapBlock(b, m) {
       const shown = visible(b, m);
       if (!shown && !editing()) return '';
+      X.curB = b.id;
       const inner = block(b, m);
       if (!inner && !editing()) return '';
       const sel = editing() && ctx.edit.selected === b.id;
@@ -564,7 +585,9 @@
       const tool = sel ? `<span class="v-etool">${[['up', 'up', 'Subir'], ['down', 'down', 'Bajar'], ['dup', 'grid', 'Duplicar'], ['del', 'x', 'Borrar']]
         .map(([k, i, t]) => `<button data-eact="${k}" title="${t}" aria-label="${t}">${ic(i)}</button>`).join('')}</span>` : '';
       const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
-      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${editing() ? ' draggable="true"' : ''}>${editing() ? `<span class="v-btag">${tag}</span>${tool}` : ''}${inner}</section>`;
+      // se arrastra sólo desde la manija: tocar adentro elige lo de adentro y nunca mueve la tarjeta
+      const handle = editing() ? `<span class="v-ehandle" draggable="true" title="Arrastrar para mover la tarjeta">${ic('grid')}</span>` : '';
+      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}${sel && ctx.edit.el != null ? ' elsel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${handle}${tool}` : ''}${inner}</section>`;
     }
     /** Una columna: las tarjetas de media columna seguidas van de a dos, una al lado de la otra. */
     function colHTML(list, m) {
@@ -625,6 +648,21 @@
       if (editing() && ctx.edit.room) { if (X.sheet !== 'roomedit') openSheet('roomedit'); }
       else if (X.sheet === 'roomedit') closeSheet();
       if (X.sheet) renderSheet();
+      placeElTool();
+    }
+    /** Editor: barrita arriba del elemento elegido (subir, bajar, sacar). */
+    function placeElTool() {
+      if (!X.el.querySelectorAll || typeof document === 'undefined' || !document.createElement) return;
+      X.el.querySelectorAll('.v-eltool').forEach((x) => x.remove());
+      if (!editing() || ctx.edit.el == null || ctx.edit.el === 'cam') return;
+      const e = X.el.querySelector('[data-elsel]'); if (!e || !e.getBoundingClientRect) return;
+      const sec = e.closest('[data-block]'); if (!sec) return;
+      const r = e.getBoundingClientRect(), rs = sec.getBoundingClientRect();
+      const tb = document.createElement('span');
+      tb.className = 'v-eltool';
+      tb.innerHTML = [['up', 'up', 'Subir'], ['down', 'down', 'Bajar'], ['del', 'x', 'Sacar de la tarjeta']].map(([k, i, tt]) => `<button data-elact="${k}" title="${tt}" aria-label="${tt}">${ic(i)}</button>`).join('');
+      tb.style.left = `${Math.max(0, r.left - rs.left)}px`; tb.style.top = `${Math.max(-12, r.top - rs.top - 30)}px`;
+      sec.appendChild(tb);
     }
     /* La tablet se arma sobre un lienzo de tamaño fijo (como el diseño) y se escala a la pantalla:
      * así se ve igual en una tablet de 8" que en una de 12", sin tarjetas apretadas ni textos cortados. */
@@ -742,11 +780,16 @@
         if (t.closest('#v-sheet')) { if (t.id === 'v-sheet' && ctx.edit.onRoom) ctx.edit.onRoom('close'); return; }
         const ea = t.closest('[data-eact]'), b = t.closest('[data-block]');
         if (ea && b && ctx.edit.onAction) return ctx.edit.onAction(b.dataset.block, ea.dataset.eact);
+        // la barra del elemento elegido y «+ Agregar …» de adentro de la tarjeta
+        const ela = t.closest('[data-elact]'); if (ela && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, ela.dataset.elact, ctx.edit.el);
+        if (t.closest('[data-eladd]') && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, 'add');
         const add = t.closest('[data-eadd]'); if (add && ctx.edit.onAdd) return ctx.edit.onAdd(+add.dataset.eadd);
         // lo que se toca adentro de la tarjeta: un ambiente, un dato del resumen, un botón
         let sub = null;
         const rm = t.closest('[data-room]'), kt = t.closest('[data-kt]'), it = t.closest('[data-it]');
-        if (rm) sub = { room: rm.dataset.room }; else if (kt) sub = { item: +kt.dataset.kt }; else if (it) sub = { item: +it.dataset.it };
+        const elx = t.closest('[data-el]');
+        if (elx) { const v = elx.dataset.el; sub = { el: /^\d+$/.test(v) ? +v : v }; if (rm) sub.room = rm.dataset.room; }
+        else if (rm) sub = { room: rm.dataset.room }; else if (kt) sub = { item: +kt.dataset.kt }; else if (it) sub = { item: +it.dataset.it };
         if (ctx.edit.onSelect) ctx.edit.onSelect(b ? b.dataset.block : null, sub);
         return;
       }
@@ -764,6 +807,7 @@
       const gate = t.closest('[data-gate]'); if (gate) { vib(); return c.access(gate.dataset.gate); }
       const alb = t.closest('[data-alarm]'); if (alb) return openSheet('alarm', alb.dataset.alarm);
       const en = t.closest('[data-ent]'); if (en) { const id = en.dataset.ent, d = id.split('.')[0]; vib(); return c.call(d === 'scene' || d === 'script' ? d : 'homeassistant', d === 'scene' || d === 'script' ? 'turn_on' : 'toggle', { entity_id: id }); }
+      const rn = t.closest('[data-run]'); if (rn) { vib(); const id = rn.dataset.run; toast(`«${fname(id)}» en marcha`); return id.startsWith('script.') ? c.call('script', 'turn_on', { entity_id: id }) : c.call('automation', 'trigger', { entity_id: id }); }
       const au = t.closest('[data-auto]'); if (au) { vib(); const s = st(au.dataset.auto); return c.call('automation', s && s.state === 'on' ? 'turn_off' : 'turn_on', { entity_id: au.dataset.auto }); }
       const mp = t.closest('[data-mp]'); if (mp) { vib(); return c.call('media_player', 'media_play_pause', { entity_id: mp.dataset.mp }); }
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
@@ -878,6 +922,7 @@
     return {
       setView(v) { X.view = v || null; X.cache = {}; X.shell = null; render(); },
       view: () => X.view,
+      shown: (id) => X.shown[id] || null, // lo que muestra cada tarjeta (para pasar de automático a armada a mano)
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
