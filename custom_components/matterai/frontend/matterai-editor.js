@@ -94,7 +94,8 @@
   .slot{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px}.slot img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:#0d1116}.slot span{flex:1}
   .zl{padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px;border:1px solid transparent;cursor:pointer}.zl.sel{border-color:#f2b766}
   .toastE{position:fixed;z-index:70;left:50%;bottom:22px;transform:translateX(-50%);background:#262e3a;border:1px solid rgba(160,175,200,.2);padding:10px 16px;border-radius:12px;display:none}
-  .ed{grid-template-columns:270px minmax(0,1fr) 360px}.ed.nolist{grid-template-columns:0 minmax(0,1fr) 380px}.ed.nolist .ed-l{display:none}
+  .ed{grid-template-columns:270px minmax(0,1fr) 360px}.ed.nolist{grid-template-columns:0 minmax(0,1fr) 380px}.ed.nolist .ed-l{visibility:hidden;padding:0;border:0;overflow:hidden}
+  .ed-l{grid-column:1;grid-row:2}.ed-c{grid-column:2;grid-row:2}.ed-r{grid-column:3;grid-row:2}
   .ed-c{min-width:0}.ed-top{min-width:0}.ed *{scrollbar-color:#3a4150 transparent;scrollbar-width:thin}
   .eb.on{border-color:#f2b766;color:#f2b766}
   .rme .dtag{max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rme small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
