@@ -59,7 +59,8 @@
     rooms: { name: 'Ambientes', desc: 'Los ambientes elegidos, con su interruptor', kinds: ['phone', 'tablet'] },
     scenes: { name: 'Escenas', desc: 'Escenas y scripts para tocar', kinds: ['phone', 'tablet'] },
     buttons: { name: 'Botones', desc: 'Botones a elección, con su acción', kinds: ['phone', 'tablet'] },
-    camera: { name: 'Cámara con acciones', desc: 'Portero: cámara y botones (abrir, ver más)', kinds: ['phone', 'tablet'] },
+    frigate: { name: 'Cámaras en vivo (Frigate)', desc: 'Video en vivo con el visor de Frigate: pasar de cámara, eventos y grabaciones', kinds: ['phone', 'tablet'] },
+    camera: { name: 'Portero: cámara con botones', desc: 'Una cámara en vivo con sus botones (abrir, ver más)', kinds: ['phone', 'tablet'] },
     alarm: { name: 'Alarma', desc: 'Botón grande para armar y desarmar', kinds: ['phone', 'tablet'] },
     away: { name: 'Modo ausente', desc: 'Un interruptor o escena «me voy»', kinds: ['phone', 'tablet'] },
     routines: { name: 'Rutinas', desc: 'Automatizaciones con su interruptor', kinds: ['phone', 'tablet'] },
@@ -302,6 +303,8 @@
       const n = r.lightsOn.length;
       return `<div class="v-tile ${n ? 'lit' : ''}" data-room="${esc(r.id)}"${i != null ? EL(i) : ''}><span class="v-tic">${ic(roomIc(r))}</span><b>${esc(r.name)}</b><span>${n ? `${n} prendida${n > 1 ? 's' : ''}` : 'Apagado'}</span></div>`;
     }
+    // video continuo (MJPEG) de la cámara: lo que se ve mientras carga el visor de Frigate y en la vista previa del editor
+    const camStream = (id) => { const s = st(id), p = s && s.attributes.entity_picture; return p ? url(p.replace('/api/camera_proxy/', '/api/camera_proxy_stream/')) : ''; };
     const camSrc = (id) => { const s = st(id); return s && s.attributes.entity_picture ? url(s.attributes.entity_picture) + (s.attributes.entity_picture.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 10000) : ''; };
     /** Equipos de una tarjeta: los elegidos, o los de los ambientes elegidos, o los de la casa (hasta 8). */
     function entsOf(c, m, dom, roomKey) {
@@ -383,7 +386,7 @@
           X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items; X.shown[b.id] = items;
           return `${t}<div class="v-kpis n${Math.min(items.length, K === 'tablet' ? 6 : 3)}">${items.map((it, i) => kpi(m, it, i)).join('')}</div>${elAdd('Agregar un dato')}`;
         }
-        case 'featured': case 'camera': {
+        case 'featured': case 'camera': case 'frigate': {
           const list = [c.entity].concat(c.entities || [], m.cams || []).filter((id, i, a) => id && st(id) && a.indexOf(id) === i);
           X.camIdx = X.camIdx || {}; const ci = (X.camIdx[b.id] || 0) % Math.max(list.length, 1); X.camList = X.camList || {}; X.camList[b.id] = list;
           const cam = list[ci] || null, gate = c.gate && st(c.gate) ? c.gate : null;
@@ -391,10 +394,12 @@
           const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}"${EL(i)}>${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
           X.shown[b.id] = c.items || [];
           // video en vivo con el visor de Frigate (se arma aparte y no se corta cuando cambia otra cosa) o foto cada 10 s
-          const live = !!cam && c.video !== 'photo' && liveOk();
-          const photo = cam ? `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">` : '<div class="v-feed none"></div>';
-          const feed = !cam ? photo : live && !editing() ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}">${photo}</div>` : photo;
-          const badge = !cam ? '' : live ? (editing() ? '<span class="v-live"><i></i>VIDEO EN VIVO · se ve en el equipo</span>' : '') : '<span class="v-live photo">FOTO · cada 10 s</span>';
+          const video = !!cam && c.video !== 'photo', live = video && liveOk() && !editing();
+          // en video: el visor de Frigate en el equipo; mientras carga (y en el editor) el video continuo de la cámara
+          const photo = !cam ? '<div class="v-feed none"></div>' : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
+            : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
+          const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}">${photo}</div>` : photo;
+          const badge = !cam ? '' : video ? (live ? '' : '<span class="v-live"><i></i>EN VIVO</span>') : '<span class="v-live photo">FOTO · cada 10 s</span>';
           return `${t}<div class="v-cam ${live && !editing() ? 'is-live' : ''}">${feed}${badge}${list.length > 1 && !(live && !editing()) ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
             <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${live && card() && card()._config && card()._config.camera_card ? `<button class="v-cbtn" data-camall="1">${ic('film')}Grabaciones</button>` : ''}${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>${elAdd('Agregar un botón')}`;
         }
@@ -692,6 +697,8 @@
         X.el.innerHTML = K === 'tablet'
           ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
           : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`;
+        // si había una ventana abierta (por ejemplo el ambiente en el editor), sigue abierta después de rearmar la pantalla
+        if (X.sheet) { const sh = X.el.querySelector('#v-sheet'); if (sh && sh.classList) sh.classList.add('show'); }
       }
       set('#v-head', head(m, K === 'phone'));
       const bl = L.blocks;
@@ -1047,7 +1054,7 @@
     el.addEventListener('dragend', () => { dragId = null; clearMarks(); });
     const refreshCam = () => {
       if (!X.el || X.el.hidden || (typeof document !== 'undefined' && document.hidden)) return;
-      X.el.querySelectorAll('img[data-cam]').forEach((im) => {
+      X.el.querySelectorAll('img[data-cam]:not([data-stream])').forEach((im) => {
         if (im.closest && im.closest('[data-live]') && im.closest('[data-live]').querySelector('advanced-camera-card')) return; const s = camSrc(im.dataset.cam); if (s && im.getAttribute('src') !== s) im.src = s; });
     };
     X.camT = setInterval(refreshCam, 10000);

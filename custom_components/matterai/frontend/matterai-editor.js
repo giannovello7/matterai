@@ -202,6 +202,7 @@
         if (!h || h === this.hass) return;
         this.hass = h;
         if (this.card) this.card.hass = h;
+        if (this.pcard) this.pcard.hass = h;
         if (this.vista) this.vista.render();
       }, 1500);
       return this;
@@ -261,16 +262,16 @@
     addBlock(type, col) {
       const K = this.K, CAT = window.MaeVista.CATALOG;
       const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
-      const titled = ['rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text'];
+      const titled = ['frigate', 'rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text'];
       const b = { id: this.newId(type), type, col: K === 'tablet' ? (col != null ? col : type === 'plan' ? 0 : 1) : 0, cfg };
-      if (titled.includes(type)) b.title = CAT[type].name;
+      if (titled.includes(type)) b.title = type === 'frigate' ? 'Cámaras' : CAT[type].name;
       this.change(() => { this.blocks().push(b); this.sel = b.id; this.roomEd = null; this.rdraft = null; });
     }
     /** Catálogo de tarjetas (como «Agregar tarjeta» de Home Assistant), con buscador. */
     openCatalog(col) {
       this.closeCatalog();
       const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
-        weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list' };
+        weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list', frigate: 'cam' };
       const box = document.createElement('div');
       box.className = 'catp';
       box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' && col != null ? ` · ${col === 0 ? 'columna del plano' : `columna ${col}`}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
@@ -460,7 +461,7 @@
     drawPreview() {
       const size = this.sizeFrame(), fr = this.$('#frame');
       const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: this.editCtx(), sim: this.sim || null });
-      if (this.vista && this.ifr && this.ifr.isConnected) { this.vista.setCtx(ctx()); this.vista.setView(this.viewFor()); return; }
+      if (this.vista && this.ifr && this.ifr.isConnected) { this.vista.setCtx(ctx()); this.vista.setView(this.viewFor()); this.previewRoom(); return; }
       if (!this.card) { fr.innerHTML = '<p style="padding:20px;color:#8f99ab">La vista previa necesita la tarjeta MatterAI (recargá la página).</p>'; return; }
       fr.innerHTML = '';
       const ifr = this.ifr = document.createElement('iframe');
@@ -468,15 +469,30 @@
       ifr.srcdoc = `<!doctype html><html lang="es" class="mae-ed"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500&display=swap">
         <link rel="stylesheet" href="${BASE}/vista.css?t=${this.ver}"><style>html,body{margin:0;background:#161b21}</style></head>
-        <body><div id="pv"></div><script src="${BASE}/vista.js?t=${this.ver}"><\/script></body></html>`;
+        <body><div id="pv"></div><script src="${BASE}/matterai-home-card.js?t=${this.ver}"><\/script><script src="${BASE}/vista.js?t=${this.ver}"><\/script></body></html>`;
       ifr.onload = () => {
         const W = ifr.contentWindow;
         if (!W || !W.MaeVista) { this.toast('No se pudo cargar la vista previa'); return; }
+        // la tarjeta de la app adentro de la pantalla (sin dibujarse): ambientes, clima, luces… se abren como en el celular
+        const PC = W.customElements && W.customElements.get('matterai-home-card');
+        this.pcard = null;
+        if (PC) {
+          try {
+            const pc = W.document.createElement('matterai-home-card');
+            pc.setAttribute('headless', ''); pc.setAttribute('theme', 'sobrio');
+            pc.setConfig(Object.assign({}, this.cfg, { camera_inline: false }));
+            W.document.body.appendChild(pc);
+            pc.hass = this.p._hass || this.hass;
+            pc.addEventListener('matterai-model', () => { if (this.vista) this.vista.render(); });
+            this.pcard = pc;
+          } catch (e) { this.pcard = null; }
+        }
         this.vista = W.MaeVista.create(W.document.getElementById('pv'), Object.assign({
-          card: this.card, hass: () => this.p._hass || this.hass, base: () => '', toast: () => {}, openEntity() {}, openMenu() {},
+          card: this.pcard || this.card, hass: () => this.p._hass || this.hass, base: () => '', toast: () => {}, openEntity() {}, openMenu() {},
           sign: async (path) => (await this.hass.callWS({ type: 'auth/sign_path', path, expires: 7200 })).path,
         }, ctx()));
         this.vista.setView(this.viewFor());
+        this.previewRoom();
       };
       fr.appendChild(ifr);
       void size;
@@ -488,7 +504,7 @@
         onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col), onRoom: (a, i) => this.roomAct(a, i),
-        room: R ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
+        room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
     }
     /** Tocar algo en la pantalla del medio: la tarjeta, y si fue un ambiente, se abre por dentro para editarlo. */
     pick(id, sub) {
@@ -529,7 +545,27 @@
         else this.blockAct(id, k);
       });
     }
-    syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.editCtx() }); }
+    syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.editCtx() }); this.previewRoom(); }
+    /** El ambiente que se edita se ve abierto en la pantalla, como lo ve el cliente (la ventana de la app), con los
+     *  cambios que se van haciendo (todavía sin guardar en la casa). */
+    previewRoom() {
+      const pc = this.pcard; if (!pc || typeof pc.openRoom !== 'function') return;
+      const R = this.rdraft;
+      if (!R) {
+        if (this.pcRoomOn) { this.pcRoomOn = false; try { pc._closeRoom(); pc.setConfig(Object.assign({}, this.cfg, { camera_inline: false })); pc.hass = this.p._hass || this.hass; } catch (_) { /* nada */ } }
+        return;
+      }
+      const list = clone(this.roomsCfg()), i = R._orig != null ? list.findIndex((x) => x.name === R._orig) : -1;
+      const d = clone(R); delete d._orig;
+      if (i >= 0) list[i] = Object.assign({}, list[i], d); else list.push(d);
+      const sig = JSON.stringify(d);
+      try {
+        if (sig !== this.pcRoomSig) { this.pcRoomSig = sig; pc.setConfig(Object.assign({}, this.cfg, { rooms: list, camera_inline: false })); pc.hass = this.p._hass || this.hass; }
+        const m = pc.model && pc.model(), r = m && m.rooms.find((x) => x.name === d.name);
+        if (r && (pc._room !== r.id || !this.pcRoomOn)) { pc.openRoom(r.id); }
+        this.pcRoomOn = true;
+      } catch (_) { /* si algo falla, queda la pantalla como estaba */ }
+    }
     roomDirty() {
       const R = this.rdraft; if (!R) return false;
       if (R._orig == null) return true;
@@ -704,7 +740,7 @@
       const autoChk = (txt) => `<label class="chk"><input type="checkbox" data-fb="cfg.auto" ${c.auto ? 'checked' : ''}> ${txt}</label>`;
       switch (b.type) {
         case 'kpis': h += this.elemSection(b); break;
-        case 'featured': case 'camera':
+        case 'featured': case 'camera': case 'frigate':
           h += this.camFields(b, opts);
           if (b.type === 'camera') h += this.elemSection(b);
           break;
@@ -861,7 +897,7 @@
     camFields(b, opts) {
       const c = b.cfg;
       return `<label class="fld"><span>Imagen</span><select data-f="cfg.video"><option value="">Video en vivo (visor de Frigate)</option><option value="photo" ${c.video === 'photo' ? 'selected' : ''}>Foto cada 10 s (para internet lento)</option></select></label>
-        <p class="hint" style="margin-top:-4px">El video se ve en el celular o la tablet (y con «Probar en el equipo»). Acá en la vista previa se muestra una foto.</p>`
+        <p class="hint" style="margin-top:-4px">En el equipo se ve con el visor de Frigate (eventos y grabaciones); acá, en la vista previa, se ve el video en vivo de la cámara.</p>`
         + this.ent('Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate')
         + this.multi('Más cámaras (se pasan con «Otra cámara» o deslizando)', 'entities', c.entities, opts(PICK.camera).filter(([e]) => e !== c.entity));
     }
@@ -1390,6 +1426,7 @@
       if (this.trying) this.endTry();
       this.closeCB(); this.closeCatalog();
       if (this.vista) this.vista.destroy();
+      this.pcard = null;
       this.host.remove();
       if (this.p._renderViews) this.p._renderViews();
     }
