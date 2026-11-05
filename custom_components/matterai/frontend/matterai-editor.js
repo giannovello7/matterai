@@ -383,7 +383,7 @@
       this.$('#ed').classList.toggle('dlgon', open);
       if (!open) { this.$('#dlgh').innerHTML = ''; this.$('#dlgf').innerHTML = ''; return; }
       const b = this.selBlock(), CAT = window.MaeVista.CATALOG;
-      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo'
+      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Opciones del dashboard'
         : b ? `${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : '';
       const sub = this.roomEd != null || this.el != null || this.pz != null;
       const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Configuración'], ['vis', 'Visibilidad'], ['lay', 'Diseño']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
@@ -398,6 +398,8 @@
       this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver">← Volver</button><h2>${esc(v.name)}</h2>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
+          <span class="eseg" title="Modo de día o de noche de este diseño (el cliente también lo puede cambiar en Opciones)">${[['dark', '☾ Oscuro'], ['light', '☀ Claro'], ['auto', 'Auto']].map(([k, l]) => `<button data-theme="${k}" class="${(this.lay().theme || 'dark') === k ? 'on' : ''}">${l}</button>`).join('')}</span>
+          <button class="eb ico" data-e="dash" title="Opciones del dashboard (nombre, tema)">⚙</button>
           <button class="eb pri2" data-e="add" title="Agregar una tarjeta">+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
           <span class="emenu"><button class="eb ${Object.values(this.sim || {}).some(Boolean) ? 'pri2' : ''}" data-e="simm" title="Ver cómo queda en otras situaciones (no toca la casa)">Simular${Object.values(this.sim || {}).filter(Boolean).length ? ` (${Object.values(this.sim || {}).filter(Boolean).length})` : ''} ▾</button>${this.simOpen ? `<span class="emenu-l" style="left:0;right:auto">
             ${[['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']].map(([k, l]) => `<button data-sim="${k}">${(this.sim || {})[k] ? '✓ ' : ''}${l}</button>`).join('')}</span>` : ''}</span>
@@ -463,7 +465,7 @@
       fr.innerHTML = '';
       const ifr = this.ifr = document.createElement('iframe');
       ifr.title = 'Vista previa';
-      ifr.srcdoc = `<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+      ifr.srcdoc = `<!doctype html><html lang="es" class="mae-ed"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500&display=swap">
         <link rel="stylesheet" href="${BASE}/vista.css?t=${this.ver}"><style>html,body{margin:0;background:#161b21}</style></head>
         <body><div id="pv"></div><script src="${BASE}/vista.js?t=${this.ver}"><\/script></body></html>`;
@@ -670,6 +672,14 @@
       this.drawDlg(); // título, pestañas y botones de la ventana (al volver de un elemento o un ambiente también)
       if (!b && this.zone === 'header') { r.innerHTML = this.headerEditor(); return; }
       if (!b && this.zone === 'dock') { r.innerHTML = this.dockEditor(); return; }
+      if (!b && this.zone === 'dash') {
+        r.innerHTML = `<h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}" maxlength="40"></label>
+          <label class="fld"><span>Modo de ${this.K === 'tablet' ? 'la tablet' : 'el celular'}</span><select data-lt="theme">${[['', 'Oscuro (grafito)'], ['light', 'Claro'], ['auto', 'Automático (como el modo claro u oscuro del equipo)']]
+            .map(([k, l]) => `<option value="${k}" ${(this.lay().theme || '') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <p class="hint">Cada diseño (celular y tablet) tiene su modo. El cliente lo puede cambiar en la app: Opciones → Pantalla → Modo de día o de noche.</p>
+          <p class="hint">«Simular → De noche» (arriba) es otra cosa: muestra cómo se ve el plano y las tarjetas que dependen de la hora, sin cambiar el modo.</p>`;
+        return;
+      }
       if (b && b.type === 'plan' && this.pz != null) { r.innerHTML = this.zoneEditor(this.pz); return; }
       if (!b) {
         if (r.closest && r.closest('.dlg') && !this.$('#edl')) { r.innerHTML = ''; return; } // sin tarjeta elegida: la ventana está cerrada
@@ -1004,6 +1014,7 @@
         if (!this.blocks().length) this.prearmado(true); // todavía no tiene diseño para este tipo: arranca del prearmado
         this.draw();
       }; });
+      W.querySelectorAll('[data-theme]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().theme = x.dataset.theme === 'dark' ? null : x.dataset.theme; }); });
       W.querySelectorAll('[data-sim]').forEach((x) => { x.onclick = () => {
         this.sim = Object.assign({}, this.sim || {}, { [x.dataset.sim]: !(this.sim || {})[x.dataset.sim] });
         if (this.vista) this.vista.setCtx({ sim: this.sim });
@@ -1191,6 +1202,7 @@
       if (k !== 'simm' && this.simOpen) this.simOpen = false;
       if (k === 'close') return this.close();
       if (k === 'more') { this.moreOpen = !this.moreOpen; this.draw(); return; }
+      if (k === 'dash') return this.pick(null, { zone: 'dash' });
       if (k === 'simm') { this.simOpen = !this.simOpen; this.draw(); return; }
       if (k === 'list') { this.showList = !this.showList; try { localStorage.setItem('matterai.editor.list', this.showList ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } this.draw(); this.sizeFrame(); return; }
       if (k === 'add') return this.openCatalog(null);

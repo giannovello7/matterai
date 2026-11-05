@@ -1,7 +1,7 @@
 """Constantes de la integración MatterAI."""
 
 DOMAIN = "matterai"
-VERSION = "2.22.0"
+VERSION = "2.22.1"
 
 # Configuración del dashboard (lo que antes era el YAML del panel)
 STORAGE_KEY = f"{DOMAIN}.dashboard"

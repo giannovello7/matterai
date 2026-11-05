@@ -307,3 +307,4 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .v-eadd:hover{border-color:var(--warm);color:var(--warm)}
 .vista.editing .v-c0,.vista.editing .v-c1,.vista.editing .v-c2{min-height:120px}
 .vista.editing [data-ri]{cursor:grab}.vista.editing [data-ri].dragging{opacity:.35}.vista.editing [data-ri].dropb{box-shadow:0 -3px 0 var(--warm)}
+html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}

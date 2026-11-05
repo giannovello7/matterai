@@ -680,9 +680,11 @@
       // en el editor manda lo que se está diseñando; en la tablet de verdad, cómo está parada (o «vertical» si se fijó así)
       const vertical = K === 'tablet' && (editing() ? ori === 'portrait'
         : ori === 'portrait' || (typeof innerHeight !== 'undefined' && innerHeight > innerWidth));
-      const th = L.theme || 'dark';
+      // el cliente puede elegir en Opciones (oscuro, claro o como el equipo); si no, el del instalador
+      let mine = null; try { mine = !editing() && typeof localStorage !== 'undefined' ? localStorage.getItem('matterai.theme') : null; } catch (_) { mine = null; }
+      const th = mine || L.theme || 'dark';
       const light = th === 'light' || (th === 'auto' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
-      if (!editing() && typeof document !== 'undefined' && document.documentElement && document.documentElement.classList) document.documentElement.classList.toggle('mae-light', light);
+      if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList) document.documentElement.classList.toggle('mae-light', light);
       const sig = `${K}|${vertical}|${editing()}|${light}`;
       if (X.shell !== sig) {
         X.shell = sig; X.cache = {}; X.colSig = {}; X.partCache = {};
