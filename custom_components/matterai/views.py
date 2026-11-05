@@ -76,6 +76,7 @@ class Views:
         self.history: dict[str, list[dict[str, Any]]] = {}  # versiones anteriores de cada dashboard (la más nueva primero)
         self.previews: dict[str, dict[str, Any]] = {}       # «Probar en el equipo»: diseño sin guardar (sólo en memoria)
         self.preview_timers: dict[str, Any] = {}
+        self.seen: dict[str, str] = {}  # usuario de un equipo → «phone» o «tablet» (lo que pidió la última vez)
 
     async def async_load(self) -> None:
         data = await self._store.async_load() or {}
@@ -84,9 +85,11 @@ class Views:
         self.users = data.get("users") or {}
         self.default = data.get("default")
         self.history = data.get("history") or {}
+        self.seen = data.get("seen") or {}
 
     def _save(self) -> None:
-        self._store.async_delay_save(lambda: {"views": self.views, "assign": self.assign, "users": self.users, "default": self.default, "history": self.history}, 2)
+        self._store.async_delay_save(lambda: {"views": self.views, "assign": self.assign, "users": self.users, "default": self.default, "history": self.history,
+                                              "seen": self.seen}, 2)
 
     def put(self, view: dict[str, Any], by: str = "instalador") -> dict[str, Any]:
         vid = view.get("id") or uuid.uuid4().hex[:10]
@@ -167,6 +170,7 @@ def resolve(view: dict[str, Any] | None, kind: str | None) -> dict[str, Any] | N
     out["orientation"] = (lay or {}).get("orientation") or view.get("orientation")
     out["header"] = (lay or {}).get("header") or None  # qué se ve arriba (hora, clima, avisos, menú)
     out["dock"] = (lay or {}).get("dock") or None      # botones de la barra de abajo, en orden
+    out["theme"] = (lay or {}).get("theme") or None    # oscuro, claro o automático (según el equipo)
     return out
 
 
@@ -229,6 +233,7 @@ def ws_views_list(hass: HomeAssistant, connection: websocket_api.ActiveConnectio
             "model": " ".join(x for x in (mine[0].data.get("manufacturer"), mine[0].data.get("model")) if x) if mine else "",
             "devices": [e.data.get("device_id") for e in mine if e.data.get("device_id")],
             "view": v.users.get(d["user_id"]) or next((v.assign[e.data["device_id"]] for e in mine if v.assign.get(e.data.get("device_id"))), None),
+            "kind": v.seen.get(d["user_id"]),  # «phone» / «tablet»: el diseño que usa (None: todavía no abrió la app)
         })
     connection.send_result(msg["id"], {"views": list(v.views.values()), "default": v.default, "devices": devices, "people": people})
 
@@ -410,6 +415,9 @@ def ws_app_view(hass: HomeAssistant, connection: websocket_api.ActiveConnection,
     mine = v.assign.get(msg["device_id"]) if _owns_device(hass, connection.user.id, msg["device_id"]) else None
     mine = (mine if mine in v.views else None) or (v.users.get(connection.user.id) if house.is_device_user(connection.user.id) else None)
     view = v.views.get(mine) if mine else (v.views.get(v.default) if v.default else None)
+    if msg.get("kind") in KINDS and v.seen.get(connection.user.id) != msg["kind"]:
+        v.seen[connection.user.id] = msg["kind"]  # así el panel sabe si ese equipo es celular o tablet
+        v._save()  # noqa: SLF001
     trial = v.preview(view["id"]) if view else None  # el instalador está probando un diseño sin guardar
     connection.send_result(msg["id"], {"view": resolve(trial or view, msg.get("kind")), "personal": bool(mine), "preview": bool(trial)})
 

@@ -253,7 +253,7 @@
     openCatalog(col) {
       this.closeCatalog();
       const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
-        weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film' };
+        weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list' };
       const box = document.createElement('div');
       box.className = 'catp';
       box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' && col != null ? ` · ${col === 0 ? 'columna del plano' : `columna ${col}`}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
@@ -311,7 +311,7 @@
     set K(k) { this._k = k; }
     lay() { const L = this.v.layouts || (this.v.layouts = {}); return L[this.K] || (L[this.K] = { blocks: [] }); }
     /** Lo que ve el motor: el dashboard con las tarjetas del tipo que se está editando. */
-    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, layouts: undefined }); }
+    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, theme: l.theme || null, layouts: undefined }); }
     model() { return this.card && this.card.model ? this.card.model() : null; }
     states() { return this.hass.states; }
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
@@ -600,6 +600,8 @@
             <li>Arrastrá las tarjetas para moverlas. Con <b style="display:inline">+ Agregar tarjeta</b> sumás una nueva.</li>
             <li><b style="display:inline">Guardar</b> (arriba a la derecha) se lo manda a los equipos al instante.</li></ol></div>
           <h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}"></label>
+          <label class="fld"><span>Tema ${this.K === 'tablet' ? 'de la tablet' : 'del celular'}</span><select data-lt="theme">${[['', 'Oscuro (grafito)'], ['light', 'Claro'], ['auto', 'Automático (igual que el modo claro u oscuro del equipo)']]
+            .map(([k, l]) => `<option value="${k}" ${(this.lay().theme || '') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
           <p class="hint">Estás editando el diseño para <b>${this.K === 'tablet' ? 'la tablet' : 'el celular'}</b>. Cambiá arriba entre Celular y Tablet: cada uno tiene el suyo, y los dos se guardan juntos.</p>`;
         return;
       }
@@ -639,6 +641,10 @@
             <label class="fld"><span>Máximo</span><input type="number" data-f="cfg.max" value="${esc(c.max != null ? c.max : '')}" placeholder="100"></label></div>`;
           break;
         case 'people': h += '<p class="hint">Muestra las personas de la casa, con quién está y quién no.</p>'; break;
+        case 'activity':
+          h += `<label class="fld"><span>De qué</span><select data-actroom><option value="">Toda la casa</option>${(m ? m.rooms : []).map((x) => `<option ${(c.rooms || [])[0] === x.name ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select></label>
+            <p class="hint">Abre la Actividad con filtros por día, tipo, ambiente y un buscador de equipos. Tocar un evento muestra el historial de ese equipo (como en Home Assistant).</p>`;
+          break;
         case 'text':
           h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="separator" ${c.style === 'separator' ? 'selected' : ''}>Separador (sólo el título)</option><option value="" ${c.style !== 'separator' ? 'selected' : ''}>Nota con texto</option></select></label>`;
           if (c.style !== 'separator') h += `<label class="fld"><span>Texto</span><textarea data-f="cfg.text" maxlength="600" style="font-family:inherit;font-size:13px;min-height:90px">${esc(c.text || '')}</textarea></label>`;
@@ -1004,6 +1010,8 @@
       W.querySelectorAll('#edr [data-mk]').forEach((x) => { x.onchange = () => this.change(() => { const k = x.dataset.mk, m0 = this.model();
         if (k === 'rooms' && b.type === 'rooms' && !(b.cfg.rooms && b.cfg.rooms.length) && m0) b.cfg.rooms = m0.rooms.slice(0, 4).map((r) => r.name); // parte de lo que se ve
         const L = (b.cfg[k] = b.cfg[k] || []); if (x.checked) { if (!L.includes(x.value)) L.push(x.value); } else b.cfg[k] = L.filter((y) => y !== x.value); }); });
+      W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
+      W.querySelectorAll('#edr [data-lt]').forEach((x) => { x.onchange = () => this.change(() => { this.lay()[x.dataset.lt] = x.value || null; }); });
       const back = () => { this.zone = null; this.pz = null; this.drawProps(); this.syncPreview(); this.bind(); };
       W.querySelectorAll('#edr [data-zback],#edr [data-pzback]').forEach((x) => { x.onclick = back; });
       W.querySelectorAll('#edr [data-hd]').forEach((x) => { x.onchange = () => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); if (x.checked) delete H[x.dataset.hd]; else H[x.dataset.hd] = false; l.header = Object.keys(H).length ? H : null; }); });
@@ -1115,7 +1123,7 @@
     /** Lo que se guarda (o se prueba): los dos diseños, el plano y lo demás del dashboard. */
     payload() {
       const v = this.v, L = v.layouts || {};
-      const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null } : null);
+      const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null } : null);
       return { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
         plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
     }

@@ -60,6 +60,7 @@ async def async_forget(hass: HomeAssistant, user_id: str) -> bool:
     audit_log(hass, "access", "equipo desvinculado", name)
     ad = rt.get("app_devices")
     if rt.get("views") is not None:
+        rt["views"].seen.pop(user_id, None)
         rt["views"].set_user(user_id, None)
     for e in app_entries(hass):
         if e.data.get("user_id") == user_id:

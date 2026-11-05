@@ -40,6 +40,7 @@ BLOCK_TYPES = (
     "people",     # quién está en casa
     "text",       # texto o separador
     "image",      # una imagen (con acción al tocar)
+    "activity",   # acceso a la Actividad (toda la casa o un ambiente), desde la 2.21
 )
 SIZES = ("full", "half")
 COND_TYPES = ("state", "not_state", "night", "day", "music", "alarm_armed", "alarm_off", "someone_home", "nobody_home")
@@ -168,6 +169,7 @@ def layout_schema(max_blocks: int) -> vol.Schema:
         vol.Optional("orientation"): vol.Any(None, vol.In(["landscape", "portrait", "auto"])),
         vol.Optional("header"): vol.Any(None, HEADER),                                       # desde la 2.20
         vol.Optional("dock"): vol.Any(None, vol.All([vol.In(DOCK_KEYS)], vol.Length(max=10))),
+        vol.Optional("theme"): vol.Any(None, vol.In(["dark", "light", "auto"])),          # desde la 2.21: oscuro, claro o según el equipo
     }, extra=vol.REMOVE_EXTRA)
 
 

@@ -159,10 +159,29 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .vista .v-dock .v-mic{width:58px!important;height:58px;margin:-18px 6px 0;border-radius:50%;background:var(--fg)!important;color:var(--bg)!important}
 .vista .v-dock .v-mic svg.i{width:24px;height:24px}
 .v-dock .v-eq{top:4px;right:calc(50% - 20px)}
-.vista.k-tablet.vert{height:auto;min-height:100vh;overflow:visible}
-.vert .v-tab{flex-direction:column;height:auto}
-.vert .v-c0{max-width:none;height:auto}.vert .v-c0 .v-plan{height:auto;width:100%}
-.vert .v-cols{grid-template-columns:1fr 1fr}
+/* tablet en vertical (como el diseño): el plano a la izquierda; arriba a la derecha la hora, el resumen y la
+   primera columna; abajo, de lado a lado, la segunda columna, la música y la barra */
+.vista.k-tablet.vert{height:100vh;overflow:hidden}
+.vert .v-tab{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto auto auto;gap:12px;height:100%}
+.vert .v-main,.vert .v-cols{display:contents}
+.vert .v-c0{grid-row:1/4;grid-column:1;height:100%;max-width:52vw;min-height:0}
+.vert .v-c0 .v-b{height:100%}.vert .v-c0 .v-plan{height:100%;width:auto;max-width:100%}
+.vert .v-head{grid-row:1;grid-column:2;flex-wrap:wrap;gap:10px}.vert .v-head .v-when b{font-size:40px}
+.vert .v-top{grid-row:2;grid-column:2;min-width:0}.vert .v-top .v-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}
+.vert .v-c1{grid-row:3;grid-column:2;min-height:0}
+.vert .v-c2{grid-row:4;grid-column:1/3;flex-direction:row;overflow-x:auto;overflow-y:hidden;align-items:stretch;max-height:34vh}
+.vert .v-c2>.v-b,.vert .v-c2>.v-halfs{flex:1 0 260px;min-width:0;overflow:auto}
+.vert .v-c2>.v-eadd{flex:0 0 160px;margin:0}
+.vert .v-player{grid-row:5;grid-column:1/3}.vert .v-dock{grid-row:6;grid-column:1/3}
+.vert .v-top:empty{display:none}
+/* ───── tema claro (se elige en el editor: oscuro, claro o según el equipo) ───── */
+.vista.light{--bg:#f2f3f5;--card:#ffffff;--card2:#eceef2;--line:rgba(22,27,33,.10);--fg:#161b21;--muted:#6a7383;--off:#d3d8e0;
+  --warm:#d58a24;--warm-s:rgba(213,138,36,.14);--cool:#2b86c5;--cool-s:rgba(43,134,197,.12);--green:#2f9e63;--red:#d9534a;--red-s:rgba(217,83,74,.12)}
+.vista.light .v-cam,.vista.light .v-imgc{border-color:var(--line)}
+.vista.light .v-player,.vista.light .v-kpi,.vista.light .v-card{box-shadow:0 1px 2px rgba(20,25,35,.06)}
+.vista.light .v-pw::after{background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.vista.light .v-mic{background:var(--fg)!important;color:#fff!important}
+html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.with-inicio .home{background:#f2f3f5}
 /* ───── hojas propias ───── */
 .v-sheet{position:fixed;inset:0;z-index:18;background:rgba(8,10,14,.55);display:none;align-items:flex-end;justify-content:center}
 .v-sheet.show{display:flex}
@@ -227,6 +246,14 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-rer.on .v-bic{background:var(--warm-s);color:var(--warm)}
 .v-ret{display:flex;gap:2px;flex:none}.v-ret button{width:30px;height:30px;border-radius:9px!important;display:grid!important;place-items:center;color:var(--muted)}
 .v-ret button:hover{background:var(--card2)!important;color:var(--fg)}.v-ret .i{width:16px;height:16px}
+.v-rblk{margin-bottom:16px}.v-rblk h4{display:flex;align-items:center;gap:8px;margin:0 2px 10px;font-size:11px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+.v-rblk h4 svg.i{width:15px;height:15px}
+.v-rgrid{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:8px}.v-rlist{display:flex;flex-direction:column;gap:8px}
+.v-rgrid .v-rer{flex-wrap:wrap;position:relative;padding-right:8px}.v-rgrid .v-rer .v-ret{position:absolute;top:2px;right:2px;opacity:.55}.v-rgrid .v-rer:hover .v-ret{opacity:1}
+.v-rgrid .v-rer .v-tx{padding-right:24px}
+.v-rcam{position:relative;border-radius:16px;overflow:hidden;background:#0b0e12;aspect-ratio:16/9}.v-rcam img{width:100%;height:100%;object-fit:cover;display:block}
+.v-rcn{position:absolute;left:10px;bottom:8px;font-weight:700;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8);color:#fff}
+.v-rcam .v-ret{position:absolute;top:6px;right:6px;background:rgba(10,12,16,.7);border-radius:10px}.v-rcam .v-ret button{color:#fff}
 .v-rsave{display:block;width:100%;margin-top:4px;padding:13px!important;border-radius:14px;background:var(--warm)!important;color:#1b1408!important;font-weight:700!important;text-align:center!important}
 .vista.editing .v-b [data-el],.vista.editing .v-b .v-ehandle,.vista.editing .v-b .v-ehandle *,.vista.editing .v-b .v-eltool,.vista.editing .v-b .v-eltool *,.vista.editing .v-b .v-eladd{pointer-events:auto}
 .vista.editing .v-b [data-el]{cursor:pointer}

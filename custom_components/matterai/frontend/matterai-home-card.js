@@ -4158,6 +4158,11 @@
 
     _hRoomAct(r) {
       if (!this._hass || typeof this._hass.callWS !== 'function') return '';
+      // ya no va la lista en cada ambiente (se veía en todos): un botón a la Actividad filtrada por este ambiente.
+      // room_activity: true vuelve a mostrar los últimos 6 cambios acá.
+      if (this._config.room_activity !== true) {
+        return `<div class="blk sh-act"><button class="tbtn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:11px 13px" data-action="roomact" data-id="${esc(r.id)}">${ic('history')} Ver la actividad de este ambiente</button></div>`;
+      }
       const ra = this._roomAct;
       if (!ra || ra.room !== r.id) { Promise.resolve().then(() => this._loadRoomAct(r)); return ''; }
       if (!ra.ids.length) return '';

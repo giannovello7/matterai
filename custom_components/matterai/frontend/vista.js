@@ -75,6 +75,7 @@
     people: { name: 'Personas', desc: 'Quién está en casa', kinds: ['phone', 'tablet'] },
     text: { name: 'Texto', desc: 'Un título, un separador o una nota', kinds: ['phone', 'tablet'] },
     image: { name: 'Imagen', desc: 'Una foto o logo, con acción al tocar', kinds: ['phone', 'tablet'] },
+    activity: { name: 'Actividad', desc: 'Qué pasó en la casa: por equipo, día, tipo y ambiente', kinds: ['phone', 'tablet'] },
   };
   /* Condiciones para mostrar una tarjeta (como la tarjeta condicional de Home Assistant) */
   const CONDITIONS = { state: 'Un equipo está en un estado', not_state: 'Un equipo NO está en un estado', night: 'Es de noche (20 a 7 h)', day: 'Es de día (7 a 20 h)',
@@ -167,11 +168,11 @@
     /* layout: lo del editor, o el prearmado */
     function layout(m) {
       const v = X.view || {};
-      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null };
+      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null };
       const cfg = card() && card()._config;
       const d = defaults(kind(), m, v, (hass() || {}).states, cfg && cfg.floorplan);
       if (v.plan) d.plan = v.plan;
-      d.header = v.header || null; d.dock = v.dock || null;
+      d.header = v.header || null; d.dock = v.dock || null; d.theme = v.theme || null;
       return d;
     }
     const roomByName = (m, n) => m.rooms.find((r) => r.name.toLowerCase() === String(n).toLowerCase() || String(r.id).toLowerCase() === String(n).toLowerCase());
@@ -445,9 +446,8 @@
         case 'music': {
           const p = player();
           if (!p) return editing() ? `${t}<p class="v-empty">Aparece cuando hay música sonando.</p>` : '';
-          if (K === 'tablet' && !editing()) return ''; // en la tablet la música va en la barra de arriba del dock
           const art = p.attributes.entity_picture ? `style="background-image:url('${esc(url(p.attributes.entity_picture))}')"` : '';
-          return `<div class="v-card">${t}<div class="v-music"><span class="v-art" ${art}></span><span class="v-tx"><b>${esc(p.attributes.media_title || 'Música')}</b><span>${esc(p.attributes.media_artist || fname(p.entity_id))}</span></span>
+          return `<div class="v-card v-mcard" data-k="player">${t}<div class="v-music"><span class="v-art" ${art}></span><span class="v-tx"><b>${esc(p.attributes.media_title || 'Música')}</b><span>${esc(p.attributes.media_artist || fname(p.entity_id))}</span></span>
             <button class="v-mb pl" data-mp="${esc(p.entity_id)}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button><button class="v-mb" data-mn="${esc(p.entity_id)}">${ic('next')}</button></div></div>`;
         }
         case 'lock': {
@@ -525,6 +525,12 @@
         case 'text': {
           if (c.style === 'separator' || !c.text) return `<div class="v-sep"><span>${esc(b.title || '')}</span></div>`;
           return `<div class="v-card v-text">${b.title ? `<b>${esc(b.title)}</b>` : ''}<p>${esc(c.text).replace(/\n/g, '<br>')}</p></div>`;
+        }
+        case 'activity': {
+          // la Actividad completa (filtros por día, tipo, ambiente y buscador de equipos); tocar un evento muestra el historial de ese equipo
+          const rm = c.rooms && c.rooms[0] ? roomByName(m, c.rooms[0]) : null;
+          return `<div class="v-card v-actc" data-actv="${esc(rm ? rm.id : '')}">${t}<div class="v-row"><span class="v-bic">${ic('list')}</span><span class="v-tx"><b>${esc(rm ? `Actividad · ${rm.name}` : 'Actividad de la casa')}</b>
+            <span>Qué pasó y quién lo hizo · por equipo, día y tipo</span></span><span class="v-chev">${ic('chev')}</span></div></div>`;
         }
         case 'image': {
           const src = img(c.image);
@@ -673,11 +679,16 @@
       if (!m0) { if (X.el.innerHTML === '') X.el.innerHTML = '<p class="v-empty">Conectando con tu casa…</p>'; return; }
       const m = buildSim(m0);
       const L = X.layout = layout(m), K = kind(), ori = ctx.orientation || L.orientation || 'landscape';
-      const vertical = K === 'tablet' && (ori === 'portrait' || (ori === 'auto' && typeof innerHeight !== 'undefined' && innerHeight > innerWidth));
-      const sig = `${K}|${vertical}|${editing()}`;
+      // en el editor manda lo que se está diseñando; en la tablet de verdad, cómo está parada (o «vertical» si se fijó así)
+      const vertical = K === 'tablet' && (editing() ? ori === 'portrait'
+        : ori === 'portrait' || (typeof innerHeight !== 'undefined' && innerHeight > innerWidth));
+      const th = L.theme || 'dark';
+      const light = th === 'light' || (th === 'auto' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
+      if (!editing() && typeof document !== 'undefined' && document.documentElement && document.documentElement.classList) document.documentElement.classList.toggle('mae-light', light);
+      const sig = `${K}|${vertical}|${editing()}|${light}`;
       if (X.shell !== sig) {
         X.shell = sig; X.cache = {}; X.colSig = {}; X.partCache = {};
-        X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}`;
+        X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}${light ? ' light' : ''}`;
         X.el.innerHTML = K === 'tablet'
           ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
           : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`;
@@ -745,7 +756,7 @@
       const iw = innerWidth, ih = innerHeight, W = Math.max(iw, vertical ? 800 : 1180), s = iw / W;
       // zoom (y no transform) para que el alto, el scroll vertical y las ventanas fijas sigan andando bien
       e.style.zoom = s < 1 ? String(s) : ''; e.style.width = s < 1 ? W + 'px' : '';
-      e.style.height = vertical ? '' : Math.round(ih / s) + 'px';
+      e.style.height = Math.round(ih / s) + 'px';
     }
     /** Micrófono a la vista siempre (como en el diseño), salvo que el instalador apague la voz. */
     function voiceOn() { const c = card(); return !!c && typeof c.voice === 'function' && !(c._config && c._config.voice === false); }
@@ -753,7 +764,9 @@
     function drawPlayer() {
       const p = player();
       if (!p) X.hidePlayer = false;
-      const shown = !!p && !X.hidePlayer, pl = X.el.querySelector('#v-player');
+      // en la tablet, si el diseño ya tiene la tarjeta de música, la barra no se repite
+      const hasCard = kind() === 'tablet' && X.layout && (X.layout.blocks || []).some((b) => b.type === 'music');
+      const shown = !!p && !X.hidePlayer && !hasCard, pl = X.el.querySelector('#v-player');
       if (pl) pl.classList.toggle('hide', !shown);
       X.el.classList.toggle('with-player', shown);
       if (p) {
@@ -807,13 +820,25 @@
     /** Editor: el ambiente por dentro, con sus equipos en orden; se ordenan, sacan y agregan acá mismo. */
     function roomEditHTML(R) {
       const L = R.entities || [];
-      const rows = L.map((x, i) => {
-        const id = x && typeof x === 'object' ? x.entity : x, s = st(id) ? entState(id) : { on: false, txt: 'No existe en la casa' };
-        return `<div class="v-rer ${s.on ? 'on' : ''}"><span class="v-bic">${ic(defIcon(id))}</span><span class="v-tx"><b>${esc((x && x.name) || fname(id))}</b><span>${esc(s.txt)}</span></span>
-          <span class="v-ret">${i > 0 ? `<button data-rme="up" data-i="${i}" title="Subir">${ic('up')}</button>` : ''}${i < L.length - 1 ? `<button data-rme="down" data-i="${i}" title="Bajar">${ic('down')}</button>` : ''}<button data-rme="del" data-i="${i}" title="Sacar del ambiente">${ic('x')}</button></span></div>`;
-      }).join('');
-      return `<div class="v-grab"></div><div class="v-sh"><span class="v-ric on">${ic(roomIc(R))}</span><div><h2>${esc(R.name)}</h2><small>${L.length} equipo${L.length === 1 ? '' : 's'} · editando</small></div><button class="v-x" data-rme="close" aria-label="Cerrar">${ic('x')}</button></div>
-        <div class="v-list">${rows || '<p class="v-empty">Todavía no tiene equipos.</p>'}</div>
+      // como en la app: las entidades seguidas del mismo tipo forman un bloque (Cámaras, Iluminación, Equipos…)
+      const KIND = { camera: ['cam', 'cam', 'Cámaras'], light: ['light', 'bulb', 'Iluminación'], climate: ['clim', 'snow', 'Climatización'], fan: ['clim', 'snow', 'Climatización'],
+        cover: ['cover', 'curt', 'Cortinas y aberturas'], media_player: ['media', 'music', 'Multimedia'], switch: ['switch', 'plug', 'Equipos'], input_boolean: ['switch', 'plug', 'Equipos'],
+        lock: ['lock', 'lock', 'Cerraduras'], scene: ['act', 'spark', 'Acciones'], script: ['act', 'spark', 'Acciones'], button: ['act', 'spark', 'Acciones'], input_button: ['act', 'spark', 'Acciones'] };
+      const kindOf = (id) => KIND[String(id).split('.')[0]] || ['sens', 'door', 'Sensores'];
+      const groups = [];
+      L.forEach((x, i) => {
+        const id = x && typeof x === 'object' ? x.entity : x, k = kindOf(id), g = groups[groups.length - 1];
+        if (g && g.k[0] === k[0]) g.items.push([x, id, i]); else groups.push({ k, items: [[x, id, i]] });
+      });
+      const tools = (i) => `<span class="v-ret">${i > 0 ? `<button data-rme="up" data-i="${i}" title="Subir">${ic('up')}</button>` : ''}${i < L.length - 1 ? `<button data-rme="down" data-i="${i}" title="Bajar">${ic('down')}</button>` : ''}<button data-rme="del" data-i="${i}" title="Sacar del ambiente">${ic('x')}</button></span>`;
+      const tile = ([x, id, i]) => {
+        const s0 = st(id), s = s0 ? entState(id) : { on: false, txt: 'No existe en la casa' }, nm = (x && x.name) || fname(id);
+        if (id.startsWith('camera.')) return `<div class="v-rcam"><img alt="" src="${esc(camSrc(id))}"><span class="v-rcn">${esc(nm)}</span>${tools(i)}</div>`;
+        return `<div class="v-rer ${s.on ? 'on' : ''}"><span class="v-bic">${ic(defIcon(id))}</span><span class="v-tx"><b>${esc(nm)}</b><span>${esc(s.txt)}</span></span>${tools(i)}</div>`;
+      };
+      const body = groups.map((g) => `<div class="v-rblk"><h4>${ic(g.k[1])}${g.k[2]}</h4><div class="${g.k[0] === 'cam' || g.k[0] === 'cover' || g.k[0] === 'clim' || g.k[0] === 'media' ? 'v-rlist' : 'v-rgrid'}">${g.items.map(tile).join('')}</div></div>`).join('');
+      return `<div class="v-grab"></div><div class="v-sh"><span class="v-ric on">${ic(roomIc(R))}</span><div><h2>${esc(R.name)}</h2><small>${L.length} equipo${L.length === 1 ? '' : 's'} · editando (así lo ve el cliente)</small></div><button class="v-x" data-rme="close" aria-label="Cerrar">${ic('x')}</button></div>
+        ${body || '<p class="v-empty">Todavía no tiene equipos.</p>'}
         <button class="v-eadd" data-radd>+ Agregar un equipo</button>${R.dirty ? `<button class="v-rsave" data-rme="save">Guardar ambiente</button>` : ''}`;
     }
     function openSheet(k, arg) { X.sheet = k; X.sheetArg = arg || null; X.el.querySelector('#v-sheet').classList.add('show'); renderSheet(); }
@@ -889,6 +914,7 @@
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
       const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, 1);
       if (t.closest('[data-camall]')) return c.openCameras();
+      const av = t.closest('[data-actv]'); if (av) return c.openActivity(av.dataset.actv ? { room: av.dataset.actv } : undefined);
       if (t.closest('[data-bri]')) return undefined; // el brillo se maneja al soltar (change)
       const ct = t.closest('[data-ctemp]'); if (ct) {
         const s = st(ct.dataset.ctemp); if (!s) return undefined;

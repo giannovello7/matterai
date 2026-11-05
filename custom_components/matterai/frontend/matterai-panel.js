@@ -702,6 +702,16 @@
       if (!this._vopen) { try { this._vopen = new Set(JSON.parse(localStorage.getItem('matterai.panel.vopen') || '[]')); } catch (_) { this._vopen = new Set(); } }
       const saveOpen = () => { try { localStorage.setItem('matterai.panel.vopen', JSON.stringify([...this._vopen])); } catch (_) { /* sin almacenamiento */ } };
       const users = (vid) => people.filter((p) => p.view === vid && !stale(p));
+      // celular o tablet: lo que pidió el equipo (si todavía no abrió la app, se adivina por el modelo)
+      const kindOf = (p) => p.kind || (/tab|sm-x|sm-t|ipad/i.test((p.model || '') + p.name) ? 'tablet' : 'phone');
+      const devIc = (p) => `<ha-icon icon="${kindOf(p) === 'tablet' ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon>`;
+      /** Qué muestra de verdad un equipo: su dashboard, o el general, o el inicio automático; con el diseño de su tipo. */
+      const shows = (p) => {
+        const vid = p.view || r.default || null, x = views.find((y) => y.id === vid), k = kindOf(p);
+        const kname = k === 'tablet' ? 'tablet' : 'celular';
+        if (!x) return `Muestra el <b>inicio automático</b> (${kname})`;
+        return `Muestra <b>«${esc(x.name)}»</b>${p.view ? '' : ' (el general)'} · diseño de ${kname} ${lay(x, k) ? '<span class="dv-tag on">diseñado</span>' : '<span class="dv-tag">prearmado</span>'}${p.kind ? '' : ' <span class="mut">· todavía no abrió la app nueva</span>'}`;
+      };
       // el mismo equipo vinculado dos veces: mismo nombre y mismo tipo; el que se usó (o vinculó) más tarde es el bueno
       const isTab = (p) => /tab|sm-x|sm-t|ipad/i.test((p.model || '') + p.name);
       const twinsOf = (p) => people.filter((q) => q !== p && q.name.toLowerCase() === p.name.toLowerCase() && (!q.model || !p.model || isTab(q) === isTab(p)));
@@ -719,14 +729,15 @@
           <div class="dv-top">
             <button class="dv-hit" data-vtog="${esc(x.id)}" aria-expanded="${open}"><span class="dv-ic"><ha-icon icon="mdi:view-dashboard-outline"></ha-icon></span>
               <span class="dv-t"><b>${esc(x.name)}</b>${isDef ? '<span class="dv-tag gen">general</span>' : ''}
-                <small>Celular ${state(x, 'phone')} · Tablet ${state(x, 'tablet')} · ${us.length ? esc(us.map((p) => p.name).join(', ')) : isDef ? 'todos los equipos sin uno propio' : 'ningún equipo'}</small></span></button>
+                <small>Diseño de celular ${state(x, 'phone')} · Diseño de tablet ${state(x, 'tablet')}</small>
+                <small class="dv-who">${us.length ? `Lo usa${us.length > 1 ? 'n' : ''}: ${us.map((p) => `<span class="dv-dev">${devIc(p)}${esc(p.name)}</span>`).join('')}` : isDef ? `Lo ven los equipos sin uno propio${people.filter((p) => !p.view && !stale(p)).length ? `: ${people.filter((p) => !p.view && !stale(p)).map((p) => `<span class="dv-dev">${devIc(p)}${esc(p.name)}</span>`).join('')}` : ''}` : '<span class="mut">Ningún equipo lo usa todavía</span>'}</small></span></button>
             <button class="b pri" data-ved="${esc(x.id)}"><ha-icon icon="mdi:pencil-ruler"></ha-icon>Editar diseño</button>
             <button class="dv-chev" data-vtog="${esc(x.id)}" aria-label="${open ? 'Achicar' : 'Opciones'}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
           </div>
           ${open ? `<div class="dv-body">
             <label class="dv-f"><span>Nombre</span><input data-vname="${esc(x.id)}" value="${esc(x.name)}" maxlength="40"></label>
             <div class="dv-f"><span>Equipos que lo usan</span>
-              ${people.length ? `<div class="dv-chips">${people.filter((p) => !stale(p)).map((p) => `<label class="dv-chip ${p.view === x.id ? 'on' : ''}"><input type="checkbox" data-vuse="${esc(p.user_id)}" data-v="${esc(x.id)}" ${p.view === x.id ? 'checked' : ''}><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon>${esc(p.name)}${p.view && p.view !== x.id ? `<small>ahora: ${esc((views.find((y) => y.id === p.view) || {}).name || '—')}</small>` : ''}</label>`).join('')}</div>`
+              ${people.length ? `<div class="dv-chips">${people.filter((p) => !stale(p)).map((p) => `<label class="dv-chip ${p.view === x.id ? 'on' : ''}"><input type="checkbox" data-vuse="${esc(p.user_id)}" data-v="${esc(x.id)}" ${p.view === x.id ? 'checked' : ''}>${devIc(p)}${esc(p.name)}${p.view && p.view !== x.id ? `<small>ahora: ${esc((views.find((y) => y.id === p.view) || {}).name || '—')}</small>` : ''}</label>`).join('')}</div>`
                 : '<p class="mut">Todavía no hay equipos vinculados (se vinculan desde «App del cliente»).</p>'}
               <p class="mut">Una persona con celular y tablet: marcá los dos. El celular usa el diseño de celular y la tablet el de tablet.</p></div>
             <label class="dv-sw"><input type="checkbox" data-vdef="${esc(x.id)}" ${isDef ? 'checked' : ''}><span>Usarlo como dashboard general (lo ven los equipos que no tienen uno propio)</span></label>
@@ -767,6 +778,12 @@
         .dv-row{display:flex;align-items:center;gap:12px;padding:10px 4px;border-top:1px solid var(--divider-color,rgba(127,127,127,.15))}
         .dv-row:first-of-type{border-top:0}.dv-row .dv-t{flex:1}
         .dv-note{padding:12px 14px;border-radius:12px;background:rgba(127,127,127,.08);font-size:13px;line-height:1.5}
+        .dv-who{display:flex!important;flex-wrap:wrap;align-items:center;gap:6px;white-space:normal!important}
+        .dv-dev{display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 6px;border-radius:999px;background:rgba(3,169,244,.1);color:var(--primary-color,#03a9f4);font-weight:600}
+        .dv-dev ha-icon{--mdc-icon-size:15px}
+        .dv-shows{display:block;margin-top:4px;font-size:13px;opacity:.95}
+        .dv-pick{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:600;opacity:.95}.dv-pick span{opacity:.7}
+        .dv-row{align-items:flex-start}.dv-row .dv-pick,.dv-row .dv-chev{margin-top:4px}
       </style>
       <div class="dv">
         <div class="box"><div class="bh"><h2>Dashboards de esta casa</h2></div>
@@ -781,10 +798,11 @@
         <div class="box dv-eq"><div class="bh"><h2>Qué ve cada equipo</h2></div>
           ${people.map((p) => { const st = stale(p), dup = twinsOf(p).length > 0;
             const linked = p.created ? `vinculado el ${new Date(p.created * 1000).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
-            return `<div class="dv-row ${st ? 'stale' : ''}"><span class="dv-ic"><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon></span>
-            <span class="dv-t"><b>${esc(p.name)}</b>${st ? ' <span class="dv-tag warn">vínculo viejo (duplicado)</span>' : dup ? ' <span class="dv-tag on">el que se usa</span>' : ''}<small class="mut" style="display:block">${esc([p.model || 'sin avisos registrados', linked, ago(p.last_used)].filter(Boolean).join(' · '))}</small></span>
+            return `<div class="dv-row ${st ? 'stale' : ''}"><span class="dv-ic">${devIc(p)}</span>
+            <span class="dv-t"><b>${esc(p.name)}</b>${st ? ' <span class="dv-tag warn">vínculo viejo (duplicado)</span>' : dup ? ' <span class="dv-tag on">el que se usa</span>' : ''}<small class="mut" style="display:block">${esc([kindOf(p) === 'tablet' ? 'Tablet' : 'Celular', p.model, linked, ago(p.last_used)].filter(Boolean).join(' · '))}</small>
+              ${st ? '' : `<small class="dv-shows">${shows(p)}</small>`}</span>
             ${st ? `<button class="b warn" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" data-stale="1"><ha-icon icon="mdi:link-variant-off"></ha-icon>Quitar duplicado</button>`
-              : `<select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select>
+              : `<label class="dv-pick"><span>Dashboard</span><select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select></label>
             <button class="dv-chev" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" title="Desvincular este equipo" aria-label="Desvincular"><ha-icon icon="mdi:link-variant-off"></ha-icon></button>`}</div>`; }).join('')}
           ${people.some(stale) ? '<div class="dv-note warnn"><b>Hay equipos vinculados dos veces.</b> Pasa al volver a vincular el mismo celular o tablet (por ejemplo, al reinstalar la app). El marcado como «vínculo viejo» es el que no se usa hace más tiempo: «Quitar duplicado» lo borra y su dashboard pasa al que queda. Desde esta versión, si un equipo se vuelve a vincular, la casa reemplaza el vínculo viejo sola.</div>' : ''}
           ${loose.map((d) => `<div class="dv-row"><span class="dv-ic"><ha-icon icon="mdi:cellphone-link"></ha-icon></span><span class="dv-t"><b>${esc(d.name)}</b><small class="mut" style="display:block">${esc(d.model || '')} · acceso compartido</small></span>
