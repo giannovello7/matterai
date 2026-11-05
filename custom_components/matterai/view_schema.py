@@ -160,6 +160,7 @@ HEADER = vol.Schema({
     vol.Optional("weather"): bool,  # clima
     vol.Optional("bell"): bool,     # campanita de avisos
     vol.Optional("menu"): bool,     # menú
+    vol.Optional("casa"): bool,     # botón «Toda la casa» al final del inicio del celular
 }, extra=vol.REMOVE_EXTRA)
 
 

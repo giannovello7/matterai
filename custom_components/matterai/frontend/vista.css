@@ -308,3 +308,6 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .vista.editing .v-c0,.vista.editing .v-c1,.vista.editing .v-c2{min-height:120px}
 .vista.editing [data-ri]{cursor:grab}.vista.editing [data-ri].dragging{opacity:.35}.vista.editing [data-ri].dropb{box-shadow:0 -3px 0 var(--warm)}
 html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
+.v-allb.off{display:none!important}.vista.editing .v-allb.off{display:flex!important;opacity:.35}
+.vista.editing #v-allb{cursor:pointer;outline:1px dashed transparent;outline-offset:3px}.vista.editing #v-allb:hover{outline-color:rgba(242,183,102,.6)}.vista.editing #v-allb.zsel{outline:2px solid var(--warm)}
+.vista.editing #v-allb *{pointer-events:none}

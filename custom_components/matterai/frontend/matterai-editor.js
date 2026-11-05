@@ -384,7 +384,7 @@
       this.$('#ed').classList.toggle('dlgon', open);
       if (!open) { this.$('#dlgh').innerHTML = ''; this.$('#dlgf').innerHTML = ''; return; }
       const b = this.selBlock(), CAT = window.MaeVista.CATALOG;
-      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Opciones del dashboard'
+      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Opciones del dashboard' : this.zone === 'allb' ? 'Botón «Toda la casa»'
         : b ? `${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : '';
       const sub = this.roomEd != null || this.el != null || this.pz != null;
       const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Configuración'], ['vis', 'Visibilidad'], ['lay', 'Diseño']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
@@ -699,7 +699,8 @@
     }
     multi(label, key, chosen, options) {
       const set = new Set(chosen || []);
-      return `<h4>${esc(label)}</h4>${(chosen || []).map((x, i) => `<div class="ord"><span>${esc(options.find((o) => o[0] === x) ? options.find((o) => o[0] === x)[1] : x)}</span><button data-omv="${key}" data-i="${i}" data-d="-1">↑</button><button data-omv="${key}" data-i="${i}" data-d="1">↓</button></div>`).join('')}
+      // las elegidas se ordenan arrastrando (⋮⋮) y se sacan con ✕; abajo, la lista para sumar o sacar
+      return `<h4>${esc(label)}</h4><div class="elist">${(chosen || []).map((x, i) => `<div class="elr" draggable="true" data-sr="m:${key}" data-i="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="tx"><b>${esc(options.find((o) => o[0] === x) ? options.find((o) => o[0] === x)[1] : x)}</b></span><button data-mdel="${key}" data-i="${i}" title="Sacar">✕</button></div>`).join('')}</div>
         <div class="ml">${options.map(([v, l]) => `<label><input type="checkbox" data-mk="${key}" value="${esc(v)}" ${set.has(v) ? 'checked' : ''}> ${esc(l)}</label>`).join('')}</div>`;
     }
     drawProps() {
@@ -708,6 +709,12 @@
       this.drawDlg(); // título, pestañas y botones de la ventana (al volver de un elemento o un ambiente también)
       if (!b && this.zone === 'header') { r.innerHTML = this.headerEditor(); return; }
       if (!b && this.zone === 'dock') { r.innerHTML = this.dockEditor(); return; }
+      if (!b && this.zone === 'allb') {
+        const H = this.lay().header || {};
+        r.innerHTML = `<h4>Botón «Toda la casa»</h4><label class="chk"><input type="checkbox" data-hd="casa" ${H.casa !== false ? 'checked' : ''}> Mostrarlo (abre todos los ambientes de la casa)</label>
+          <p class="hint">Va al final del inicio del celular. Si lo sacás, los ambientes siguen en la barra de abajo con el botón «Casa» (si lo agregás).</p>`;
+        return;
+      }
       if (!b && this.zone === 'dash') {
         r.innerHTML = `<h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}" maxlength="40"></label>
           <label class="fld"><span>Modo de ${this.K === 'tablet' ? 'la tablet' : 'el celular'}</span><select data-lt="theme">${[['', 'Oscuro (grafito)'], ['light', 'Claro'], ['auto', 'Automático (como el modo claro u oscuro del equipo)']]
@@ -831,6 +838,7 @@
       if (from === to) return;
       const mv = (L) => { if (!L || from < 0 || from >= L.length || to < 0 || to >= L.length) return; const [x] = L.splice(from, 1); L.splice(to, 0, x); };
       if (g === 'room') { if (this.rdraft) { mv(this.rdraft.entities); this.drawProps(); this.syncPreview(); this.bind(); } return; }
+      if (g.startsWith('m:')) { const b0 = this.selBlock(); if (b0) this.change(() => mv((b0.cfg || {})[g.slice(2)])); return; }
       if (g === 'dock') { this.change(() => { const D = this.dockKeys(); mv(D); this.lay().dock = D; }); return; }
       const b = this.selBlock(); if (!b) return;
       this.change(() => { this.materialize(b); mv(this.elemList(b)); if (this.el === from) this.el = to; });
@@ -1209,6 +1217,7 @@
         this.toast('Subiendo…');
         try { const p = await this.upload(f); this.change(() => { b.cfg.image = p; }); this.toast('Imagen subida'); } catch (e) { this.toast(`No se pudo subir: ${e.message || e}`); }
       }; });
+      W.querySelectorAll('#edr [data-mdel]').forEach((x) => { x.onclick = () => this.change(() => { const L = b.cfg[x.dataset.mdel]; if (L) L.splice(+x.dataset.i, 1); }); });
       W.querySelectorAll('#edr [data-omv]').forEach((x) => { x.onclick = () => this.change(() => { const L = b.cfg[x.dataset.omv], i = +x.dataset.i, j = i + +x.dataset.d; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; }); });
     }
     /** «Automático» → manual: arranca con lo que la app está mostrando (así se puede cambiar lo que ya está). */

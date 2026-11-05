@@ -717,6 +717,7 @@
       } else {
         setCol('#v-c1', bl, m, addSlot(0));
         set('#v-allb', `${ic('grid')}Toda la casa`);
+        { const ab = X.el.querySelector('#v-allb'); if (ab && ab.classList) ab.classList.toggle('off', ((L.header || {}).casa) === false); }
         // reproductor: sólo con música; se esconde al botón Música
         const p = drawPlayer();
         set('#v-nav', dockHTML(m, p));
@@ -732,7 +733,7 @@
     function editMarks() {
       if (!X.el.querySelector) return;
       const z = editing() ? ctx.edit.zone : null;
-      [['#v-head', 'header'], ['#v-nav', 'dock'], ['#v-dock', 'dock']].forEach(([q, k]) => { const e = X.el.querySelector(q); if (e && e.classList) e.classList.toggle('zsel', z === k); });
+      [['#v-head', 'header'], ['#v-nav', 'dock'], ['#v-dock', 'dock'], ['#v-allb', 'allb']].forEach(([q, k]) => { const e = X.el.querySelector(q); if (e && e.classList) e.classList.toggle('zsel', z === k); });
       const sel = editing() ? ctx.edit.selected : null;
       if (sel && sel !== X.lastSel) {
         const sec = X.el.querySelector(`[data-block="${String(sel).replace(/"/g, '')}"]`);
@@ -883,6 +884,7 @@
         if (t.closest('[data-radd]') && ctx.edit.onRoom) return ctx.edit.onRoom('add');
         if (t.closest('#v-sheet')) { if (t.id === 'v-sheet' && ctx.edit.onRoom) ctx.edit.onRoom('close'); return; }
         if (t.closest('#v-head')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'header' });
+        if (t.closest('#v-allb')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'allb' });
         if (t.closest('#v-nav,#v-dock')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'dock' });
         const ea = t.closest('[data-eact]'), b = t.closest('[data-block]');
         if (ea && b && ctx.edit.onAction) return ctx.edit.onAction(b.dataset.block, ea.dataset.eact);
