@@ -96,6 +96,7 @@ CFG = vol.Schema({
     vol.Optional("min"): vol.Any(None, vol.Coerce(float)),                                # medidor del sensor
     vol.Optional("max"): vol.Any(None, vol.Coerce(float)),
     vol.Optional("tap"): ACTION,                                                          # acción de la tarjeta
+    vol.Optional("video"): vol.Any(None, vol.In(["live", "photo"])),                      # cámara: video en vivo o foto
 }, extra=vol.REMOVE_EXTRA)
 
 COND = vol.Schema({

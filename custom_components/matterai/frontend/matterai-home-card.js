@@ -3097,6 +3097,20 @@
     voiceAvailable() { return this._voiceAvailable(); }
     voice() { this._voiceStart(); }
     players() { return this._musPlayers(); }
+    /** Para el motor de dashboards: el visor de Frigate (Advanced Camera Card) con estas cámaras, en vivo.
+     *  Devuelve null si todavía no cargó (la pide y avisa con whenDefined) o si no se puede armar. */
+    liveCam(ids) {
+      const TAG = 'advanced-camera-card';
+      if (!ids || !ids.length || typeof customElements === 'undefined') return null;
+      if (!customElements.get(TAG)) { this._ensureCamCard(); return null; }
+      const base = this._config.camera_card || {}, known = base.cameras || [];
+      let cfg = Object.assign({}, base, { cameras: ids.map((id) => known.find((k) => k && k.camera_entity === id) || { camera_entity: id }) });
+      if (typeof window.__maeAdaptCamera === 'function') cfg = window.__maeAdaptCamera(cfg); // app: modo de video que anda fuera de HA
+      const el = document.createElement(TAG);
+      try { el.setConfig(Object.assign(cfg, { type: `custom:${TAG}` })); } catch (_) { return null; }
+      el.hass = this._hass;
+      return el;
+    }
     openCameras() {
       const ev = new CustomEvent('matterai-camera-card', { detail: { config: this._config.camera_card }, bubbles: true, composed: true, cancelable: true });
       if (this.dispatchEvent(ev) && this._m && this._m.cams[0]) this._moreInfo(this._m.cams[0]);

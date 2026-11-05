@@ -745,7 +745,9 @@
     /** Campos de la cámara (la cámara principal, el botón grande y las demás cámaras). */
     camFields(b, opts) {
       const c = b.cfg;
-      return this.ent('Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate')
+      return `<label class="fld"><span>Imagen</span><select data-f="cfg.video"><option value="">Video en vivo (visor de Frigate)</option><option value="photo" ${c.video === 'photo' ? 'selected' : ''}>Foto cada 10 s (para internet lento)</option></select></label>
+        <p class="hint" style="margin-top:-4px">El video se ve en el celular o la tablet (y con «Probar en el equipo»). Acá en la vista previa se muestra una foto.</p>`
+        + this.ent('Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate')
         + this.multi('Más cámaras (se pasan con «Otra cámara» o deslizando)', 'entities', c.entities, opts(PICK.camera).filter(([e]) => e !== c.entity));
     }
     /** Campos de un dato del resumen o de un botón. */

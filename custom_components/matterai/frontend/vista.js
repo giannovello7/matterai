@@ -128,7 +128,7 @@
 
   /* ───────── una instancia por pantalla ───────── */
   function create(el, ctx) {
-    const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, hist: {}, simOver: null, shown: {}, curB: null,
+    const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, hist: {}, simOver: null, shown: {}, curB: null, live: {}, colSig: {}, partCache: {},
       dismissed: new Set(load('matterai.vista.dismissed', [])) };
     const card = () => ctx.card;
     const hass = () => ctx.hass && ctx.hass();
@@ -383,8 +383,13 @@
           const g = gate ? gateState(gate) : null;
           const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}"${EL(i)}>${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
           X.shown[b.id] = c.items || [];
-          return `${t}<div class="v-cam">${cam ? `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}"><span class="v-live"><i></i>EN VIVO</span>` : '<div class="v-feed none"></div>'}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
-            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>${elAdd('Agregar un botón')}`;
+          // video en vivo con el visor de Frigate (se arma aparte y no se corta cuando cambia otra cosa) o foto cada 10 s
+          const live = !!cam && c.video !== 'photo' && liveOk();
+          const photo = cam ? `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">` : '<div class="v-feed none"></div>';
+          const feed = !cam ? photo : live && !editing() ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}">${photo}</div>` : photo;
+          const badge = !cam ? '' : live ? (editing() ? '<span class="v-live"><i></i>VIDEO EN VIVO · se ve en el equipo</span>' : '') : '<span class="v-live photo">FOTO · cada 10 s</span>';
+          return `${t}<div class="v-cam ${live && !editing() ? 'is-live' : ''}">${feed}${badge}${list.length > 1 && !(live && !editing()) ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
+            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${live && card() && card()._config && card()._config.camera_card ? `<button class="v-cbtn" data-camall="1">${ic('film')}Grabaciones</button>` : ''}${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>${elAdd('Agregar un botón')}`;
         }
         case 'rooms': {
           const names = (c.rooms && c.rooms.length) ? c.rooms : m.rooms.slice(0, 4).map((r) => r.name);
@@ -589,16 +594,59 @@
       const handle = editing() ? `<span class="v-ehandle" draggable="true" title="Arrastrar para mover la tarjeta">${ic('grid')}</span>` : '';
       return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}${sel && ctx.edit.el != null ? ' elsel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${handle}${tool}` : ''}${inner}</section>`;
     }
-    /** Una columna: las tarjetas de media columna seguidas van de a dos, una al lado de la otra. */
-    function colHTML(list, m) {
-      let out = '', buf = [];
-      const flush = () => { if (buf.length) { out += `<div class="v-halfs">${buf.join('')}</div>`; buf = []; } };
+    /** Una columna en partes: cada tarjeta (o par de medias columnas, una al lado de la otra) es una parte. */
+    function colParts(list, m) {
+      const out = []; let buf = [];
+      const flush = () => { if (buf.length) { out.push({ key: `h:${buf.map((x) => x.id).join(',')}`, html: `<div class="v-halfs">${buf.map((x) => x.h).join('')}</div>` }); buf = []; } };
       list.forEach((b) => {
         const h = wrapBlock(b, m); if (!h) return;
-        if (b.size === 'half') { buf.push(h); if (buf.length === 2) flush(); } else { flush(); out += h; }
+        if (b.size === 'half') { buf.push({ id: b.id, h }); if (buf.length === 2) flush(); } else { flush(); out.push({ key: b.id, html: h }); }
       });
       flush();
       return out;
+    }
+    function colHTML(list, m) { return colParts(list, m).map((x) => x.html).join(''); }
+    /** Dibuja una columna cambiando sólo las tarjetas que cambiaron (una luz que se prende no corta el video de la cámara). */
+    function setCol(sel, list, m, tail) {
+      const parts = colParts(list, m), html = parts.map((x) => x.html).join('') + (tail || '');
+      const e = X.el.querySelector(sel);
+      if (!e || X.cache[sel] === html) return;
+      const sig = `${parts.map((x) => x.key).join('|')}#${tail || ''}`;
+      const real = e.children && typeof document !== 'undefined' && document.createElement;
+      if (real && X.colSig[sel] === sig && e.children.length === parts.length + (tail ? 1 : 0)) {
+        parts.forEach((x, i) => {
+          const k = `${sel}|${x.key}`;
+          if (X.partCache[k] === x.html) return;
+          const tpl = document.createElement('template'); tpl.innerHTML = x.html;
+          const nu = tpl.content.firstElementChild; if (nu) e.children[i].replaceWith(nu);
+        });
+      } else e.innerHTML = html;
+      X.cache[sel] = html; X.colSig[sel] = sig;
+      parts.forEach((x) => { X.partCache[`${sel}|${x.key}`] = x.html; });
+    }
+    /** ¿Se puede mostrar video en vivo? (la tarjeta MatterAI sabe armar el visor de Frigate) */
+    function liveOk() { const c = card(); return !!(c && typeof c.liveCam === 'function'); }
+    /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
+    function mountLive() {
+      if (!X.el.querySelectorAll || editing()) return;
+      const seen = new Set();
+      X.el.querySelectorAll('[data-live]').forEach((slot) => {
+        const id = slot.dataset.live, key = slot.dataset.key; seen.add(id);
+        let L = X.live[id];
+        if (!L || L.key !== key) {
+          const elx = card().liveCam([key].concat((X.camList[id] || []).filter((x) => x !== key)));
+          if (!elx) { waitLive(); return; }
+          L = X.live[id] = { el: elx, key };
+        }
+        L.el.hass = hass();
+        if (L.el.parentNode !== slot) { slot.innerHTML = ''; slot.appendChild(L.el); }
+      });
+      Object.keys(X.live).forEach((id) => { if (!seen.has(id)) delete X.live[id]; });
+    }
+    function waitLive() {
+      if (X.liveWait || typeof customElements === 'undefined') return;
+      X.liveWait = true;
+      customElements.whenDefined('advanced-camera-card').then(() => { X.liveWait = false; X.cache = {}; X.partCache = {}; render(); });
     }
     /** En el editor: al final de cada columna, «+ Agregar tarjeta» (como en Home Assistant). */
     const addSlot = (col) => (editing() && ctx.edit.onAdd ? `<button class="v-eadd" data-eadd="${col}">+ Agregar tarjeta</button>` : '');
@@ -611,7 +659,7 @@
       const vertical = K === 'tablet' && (ori === 'portrait' || (ori === 'auto' && typeof innerHeight !== 'undefined' && innerHeight > innerWidth));
       const sig = `${K}|${vertical}|${editing()}`;
       if (X.shell !== sig) {
-        X.shell = sig; X.cache = {};
+        X.shell = sig; X.cache = {}; X.colSig = {}; X.partCache = {};
         X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}`;
         X.el.innerHTML = K === 'tablet'
           ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
@@ -621,12 +669,12 @@
       const bl = L.blocks;
       if (K === 'tablet') {
         // columna del plano (0), y las dos columnas de tarjetas
-        set('#v-c0', colHTML(bl.filter((b) => (b.col || 0) === 0), m) + addSlot(0));
+        setCol('#v-c0', bl.filter((b) => (b.col || 0) === 0), m, addSlot(0));
         // el resumen va de lado a lado sobre las dos columnas (como en el diseño)
         const top = (b) => b.type === 'kpis' && (b.col || 0) !== 0;
-        set('#v-top', colHTML(bl.filter(top), m));
-        set('#v-c1', colHTML(bl.filter((b) => b.col === 1 && !top(b)), m) + addSlot(1));
-        set('#v-c2', colHTML(bl.filter((b) => b.col === 2 && !top(b)), m) + addSlot(2));
+        setCol('#v-top', bl.filter(top), m, '');
+        setCol('#v-c1', bl.filter((b) => b.col === 1 && !top(b)), m, addSlot(1));
+        setCol('#v-c2', bl.filter((b) => b.col === 2 && !top(b)), m, addSlot(2));
         fit(vertical);
         const c = card();
         const p = drawPlayer();
@@ -636,7 +684,7 @@
             : k === 'musica' ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`
             : `<button class="${j === 0 ? 'on' : ''}" data-scr="${k}">${ic(i)}${t2}</button>`)).join(''));
       } else {
-        set('#v-c1', colHTML(bl, m) + addSlot(0));
+        setCol('#v-c1', bl, m, addSlot(0));
         set('#v-allb', `${ic('grid')}Toda la casa`);
         // reproductor: sólo con música; se esconde al botón Música
         const p = drawPlayer();
@@ -649,6 +697,7 @@
       else if (X.sheet === 'roomedit') closeSheet();
       if (X.sheet) renderSheet();
       placeElTool();
+      mountLive();
     }
     /** Editor: barrita arriba del elemento elegido (subir, bajar, sacar). */
     function placeElTool() {
@@ -812,6 +861,7 @@
       const mp = t.closest('[data-mp]'); if (mp) { vib(); return c.call('media_player', 'media_play_pause', { entity_id: mp.dataset.mp }); }
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
       const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, 1);
+      if (t.closest('[data-camall]')) return c.openCameras();
       if (t.closest('[data-bri]')) return undefined; // el brillo se maneja al soltar (change)
       const ct = t.closest('[data-ctemp]'); if (ct) {
         const s = st(ct.dataset.ctemp); if (!s) return undefined;
@@ -912,7 +962,8 @@
     el.addEventListener('dragend', () => { dragId = null; clearMarks(); });
     const refreshCam = () => {
       if (!X.el || X.el.hidden || (typeof document !== 'undefined' && document.hidden)) return;
-      X.el.querySelectorAll('img[data-cam]').forEach((im) => { const s = camSrc(im.dataset.cam); if (s && im.getAttribute('src') !== s) im.src = s; });
+      X.el.querySelectorAll('img[data-cam]').forEach((im) => {
+        if (im.closest && im.closest('[data-live]') && im.closest('[data-live]').querySelector('advanced-camera-card')) return; const s = camSrc(im.dataset.cam); if (s && im.getAttribute('src') !== s) im.src = s; });
     };
     X.camT = setInterval(refreshCam, 10000);
     const onResize = () => { if (kind() === 'tablet') { X.shell = null; render(); } };
