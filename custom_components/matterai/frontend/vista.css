@@ -192,3 +192,12 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-btag{position:absolute;z-index:3;top:-9px;right:6px;padding:1px 8px;border-radius:8px;background:var(--card2);border:1px solid var(--line);font-size:10.5px;color:var(--muted)}
 .vista.editing .v-b.sel .v-btag{background:var(--warm);color:#1b1408;border:0}
 .vista.editing .v-nav,.vista.editing .v-player,.vista.editing .v-dock{pointer-events:none}
+.vista.editing .v-b{cursor:grab}.vista.editing .v-b.dragging{opacity:.35}
+.vista.editing .v-b.dropb{box-shadow:0 -4px 0 var(--warm)}.vista.editing .v-b.dropa{box-shadow:0 4px 0 var(--warm)}
+.v-etool{position:absolute;z-index:4;top:-15px;left:8px;display:flex;gap:2px;padding:2px;border-radius:9px;background:var(--warm);box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.vista.editing .v-b .v-etool,.vista.editing .v-b .v-etool *{pointer-events:auto}
+.v-etool button{width:26px;height:24px;display:grid;place-items:center;border:0;border-radius:7px;background:none;color:#1b1408;cursor:pointer;padding:0}
+.v-etool button:hover{background:rgba(0,0,0,.14)}.v-etool .i{width:15px;height:15px;stroke:#1b1408}
+.v-eadd{display:block;width:100%;margin:4px 0 10px;padding:12px;border-radius:14px;border:1px dashed rgba(160,175,200,.35);background:none;color:var(--muted);font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.v-eadd:hover{border-color:var(--warm);color:var(--warm)}
+.vista.editing .v-c0,.vista.editing .v-c1,.vista.editing .v-c2{min-height:120px}

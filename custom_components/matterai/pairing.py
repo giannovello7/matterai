@@ -73,6 +73,27 @@ async def async_forget(hass: HomeAssistant, user_id: str) -> bool:
     return True
 
 
+async def async_replace_twins(hass: HomeAssistant, user_id: str) -> int:
+    """El mismo equipo se volvió a vincular: el vínculo viejo se borra y lo suyo (dashboard, registro de la app
+    con avisos y ubicación) pasa al nuevo. Así nunca aparecen dos «Tablet» iguales."""
+    rt = _rt(hass)
+    if rt is None:
+        return 0
+    house, views = rt["house"], rt.get("views")
+    n = 0
+    for old in house.twins(user_id):
+        if views is not None and views.users.get(old) and not views.users.get(user_id):
+            views.set_user(user_id, views.users[old])
+        for e in app_entries(hass):
+            if e.data.get("user_id") == old:
+                hass.config_entries.async_update_entry(e, data={**e.data, "user_id": user_id})
+        name = (house.devices.get(old) or {}).get("name", "")
+        if await async_forget(hass, old):
+            audit_log(hass, "access", "vínculo anterior del mismo equipo reemplazado", name)
+            n += 1
+    return n
+
+
 class PairView(HomeAssistantView):
     """La app canjea el código del QR / link por el acceso de ese equipo."""
 
@@ -108,13 +129,15 @@ class PairView(HomeAssistantView):
         if not isinstance(body, dict) or not isinstance(body.get("code"), str):
             return self.json({"ok": False, "msg": "Pedido inválido"}, status_code=400, headers=headers)
         rt = _rt(self.hass)
-        got = await rt["house"].async_redeem(body["code"].strip(), body.get("name") or "") if rt else None
+        install = body.get("install") if isinstance(body.get("install"), str) else None
+        got = await rt["house"].async_redeem(body["code"].strip(), body.get("name") or "", install) if rt else None
         if got is None:
             self._fail(ip)
             return self.json({"ok": False, "msg": "Este código ya se usó o venció. Pedí uno nuevo."}, status_code=403, headers=headers)
         user_id, token = got
         d = rt["house"].devices.get(user_id) or {}
         audit_log(self.hass, "access", "equipo vinculado", d.get("name", ""), "QR del instalador" if d.get("via") == "pair" else "agregado desde la app", f"desde {ip}")
+        await async_replace_twins(self.hass, user_id)
         return self.json({"ok": True, "token": token, "user_id": user_id}, headers=headers)
 
 
@@ -131,13 +154,14 @@ def async_register_view(hass: HomeAssistant) -> None:
     vol.Required("type"): f"{DOMAIN}/app/upgrade",
     vol.Optional("name", default=""): str,
     vol.Optional("device_id", default=""): str,
+    vol.Optional("install"): vol.All(str, vol.Length(max=128)),
 })
 @websocket_api.async_response
 async def ws_app_upgrade(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     """Un equipo con el acceso compartido (versión anterior) recibe el suyo. No cambia nada para el cliente."""
     rt = _rt(hass)
     shared_id = connection.user.id
-    got = await rt["house"].async_upgrade(shared_id, msg["name"]) if rt else None
+    got = await rt["house"].async_upgrade(shared_id, msg["name"], msg.get("install")) if rt else None
     if got is None:
         connection.send_error(msg["id"], "not_shared", "Este equipo ya tiene su propio acceso")
         return
@@ -146,6 +170,7 @@ async def ws_app_upgrade(hass: HomeAssistant, connection: websocket_api.ActiveCo
     for e in app_entries(hass):
         if msg["device_id"] and e.data.get("device_id") == msg["device_id"] and e.data.get("user_id") == shared_id:
             hass.config_entries.async_update_entry(e, data={**e.data, "user_id": got[0]})
+    await async_replace_twins(hass, got[0])
     connection.send_result(msg["id"], {"token": got[1], "user_id": got[0]})
 
 

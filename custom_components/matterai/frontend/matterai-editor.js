@@ -94,12 +94,25 @@
   .slot{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px}.slot img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:#0d1116}.slot span{flex:1}
   .zl{padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px;border:1px solid transparent;cursor:pointer}.zl.sel{border-color:#f2b766}
   .toastE{position:fixed;z-index:70;left:50%;bottom:22px;transform:translateX(-50%);background:#262e3a;border:1px solid rgba(160,175,200,.2);padding:10px 16px;border-radius:12px;display:none}
+  .ed-top h2 .dirt{font-size:11.5px;font-weight:600;color:#f2b766;margin-left:6px;vertical-align:middle}
+  .eb:disabled{opacity:.4;cursor:default}.eb.ico{padding:7px 11px;font-size:16px;line-height:1}
+  .eb.pri2{border-color:rgba(242,183,102,.5);color:#f2b766;font-weight:700}
+  .emenu{position:relative}.emenu-l{position:absolute;right:0;top:calc(100% + 6px);z-index:30;min-width:240px;display:flex;flex-direction:column;padding:6px;border-radius:12px;background:#1e242e;border:1px solid rgba(160,175,200,.25);box-shadow:0 16px 40px rgba(0,0,0,.5)}
+  .emenu-l button{border:0;background:none;text-align:left;padding:9px 10px;border-radius:8px}.emenu-l button:hover{background:#262e3a}.emenu-l button:disabled{opacity:.4}
+  .catp{position:fixed;inset:0;z-index:75;background:rgba(5,7,10,.7);display:flex;align-items:flex-start;justify-content:center;padding:8vh 20px 20px}
+  .catin{width:min(720px,100%);max-height:80vh;display:flex;flex-direction:column;background:#161b21;border:1px solid rgba(160,175,200,.25);border-radius:18px;box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden}
+  .cath{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 0}.cath b{font-size:16px}
+  .catin input{margin:12px 16px;padding:10px 12px;border-radius:10px;border:1px solid #f2b766;background:#0d1116;color:#e9ecf2;font:inherit;outline:0}
+  .catg{overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;padding:0 16px 16px}
+  .catg button{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;background:#1e242e;border:1px solid rgba(160,175,200,.15);text-align:left}
+  .catg button:hover{border-color:#f2b766}.catg b{display:block;font-weight:600}.catg small{color:#8f99ab;font-size:12px}
+  .cic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#262e3a}.cic svg{width:20px;height:20px;fill:none;stroke:#f2b766;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   @media (max-width:1100px){.ed{grid-template-columns:240px 1fr 300px}}`;
 
   function open(panel, viewId) { return new Editor(panel, viewId).start(); }
 
   class Editor {
-    constructor(panel, viewId) { this.p = panel; this.hass = panel._hass; this.viewId = viewId; this.sel = null; this.undo = []; }
+    constructor(panel, viewId) { this.p = panel; this.hass = panel._hass; this.viewId = viewId; this.sel = null; this.undo = []; this.redo = []; }
 
     async start() {
       await loadScript(`${BASE}/vista.js?t=${Date.now()}`);
@@ -129,9 +142,128 @@
       this.draw();
       this.resH = () => this.sizeFrame();
       window.addEventListener('resize', this.resH);
-      this.keyH = (e) => { if (e.key === 'Escape' && !this.pe) this.close(); };
+      this.keyH = (e) => this.onKey(e);
       window.addEventListener('keydown', this.keyH);
+      this.unloadH = (e) => { if (this.dirty()) { e.preventDefault(); e.returnValue = ''; } };
+      window.addEventListener('beforeunload', this.unloadH);
+      // la vista previa sigue el estado de la casa en vivo (luces, portón, música…)
+      this.liveT = setInterval(() => {
+        const h = this.p._hass;
+        if (!h || h === this.hass) return;
+        this.hass = h;
+        if (this.card) this.card.hass = h;
+        if (this.vista) this.vista.render();
+      }, 1500);
       return this;
+    }
+    /** Atajos: Ctrl+Z / Ctrl+Y (o Ctrl+Shift+Z), Ctrl+S, Ctrl+D duplicar, Supr borrar, flechas mover, Esc. */
+    onKey(e) {
+      const path = e.composedPath ? e.composedPath() : [];
+      const typing = path.some((x) => x && /^(INPUT|TEXTAREA|SELECT)$/.test(x.tagName || '') && x.type !== 'checkbox');
+      const mod = e.ctrlKey || e.metaKey, k = (e.key || '').toLowerCase();
+      if (e.key === 'Escape') {
+        if (this.cb) return this.closeCB();
+        if (this.catBox) return this.closeCatalog();
+        if (this.pe) return this.closePlan();
+        if (typing) return undefined;
+        if (this.sel) return this.pick(null);
+        return this.close();
+      }
+      if (mod && k === 's') { e.preventDefault(); if (this.dirty()) this.cmd('save'); return undefined; }
+      if (typing || this.pe) return undefined;
+      if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); return this.cmd('undo'); }
+      if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); return this.cmd('redo'); }
+      if (!this.sel) return undefined;
+      if (mod && k === 'd') { e.preventDefault(); return this.blockAct(this.sel, 'dup'); }
+      if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); return this.blockAct(this.sel, 'del'); }
+      if (e.altKey && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) { e.preventDefault(); return this.blockAct(this.sel, e.key === 'ArrowUp' ? 'up' : 'down'); }
+      return undefined;
+    }
+    /** Lo que se hace con una tarjeta (desde la lista, la barra de la vista previa o el teclado). */
+    blockAct(id, act) {
+      const B = this.blocks(), i = B.findIndex((b) => b.id === id); if (i < 0) return;
+      if (act === 'up' || act === 'down') return this.change(() => this.move(id, act === 'up' ? -1 : 1));
+      if (act === 'left' || act === 'right') return this.change(() => { B[i].col = Math.max(0, Math.min(2, (B[i].col || 0) + (act === 'left' ? -1 : 1))); });
+      if (act === 'dup') return this.change(() => { const nb = clone(B[i]); nb.id = this.newId(nb.type); B.splice(i + 1, 0, nb); this.sel = nb.id; });
+      if (act === 'del') {
+        const name = (window.MaeVista.CATALOG[B[i].type] || {}).name || B[i].type;
+        this.change(() => { B.splice(i, 1); if (this.sel === id) { this.sel = null; this.roomEd = null; this.rdraft = null; } });
+        this.toast(`Tarjeta «${name}» borrada · Ctrl+Z para deshacer`);
+      }
+      return undefined;
+    }
+    newId(type) { return `${type}-${window.MaeVista.uid()}`.slice(0, 24); }
+    /** Arrastrar dentro de la vista previa: antes / después de otra tarjeta, o al final de una columna. */
+    moveTo(from, where) {
+      this.change(() => {
+        const B = this.blocks(), i = B.findIndex((b) => b.id === from); if (i < 0) return;
+        const [b] = B.splice(i, 1);
+        if (where.target) {
+          const j = B.findIndex((x) => x.id === where.target);
+          if (j < 0) { B.splice(i, 0, b); return; }
+          b.col = B[j].col || 0;
+          B.splice(j + (where.after ? 1 : 0), 0, b);
+        } else { b.col = this.K === 'tablet' ? where.col || 0 : 0; B.push(b); }
+        this.sel = b.id;
+      });
+    }
+    /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
+    addBlock(type, col) {
+      const K = this.K, CAT = window.MaeVista.CATALOG;
+      const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] } }[type] || {};
+      const titled = ['rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away'];
+      const b = { id: this.newId(type), type, col: K === 'tablet' ? (col != null ? col : type === 'plan' ? 0 : 1) : 0, cfg };
+      if (titled.includes(type)) b.title = CAT[type].name;
+      this.change(() => { this.blocks().push(b); this.sel = b.id; this.roomEd = null; this.rdraft = null; });
+    }
+    /** Catálogo de tarjetas (como «Agregar tarjeta» de Home Assistant), con buscador. */
+    openCatalog(col) {
+      this.closeCatalog();
+      const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun' };
+      const box = document.createElement('div');
+      box.className = 'catp';
+      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' && col != null ? ` · ${col === 0 ? 'columna del plano' : `columna ${col}`}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
+        <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div></div>`;
+      this.wrap.appendChild(box);
+      this.catBox = box;
+      const inp = box.querySelector('input'), g = box.querySelector('.catg');
+      const paint = () => {
+        const q = inp.value.trim().toLowerCase();
+        const list = Object.entries(CAT).filter(([, c]) => c.kinds.includes(K)).filter(([k, c]) => !q || `${k} ${c.name} ${c.desc}`.toLowerCase().includes(q));
+        g.innerHTML = list.map(([k, c]) => `<button data-ck="${k}"><span class="cic">${window.MaeVista.icon(ICO[k] || 'grid')}</span><span><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></span></button>`).join('') || '<p class="hint">No hay tarjetas con ese nombre.</p>';
+      };
+      inp.oninput = paint;
+      inp.onkeydown = (e) => { if (e.key === 'Enter') { const f = g.querySelector('[data-ck]'); if (f) f.click(); } };
+      box.onclick = (e) => {
+        if (e.target === box || e.target.closest('[data-cx]')) return this.closeCatalog();
+        const ck = e.target.closest('[data-ck]'); if (!ck) return undefined;
+        this.closeCatalog(); this.addBlock(ck.dataset.ck, col);
+        return undefined;
+      };
+      paint(); inp.focus();
+    }
+    closeCatalog() { if (this.catBox) { this.catBox.remove(); this.catBox = null; } }
+    /** Copia el diseño del otro equipo (celular ↔ tablet) adaptando las columnas. */
+    copyFrom(other) {
+      const src = ((this.v.layouts || {})[other] || {}).blocks || [];
+      if (!src.length) { this.toast('El otro diseño todavía no tiene tarjetas'); return; }
+      if (this.blocks().length && !confirm(`¿Reemplazar las tarjetas de ${this.K === 'tablet' ? 'la tablet' : 'el celular'} por las ${other === 'tablet' ? 'de la tablet' : 'del celular'}?`)) return;
+      const CAT = window.MaeVista.CATALOG;
+      const ordered = other === 'tablet' ? src.slice().sort((a, b) => (a.col || 0) - (b.col || 0)) : src;
+      let n = 0;
+      const out = ordered.filter((b) => (CAT[b.type] || { kinds: [] }).kinds.includes(this.K)).map((b) => {
+        const nb = clone(b); nb.id = this.newId(nb.type);
+        nb.col = this.K === 'tablet' ? (nb.type === 'plan' ? 0 : nb.type === 'kpis' ? 1 : 1 + (n++ % 2)) : 0;
+        return nb;
+      });
+      this.change(() => { this.lay().blocks = out; this.sel = null; });
+      this.toast(`Listo: copiado ${other === 'tablet' ? 'de la tablet' : 'del celular'}`);
+    }
+    /** El prearmado que se pone solo al abrir no cuenta como cambio sin guardar. */
+    baseline() {
+      const s = this.saved; if (!s) return;
+      (s.layouts = s.layouts || {})[this.K] = clone(this.lay());
+      if (!s.plan && this.v.plan) s.plan = clone(this.v.plan);
     }
     /** Un dashboard tiene el diseño del celular y el de la tablet (layouts); los viejos tenían una sola lista. */
     static normalize(v) {
@@ -151,7 +283,7 @@
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
     toast(t) { const e = this.$('#toastE'); e.textContent = t; e.style.display = 'block'; clearTimeout(this.tt); this.tt = setTimeout(() => { e.style.display = 'none'; }, 2200); }
     dirty() { return JSON.stringify(this.v) !== JSON.stringify(this.saved); }
-    push() { this.undo.push(JSON.stringify(this.v)); if (this.undo.length > 60) this.undo.shift(); }
+    push() { this.undo.push(JSON.stringify(this.v)); if (this.undo.length > 80) this.undo.shift(); this.redo = []; }
     change(fn) { this.push(); fn(); this.draw(); }
 
     prearmado(silent) {
@@ -162,18 +294,23 @@
       l.blocks = d.blocks;
       if (!this.v.plan && d.plan) this.v.plan = d.plan;
       if (this.K === 'tablet' && !l.orientation) l.orientation = d.orientation || 'landscape';
-      if (!silent) { this.sel = null; this.draw(); this.toast('Listo: el prearmado con los equipos de esta casa'); }
+      if (silent) this.baseline();
+      else { this.sel = null; this.draw(); this.toast('Listo: el prearmado con los equipos de esta casa'); }
     }
 
     /* ───────── dibujo ───────── */
     draw() {
-      const v = this.v, K = this.K, ori = this.lay().orientation || 'landscape';
-      this.$('#edt').innerHTML = `<button class="eb" data-e="close">← Volver</button><h2>${esc(v.name)}</h2>
+      const v = this.v, K = this.K, ori = this.lay().orientation || 'landscape', dirty = this.dirty();
+      const other = K === 'tablet' ? 'phone' : 'tablet', hasOther = !!(((v.layouts || {})[other] || {}).blocks || []).length;
+      this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver (Esc)">← Volver</button><h2>${esc(v.name)}${dirty ? ' <span class="dirt" title="Hay cambios sin guardar">● sin guardar</span>' : ''}</h2>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
-          <button class="eb" data-e="plan">Plano e imágenes</button><span class="sp"></span>
-          <button class="eb" data-e="undo" ${this.undo.length ? '' : 'disabled'}>Deshacer</button><button class="eb" data-e="pre">Prearmado</button>
-          <button class="eb" data-e="reset" ${this.dirty() ? '' : 'disabled'}>Descartar cambios</button><button class="eb pri" data-e="save" ${this.dirty() ? '' : 'disabled'}>Guardar</button>`;
+          <button class="eb pri2" data-e="add" title="Agregar una tarjeta">+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button><span class="sp"></span>
+          <button class="eb ico" data-e="undo" ${this.undo.length ? '' : 'disabled'} title="Deshacer (Ctrl+Z)">↶</button><button class="eb ico" data-e="redo" ${this.redo.length ? '' : 'disabled'} title="Rehacer (Ctrl+Y)">↷</button>
+          <span class="emenu"><button class="eb" data-e="more" title="Más opciones">Más ▾</button>${this.moreOpen ? `<span class="emenu-l">
+            <button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
+            <button data-e="reset" ${dirty ? '' : 'disabled'}>Descartar los cambios</button></span>` : ''}</span>
+          <button class="eb pri" data-e="save" ${dirty ? '' : 'disabled'} title="Guardar (Ctrl+S)">Guardar</button>`;
       this.drawList(); this.drawPreview(); this.drawProps(); this.bind();
     }
     blocks() { const l = this.lay(); return l.blocks || (l.blocks = []); }
@@ -189,7 +326,8 @@
         [['Columna del plano', 0], ['Columna 1', 1], ['Columna 2', 2]].forEach(([t, c]) => { h += `<h4 style="margin-top:6px">${t}</h4><div class="colbox" data-colbox="${c}">${B.filter((b) => (b.col || 0) === c).map(row).join('') || '<span class="hint">Arrastrá tarjetas acá</span>'}</div>`; });
       } else h += `<div class="colbox" data-colbox="0">${B.map(row).join('') || '<span class="hint">Agregá tarjetas del catálogo</span>'}</div>`;
       h += `<h4>Agregar tarjeta</h4><div class="cat">${Object.entries(CAT).filter(([, c]) => c.kinds.includes(K)).map(([k, c]) => `<button data-add="${k}"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></button>`).join('')}</div>
-        <p class="hint" style="margin-top:12px">Arrastrá las tarjetas con el mouse (o usá las flechas) para ordenarlas. Tocá una en la vista previa para editarla.</p>`;
+        <p class="hint" style="margin-top:12px">Tocá una tarjeta en la vista previa para editarla y arrastrala para moverla (también acá, en la lista).</p>
+        <p class="hint">Atajos: <b>Ctrl+Z</b> deshacer · <b>Ctrl+Y</b> rehacer · <b>Ctrl+S</b> guardar · <b>Ctrl+D</b> duplicar · <b>Supr</b> borrar · <b>Alt+↑/↓</b> mover · <b>Esc</b> soltar la tarjeta.</p>`;
       this.$('#edl').innerHTML = h;
     }
     summary(b) {
@@ -217,7 +355,7 @@
      *  ancho se comportan como en el equipo, y los estilos del panel no la tocan. */
     drawPreview() {
       const size = this.sizeFrame(), fr = this.$('#frame');
-      const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: { selected: this.sel, onSelect: (id) => this.pick(id) } });
+      const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: this.editCtx() });
       if (this.vista && this.ifr && this.ifr.isConnected) { this.vista.setCtx(ctx()); this.vista.setView(this.viewFor()); return; }
       if (!this.card) { fr.innerHTML = '<p style="padding:20px;color:#8f99ab">La vista previa necesita la tarjeta MatterAI (recargá la página).</p>'; return; }
       fr.innerHTML = '';
@@ -239,7 +377,18 @@
       fr.appendChild(ifr);
       void size;
     }
-    pick(id) { if (id !== this.sel) { this.roomEd = null; this.rdraft = null; } this.sel = id; this.drawList(); this.drawProps(); if (this.vista) this.vista.setCtx({ edit: { selected: id, onSelect: (x) => this.pick(x) } }); this.bind(); }
+    /** Lo que la vista previa puede hacer en el editor: elegir, la barra de la tarjeta, arrastrar y agregar. */
+    editCtx() {
+      return { selected: this.sel, onSelect: (x) => this.pick(x), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
+        onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col) };
+    }
+    pick(id) {
+      id = id || null;
+      if (id !== this.sel) { this.roomEd = null; this.rdraft = null; }
+      this.sel = id; this.drawList(); this.drawProps();
+      if (this.vista) this.vista.setCtx({ edit: this.editCtx() });
+      this.bind();
+    }
 
     /* ───────── propiedades ───────── */
     entOptions(domains, val) {
@@ -315,7 +464,7 @@
       const m = this.model(), rooms = m ? m.rooms.map((r) => r.name) : [];
       const SCR = window.MaeVista.SCREEN_NAMES;
       return `<div class="act"><label class="fld"><span>${esc(title)}</span><select data-f="${path}.type">${ACTION_TYPES.map(([k, l]) => `<option value="${k}" ${a.type === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-        ${a.type === 'room' ? `<label class="fld"><span>Ambiente</span><select data-f="${path}.room">${rooms.map((r) => `<option ${a.room === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>` : ''}
+        ${a.type === 'room' ? `<label class="fld"><span>Ambiente</span><select data-f="${path}.room">${a.room && !rooms.includes(a.room) ? `<option selected>${esc(a.room)}</option>` : ''}${rooms.map((r) => `<option ${a.room === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>` : ''}
         ${a.type === 'screen' ? `<label class="fld"><span>Pantalla</span><select data-f="${path}.screen">${Object.entries(SCR).map(([k, l]) => `<option value="${k}" ${a.screen === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>` : ''}
         ${a.type === 'more_info' || a.type === 'toggle' ? this.ent('Equipo (vacío: el del botón)', 'ae', a.entity, null, `${path}.entity`) : ''}
         ${a.type === 'service' ? `<label class="fld"><span>Servicio (dominio.servicio)</span><input data-f="${path}.service" value="${esc(a.service || '')}" placeholder="script.turn_on"></label>
@@ -448,9 +597,11 @@
     bind() {
       const W = this.wrap;
       W.querySelectorAll('[data-e]').forEach((x) => { x.onclick = () => this.cmd(x.dataset.e); });
+      const ed = W.querySelector('#ed');
+      if (ed) ed.onclick = (e) => { if (this.moreOpen && !e.composedPath().some((x) => x.classList && x.classList.contains('emenu'))) { this.moreOpen = false; this.draw(); } };
       W.querySelectorAll('[data-kind]').forEach((x) => { x.onclick = () => {
         if (x.dataset.kind === this.K) return;
-        this.K = x.dataset.kind; this.sel = null;
+        this.K = x.dataset.kind; this.sel = null; this.roomEd = null; this.rdraft = null;
         if (!this.blocks().length) this.prearmado(true); // todavía no tiene diseño para este tipo: arranca del prearmado
         this.draw();
       }; });
@@ -460,34 +611,30 @@
         [...sel.options].forEach((o) => { o.hidden = !!q && o.value !== '' && !(`${o.textContent} ${o.value}`.toLowerCase().includes(q)); });
         const first = [...sel.options].find((o) => !o.hidden && o.value); if (q && first) sel.size = Math.min(8, [...sel.options].filter((o) => !o.hidden).length + 1); else sel.size = 0;
       }; });
-      W.querySelectorAll('[data-add]').forEach((x) => { x.onclick = () => this.change(() => {
-        const K = this.K, id = `${x.dataset.add}-${window.MaeVista.uid()}`.slice(0, 24);
-        const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] } }[x.dataset.add] || {};
-        this.blocks().push({ id, type: x.dataset.add, col: K === 'tablet' ? (x.dataset.add === 'plan' ? 0 : 1) : 0, title: window.MaeVista.CATALOG[x.dataset.add].name, cfg });
-        this.sel = id;
-      }); });
-      // lista: flechas, duplicar, borrar, elegir
+      W.querySelectorAll('[data-add]').forEach((x) => { x.onclick = () => this.addBlock(x.dataset.add); });
+      // lista: flechas, duplicar, borrar, elegir (con on… y no addEventListener: se puede volver a enlazar sin duplicar)
       W.querySelectorAll('[data-bl]').forEach((row) => {
         const id = row.dataset.bl;
         row.onclick = (e) => {
-          const B = this.blocks(), i = B.findIndex((b) => b.id === id); if (i < 0) return;
-          if (e.target.closest('[data-mv]')) { const d = +e.target.closest('[data-mv]').dataset.mv; return this.change(() => this.move(id, d)); }
-          if (e.target.closest('[data-col]')) { const d = +e.target.closest('[data-col]').dataset.col; return this.change(() => { B[i].col = Math.max(0, Math.min(2, (B[i].col || 0) + d)); }); }
-          if (e.target.closest('[data-dup]')) return this.change(() => { const nb = clone(B[i]); nb.id = `${nb.type}-${window.MaeVista.uid()}`.slice(0, 24); B.splice(i + 1, 0, nb); this.sel = nb.id; });
-          if (e.target.closest('[data-del]')) return this.change(() => { B.splice(i, 1); if (this.sel === id) this.sel = null; });
-          if (this.sel !== id) { this.roomEd = null; this.rdraft = null; } this.sel = id; this.draw();
+          const t = e.target.closest('[data-mv],[data-col],[data-dup],[data-del]');
+          if (t) {
+            if (t.dataset.mv) return this.blockAct(id, t.dataset.mv === '-1' ? 'up' : 'down');
+            if (t.dataset.col) return this.blockAct(id, t.dataset.col === '-1' ? 'left' : 'right');
+            return this.blockAct(id, t.hasAttribute('data-dup') ? 'dup' : 'del');
+          }
+          return this.pick(id);
         };
         // arrastrar con el mouse
-        row.addEventListener('dragstart', (e) => { this.dragId = id; row.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', id); } catch (_) { /* navegador viejo */ } });
-        row.addEventListener('dragend', () => { row.classList.remove('drag'); W.querySelectorAll('.over').forEach((o) => o.classList.remove('over')); });
-        row.addEventListener('dragover', (e) => { e.preventDefault(); row.classList.add('over'); });
-        row.addEventListener('dragleave', () => row.classList.remove('over'));
-        row.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); const from = this.dragId; this.dragId = null; if (from && from !== id) this.change(() => this.dropBefore(from, id)); });
+        row.ondragstart = (e) => { this.dragId = id; row.classList.add('drag'); e.dataTransfer.effectAllowed = 'move'; try { e.dataTransfer.setData('text/plain', id); } catch (_) { /* navegador viejo */ } };
+        row.ondragend = () => { row.classList.remove('drag'); W.querySelectorAll('.over').forEach((o) => o.classList.remove('over')); };
+        row.ondragover = (e) => { e.preventDefault(); row.classList.add('over'); };
+        row.ondragleave = () => row.classList.remove('over');
+        row.ondrop = (e) => { e.preventDefault(); e.stopPropagation(); const from = this.dragId; this.dragId = null; if (from && from !== id) this.change(() => this.dropBefore(from, id)); };
       });
       W.querySelectorAll('[data-colbox]').forEach((box) => {
-        box.addEventListener('dragover', (e) => { e.preventDefault(); box.classList.add('over'); });
-        box.addEventListener('dragleave', () => box.classList.remove('over'));
-        box.addEventListener('drop', (e) => { e.preventDefault(); const from = this.dragId; this.dragId = null; if (!from) return; this.change(() => { const B = this.blocks(), i = B.findIndex((b) => b.id === from); const [b] = B.splice(i, 1); b.col = +box.dataset.colbox; B.push(b); }); });
+        box.ondragover = (e) => { e.preventDefault(); box.classList.add('over'); };
+        box.ondragleave = () => box.classList.remove('over');
+        box.ondrop = (e) => { e.preventDefault(); const from = this.dragId; this.dragId = null; if (!from) return; this.moveTo(from, { col: +box.dataset.colbox }); };
       });
       // buscador de equipos
       const b = this.selBlock();
@@ -521,7 +668,16 @@
           let val = x.value;
           if (path === 'col') val = +val;
           if (/\.entity$/.test(path) || path === 'cfg.entity' || path === 'cfg.gate') { val = val.trim(); if (val && !this.states()[val]) { this.toast('Ese equipo no existe en la casa'); return; } }
-          this.change(() => this.setPath(b, path, val));
+          this.change(() => {
+            this.setPath(b, path, val);
+            // al elegir «Abrir un ambiente / una pantalla» ya queda uno elegido (antes se veía elegido pero no se guardaba)
+            if (/(^|\.)(tap|hold)\.type$/.test(path)) {
+              const a = path.split('.').slice(0, -1).reduce((o, k) => (o ? o[/^\d+$/.test(k) ? +k : k] : o), b) || {};
+              const m0 = this.model();
+              if (val === 'room' && !a.room && m0 && m0.rooms[0]) a.room = m0.rooms[0].name;
+              if (val === 'screen' && !a.screen) a.screen = 'agenda';
+            }
+          });
         };
       });
       W.querySelectorAll('#edr [data-fb]').forEach((x) => { x.onchange = () => this.change(() => {
@@ -561,10 +717,16 @@
       const j = B.findIndex((x) => x.id === to); b.col = B[j].col || 0; B.splice(j, 0, b);
     }
     async cmd(k) {
+      if (k !== 'more' && this.moreOpen) this.moreOpen = false;
       if (k === 'close') return this.close();
-      if (k === 'undo' && this.undo.length) { this.v = JSON.parse(this.undo.pop()); this.draw(); return; }
-      if (k === 'pre') { if (confirm('¿Reemplazar las tarjetas por el prearmado con los equipos de esta casa?')) this.prearmado(false); return; }
-      if (k === 'reset') { this.push(); this.v = clone(this.saved); this.draw(); return; }
+      if (k === 'more') { this.moreOpen = !this.moreOpen; this.draw(); return; }
+      if (k === 'add') return this.openCatalog(null);
+      if (k === 'copy') return this.copyFrom(this.K === 'tablet' ? 'phone' : 'tablet');
+      const fix = () => { if (this.sel && !this.blocks().some((b) => b.id === this.sel)) this.sel = null; this.roomEd = null; this.rdraft = null; this.draw(); };
+      if (k === 'undo') { if (this.undo.length) { this.redo.push(JSON.stringify(this.v)); this.v = JSON.parse(this.undo.pop()); fix(); } return; }
+      if (k === 'redo') { if (this.redo.length) { this.undo.push(JSON.stringify(this.v)); this.v = JSON.parse(this.redo.pop()); fix(); } return; }
+      if (k === 'pre') { if (confirm('¿Reemplazar las tarjetas por el prearmado con los equipos de esta casa?')) this.prearmado(false); else this.draw(); return; }
+      if (k === 'reset') { if (!confirm('¿Descartar todos los cambios sin guardar?')) { this.draw(); return; } this.push(); this.v = clone(this.saved); fix(); return; }
       if (k === 'plan') return this.planEditor();
       if (k === 'save') {
         const v = this.v, L = v.layouts || {};
@@ -573,7 +735,7 @@
           plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
         try {
           const res = await this.hass.callWS({ type: 'matterai/views/save', view: out });
-          this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = []; this.draw();
+          this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = []; this.redo = []; this.draw();
           this.toast('Guardado: los equipos con este dashboard lo ven al instante');
         } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
       }
@@ -582,6 +744,9 @@
       if (this.dirty() && !confirm('Hay cambios sin guardar. ¿Salir igual?')) return;
       window.removeEventListener('keydown', this.keyH);
       window.removeEventListener('resize', this.resH);
+      window.removeEventListener('beforeunload', this.unloadH);
+      clearInterval(this.liveT);
+      this.closeCB(); this.closeCatalog();
       if (this.vista) this.vista.destroy();
       this.host.remove();
       if (this.p._renderViews) this.p._renderViews();
@@ -600,8 +765,10 @@
       if (!path.startsWith('/api/matterai/media/')) return path;
       return (await this.hass.callWS({ type: 'auth/sign_path', path, expires: 7200 })).path;
     }
+    closePlan() { if (this.pe) { this.pe.remove(); this.pe = null; } this.drawing = null; this.draw(); }
     async planEditor() {
-      this.v.plan = this.v.plan || { zones: [] };
+      if (this.pe) return;
+      if (!this.v.plan) { this.push(); this.v.plan = { zones: [] }; }
       this.pe = document.createElement('div');
       this.pe.className = 'pe';
       this.wrap.appendChild(this.pe);
@@ -662,18 +829,27 @@
       pe.querySelectorAll('[data-zsel]').forEach((x) => { x.onclick = () => { this.zsel = +x.dataset.zsel; this.drawPlan(); }; });
       pe.querySelectorAll('[data-pe]').forEach((x) => { x.onclick = async () => {
         const k = x.dataset.pe;
-        if (k === 'done') { this.pe.remove(); this.pe = null; this.draw(); return; }
+        if (k === 'done') { this.closePlan(); return; }
         if (k === 'new') { this.drawing = []; this.zsel = null; await this.drawPlan(); return; }
         if (k === 'cancel') { this.drawing = null; await this.drawPlan(); return; }
         if (k === 'finish') {
           if (!this.drawing || this.drawing.length < 3) { this.toast('Marcá al menos 3 puntos'); return; }
-          const name = prompt('Nombre del ambiente', `Ambiente ${(P.zones || []).length + 1}`) || `Ambiente ${(P.zones || []).length + 1}`;
-          this.push(); P.zones.push({ name: name.slice(0, 40), room: null, lights: [], poly: this.drawing }); this.zsel = P.zones.length - 1; this.drawing = null;
+          // el nombre se pone a la derecha (y toma el del ambiente al elegirlo): sin ventanitas del navegador
+          this.push(); P.zones.push({ name: `Ambiente ${(P.zones || []).length + 1}`, room: null, lights: [], poly: this.drawing }); this.zsel = P.zones.length - 1; this.drawing = null;
           await this.drawPlan(); this.drawPreview(); return;
         }
         if (k === 'zdel' && this.zsel != null) { this.push(); P.zones.splice(this.zsel, 1); this.zsel = null; await this.drawPlan(); this.drawPreview(); }
       }; });
-      pe.querySelectorAll('[data-z]').forEach((x) => { x.onchange = async () => { this.push(); const z = P.zones[this.zsel]; z[x.dataset.z] = x.value || null; if (x.dataset.z === 'name') z.name = x.value || 'Ambiente'; await this.drawPlan(); this.drawPreview(); }; });
+      pe.querySelectorAll('[data-z]').forEach((x) => { x.onchange = async () => {
+        this.push(); const z = P.zones[this.zsel], k = x.dataset.z;
+        if (k === 'room' && x.value && /^Ambiente \d+$/.test(z.name)) z.name = x.value; // toma el nombre del ambiente
+        if (k === 'room' && x.value && !z.lights.length) { // y sus luces, si todavía no eligió ninguna
+          const r = (this.model() || { rooms: [] }).rooms.find((y) => y.name === x.value);
+          if (r && r.lightsCtl) z.lights = r.lightsCtl.slice(0, 24);
+        }
+        z[k] = x.value || null; if (k === 'name') z.name = (x.value || 'Ambiente').slice(0, 40);
+        await this.drawPlan(); this.drawPreview();
+      }; });
       pe.querySelectorAll('[data-zl]').forEach((x) => { x.onchange = () => { this.push(); const z = P.zones[this.zsel]; if (x.checked) z.lights.push(x.dataset.zl); else z.lights = z.lights.filter((y) => y !== x.dataset.zl); this.drawPreview(); }; });
     }
   }

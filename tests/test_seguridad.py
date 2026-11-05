@@ -120,6 +120,29 @@ async def test_two_phones_get_different_access(hass, hass_ws_client, hass_client
     assert a["token"] != b["token"] and a["user_id"] != b["user_id"]
 
 
+async def test_same_device_paired_again_replaces_old_link(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """La misma tablet vinculada dos veces: queda un solo equipo, con el dashboard que tenía el viejo."""
+    house = await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    ik = "f" * 32
+    r1 = await client.post(PAIR, json={"code": decode((await _link(ws, 1))["code"])["c"], "name": "Tablet", "install": ik})
+    a = await r1.json()
+    views = hass.data[DOMAIN]["views"]
+    vid = views.put({"name": "Gianfranco", "kind": "tablet"})["id"]
+    views.set_user(a["user_id"], vid)
+    _, other = await _pair(client, decode((await _link(ws, 2))["code"])["c"], "Celular")  # otro equipo: no se toca
+    r2 = await client.post(PAIR, json={"code": decode((await _link(ws, 3))["code"])["c"], "name": "Tablet", "install": ik})
+    b = await r2.json()
+    assert r2.status == 200 and b["user_id"] != a["user_id"]
+    assert not house.is_device_user(a["user_id"]), "el vínculo viejo se borró"
+    assert await _valid(hass, a["token"]) is None, "y su acceso ya no sirve"
+    assert house.is_device_user(b["user_id"]) and house.is_device_user(other["user_id"])
+    assert views.users.get(b["user_id"]) == vid, "el dashboard pasó al vínculo nuevo"
+    assert [d["name"] for d in house.listing()].count("Tablet") == 1
+    assert all(ik not in json.dumps(d) for d in house.devices.values()), "sólo se guarda la huella, nunca el número de la app"
+
+
 async def test_expired_code_fails(hass, hass_ws_client, hass_client_no_auth) -> None:
     house = await _setup(hass)
     ws = await hass_ws_client(hass)

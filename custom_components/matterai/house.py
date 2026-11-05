@@ -51,6 +51,13 @@ def _hash(code: str) -> str:
     return hashlib.sha256(code.encode("utf-8")).hexdigest()
 
 
+def _install_hash(install: Any) -> str | None:
+    """Huella de la instalación de la app (la app manda un número al azar; se guarda sólo su hash)."""
+    if not isinstance(install, str) or not 16 <= len(install) <= 128:
+        return None
+    return hashlib.sha256(f"mae-install:{install}".encode()).hexdigest()[:32]
+
+
 def _clean_name(name: Any) -> str:
     text = " ".join(str(name or "").split())[:40]
     return text or "Celular"
@@ -102,7 +109,12 @@ class House:
     def is_app_user(self, user_id: str | None) -> bool:
         return self.is_device_user(user_id) or self.is_shared_user(user_id)
 
-    async def _async_new_device(self, name: str, via: str, by: str | None) -> tuple[str, str]:
+    def twins(self, user_id: str) -> list[str]:
+        """Otros vínculos del mismo equipo (misma instalación de la app): los viejos, que hay que reemplazar."""
+        ih = (self.devices.get(user_id) or {}).get("install")
+        return [u for u, d in self.devices.items() if ih and u != user_id and d.get("install") == ih]
+
+    async def _async_new_device(self, name: str, via: str, by: str | None, install: str | None = None) -> tuple[str, str]:
         """Usuario + acceso de un equipo. Devuelve (user_id, token)."""
         auth = self.hass.auth
         name = _clean_name(name)
@@ -115,6 +127,9 @@ class House:
         )
         token = auth.async_create_access_token(rt)
         self.devices[user.id] = {"name": name, "created": time.time(), "via": via, "by": by, "refresh_id": rt.id}
+        ih = _install_hash(install)
+        if ih:
+            self.devices[user.id]["install"] = ih
         await self._save()
         _LOGGER.info("Vinculado el equipo «%s» (%s)", name, via)
         return user.id, token
@@ -136,7 +151,8 @@ class House:
         for uid, d in self.devices.items():
             rt = self.hass.auth.async_get_refresh_token(d.get("refresh_id") or "")
             last = rt.last_used_at.timestamp() if rt and rt.last_used_at else None
-            out.append({"user_id": uid, "name": d.get("name"), "created": d.get("created"), "via": d.get("via"), "last_used": last})
+            out.append({"user_id": uid, "name": d.get("name"), "created": d.get("created"), "via": d.get("via"), "last_used": last,
+                        "install": bool(d.get("install"))})
         return sorted(out, key=lambda x: x.get("created") or 0)
 
     # ------------------------------------------------------------ códigos de vinculación
@@ -156,7 +172,7 @@ class House:
         await self._save()
         return code, exp
 
-    async def async_redeem(self, code: str, name: str) -> tuple[str, str] | None:
+    async def async_redeem(self, code: str, name: str, install: str | None = None) -> tuple[str, str] | None:
         """Canjea un código de un solo uso por el acceso de un equipo nuevo. None si no sirve."""
         if not code or len(code) > 64:
             return None
@@ -165,13 +181,13 @@ class House:
         if hit is None:
             return None
         await self._save()  # de un solo uso: se borra antes de crear el acceso
-        return await self._async_new_device(name, "invite" if hit.get("by") else "pair", hit.get("by"))
+        return await self._async_new_device(name, "invite" if hit.get("by") else "pair", hit.get("by"), install)
 
-    async def async_upgrade(self, user_id: str, name: str) -> tuple[str, str] | None:
+    async def async_upgrade(self, user_id: str, name: str, install: str | None = None) -> tuple[str, str] | None:
         """Un equipo con el acceso compartido (versión anterior) pasa a tener el suyo."""
         if not self.is_shared_user(user_id) or self.data.get("shared_off"):
             return None
-        return await self._async_new_device(name, "upgrade", None)
+        return await self._async_new_device(name, "upgrade", None, install)
 
     # ------------------------------------------------------------ acceso compartido (versión anterior)
     async def async_shared_off(self) -> bool:

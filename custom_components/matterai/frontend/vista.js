@@ -405,8 +405,13 @@
       const inner = block(b, m);
       if (!inner && !editing()) return '';
       const sel = editing() && ctx.edit.selected === b.id;
-      return `<section class="v-b t-${b.type}${sel ? ' sel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${esc((CATALOG[b.type] || {}).name || b.type)}</span>` : ''}${inner}</section>`;
+      // en el editor, la tarjeta elegida tiene su barra (subir, bajar, duplicar, borrar) y todas se arrastran
+      const tool = sel ? `<span class="v-etool">${[['up', 'up', 'Subir'], ['down', 'down', 'Bajar'], ['dup', 'grid', 'Duplicar'], ['del', 'x', 'Borrar']]
+        .map(([k, i, t]) => `<button data-eact="${k}" title="${t}" aria-label="${t}">${ic(i)}</button>`).join('')}</span>` : '';
+      return `<section class="v-b t-${b.type}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${editing() ? ' draggable="true"' : ''}>${editing() ? `<span class="v-btag">${esc((CATALOG[b.type] || {}).name || b.type)}</span>${tool}` : ''}${inner}</section>`;
     }
+    /** En el editor: al final de cada columna, «+ Agregar tarjeta» (como en Home Assistant). */
+    const addSlot = (col) => (editing() && ctx.edit.onAdd ? `<button class="v-eadd" data-eadd="${col}">+ Agregar tarjeta</button>` : '');
     function render() {
       if (!X.el || X.el.hidden) return;
       const m = M();
@@ -425,12 +430,12 @@
       const bl = L.blocks;
       if (K === 'tablet') {
         // columna del plano (0), y las dos columnas de tarjetas
-        set('#v-c0', bl.filter((b) => (b.col || 0) === 0).map((b) => wrapBlock(b, m)).join(''));
+        set('#v-c0', bl.filter((b) => (b.col || 0) === 0).map((b) => wrapBlock(b, m)).join('') + addSlot(0));
         // el resumen va de lado a lado sobre las dos columnas (como en el diseño)
         const top = (b) => b.type === 'kpis' && (b.col || 0) !== 0;
         set('#v-top', bl.filter(top).map((b) => wrapBlock(b, m)).join(''));
-        set('#v-c1', bl.filter((b) => b.col === 1 && !top(b)).map((b) => wrapBlock(b, m)).join(''));
-        set('#v-c2', bl.filter((b) => b.col === 2 && !top(b)).map((b) => wrapBlock(b, m)).join(''));
+        set('#v-c1', bl.filter((b) => b.col === 1 && !top(b)).map((b) => wrapBlock(b, m)).join('') + addSlot(1));
+        set('#v-c2', bl.filter((b) => b.col === 2 && !top(b)).map((b) => wrapBlock(b, m)).join('') + addSlot(2));
         fit(vertical);
         const c = card();
         const p = drawPlayer();
@@ -440,7 +445,7 @@
             : k === 'musica' ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`
             : `<button class="${j === 0 ? 'on' : ''}" data-scr="${k}">${ic(i)}${t2}</button>`)).join(''));
       } else {
-        set('#v-c1', bl.map((b) => wrapBlock(b, m)).join(''));
+        set('#v-c1', bl.map((b) => wrapBlock(b, m)).join('') + addSlot(0));
         set('#v-allb', `${ic('grid')}Toda la casa`);
         // reproductor: sólo con música; se esconde al botón Música
         const p = drawPlayer();
@@ -545,7 +550,14 @@
       if (X.held) { X.held = false; return; }
       const c = card(), m = M(); if (!c || !m) return;
       const t = e.target;
-      if (editing()) { const b = t.closest('[data-block]'); if (b && ctx.edit.onSelect) ctx.edit.onSelect(b.dataset.block); e.preventDefault(); return; }
+      if (editing()) {
+        e.preventDefault();
+        const ea = t.closest('[data-eact]'), b = t.closest('[data-block]');
+        if (ea && b && ctx.edit.onAction) return ctx.edit.onAction(b.dataset.block, ea.dataset.eact);
+        const add = t.closest('[data-eadd]'); if (add && ctx.edit.onAdd) return ctx.edit.onAdd(+add.dataset.eadd);
+        if (ctx.edit.onSelect) ctx.edit.onSelect(b ? b.dataset.block : null);
+        return;
+      }
       if (t.id === 'v-sheet' || t.closest('[data-close]')) return closeSheet();
       if (t.id === 'v-menu') { X.el.querySelector('#v-menu').classList.remove('show'); return; }
       const mm = t.closest('[data-m]'); if (mm) return menuAct(mm.dataset.m);
@@ -611,6 +623,38 @@
     el.addEventListener('pointerdown', onDown);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, onUp));
     el.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-room],[data-zone],[data-it]')) e.preventDefault(); });
+    // editor: las tarjetas se arrastran dentro de la vista previa (antes o después de otra, o a una columna vacía)
+    let dragId = null;
+    const colOfEl = (x) => {
+      if (kind() !== 'tablet') return 0;
+      const cl = x && x.closest && x.closest('#v-c0,#v-c1,#v-c2,#v-top');
+      return cl ? { 'v-c0': 0, 'v-c1': 1, 'v-c2': 2, 'v-top': 1 }[cl.id] : null;
+    };
+    const clearMarks = () => X.el.querySelectorAll('.dropb,.dropa,.dragging').forEach((x) => x.classList.remove('dropb', 'dropa', 'dragging'));
+    const after = (s, e) => { const r = s.getBoundingClientRect(); return e.clientY > r.top + r.height / 2; };
+    el.addEventListener('dragstart', (e) => {
+      if (!editing()) return;
+      const s = e.target.closest && e.target.closest('[data-block]'); if (!s) return;
+      dragId = s.dataset.block; s.classList.add('dragging');
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', dragId); } catch (_) { /* navegador viejo */ }
+    });
+    el.addEventListener('dragover', (e) => {
+      if (!editing() || !dragId) return;
+      e.preventDefault();
+      X.el.querySelectorAll('.dropb,.dropa').forEach((x) => x.classList.remove('dropb', 'dropa'));
+      const s = e.target.closest('[data-block]');
+      if (s && s.dataset.block !== dragId) s.classList.add(after(s, e) ? 'dropa' : 'dropb');
+    });
+    el.addEventListener('drop', (e) => {
+      if (!editing() || !dragId) return;
+      e.preventDefault();
+      const from = dragId, s = e.target.closest('[data-block]');
+      dragId = null; clearMarks();
+      if (!ctx.edit.onMove) return;
+      if (s && s.dataset.block !== from) ctx.edit.onMove(from, { target: s.dataset.block, after: after(s, e) });
+      else if (!s) { const col = colOfEl(e.target); if (col != null) ctx.edit.onMove(from, { col }); }
+    });
+    el.addEventListener('dragend', () => { dragId = null; clearMarks(); });
     const refreshCam = () => {
       if (!X.el || X.el.hidden || (typeof document !== 'undefined' && document.hidden)) return;
       X.el.querySelectorAll('img[data-cam]').forEach((im) => { const s = camSrc(im.dataset.cam); if (s && im.getAttribute('src') !== s) im.src = s; });

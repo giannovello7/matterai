@@ -701,7 +701,12 @@
       const views = r.views || [];
       if (!this._vopen) { try { this._vopen = new Set(JSON.parse(localStorage.getItem('matterai.panel.vopen') || '[]')); } catch (_) { this._vopen = new Set(); } }
       const saveOpen = () => { try { localStorage.setItem('matterai.panel.vopen', JSON.stringify([...this._vopen])); } catch (_) { /* sin almacenamiento */ } };
-      const users = (vid) => people.filter((p) => p.view === vid);
+      const users = (vid) => people.filter((p) => p.view === vid && !stale(p));
+      // el mismo equipo vinculado dos veces: mismo nombre y mismo tipo; el que se usó (o vinculó) más tarde es el bueno
+      const isTab = (p) => /tab|sm-x|sm-t|ipad/i.test((p.model || '') + p.name);
+      const twinsOf = (p) => people.filter((q) => q !== p && q.name.toLowerCase() === p.name.toLowerCase() && (!q.model || !p.model || isTab(q) === isTab(p)));
+      const fresh = (p) => Math.max(p.last_used || 0, p.created || 0);
+      const stale = (p) => twinsOf(p).some((q) => fresh(q) > fresh(p) || (fresh(q) === fresh(p) && q.user_id > p.user_id));
       // equipos con la app registrada en mobile_app que no son un equipo vinculado (acceso compartido viejo)
       const loose = (r.devices || []).filter((d) => !people.some((p) => (p.devices || []).includes(d.device_id)));
       const lay = (x, k) => { const L = (x.layouts || {})[k]; return (L && L.blocks && L.blocks.length) || ((x.kind || 'phone') === k && x.blocks && x.blocks.length); };
@@ -721,7 +726,7 @@
           ${open ? `<div class="dv-body">
             <label class="dv-f"><span>Nombre</span><input data-vname="${esc(x.id)}" value="${esc(x.name)}" maxlength="40"></label>
             <div class="dv-f"><span>Equipos que lo usan</span>
-              ${people.length ? `<div class="dv-chips">${people.map((p) => `<label class="dv-chip ${p.view === x.id ? 'on' : ''}"><input type="checkbox" data-vuse="${esc(p.user_id)}" data-v="${esc(x.id)}" ${p.view === x.id ? 'checked' : ''}><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon>${esc(p.name)}${p.view && p.view !== x.id ? `<small>ahora: ${esc((views.find((y) => y.id === p.view) || {}).name || '—')}</small>` : ''}</label>`).join('')}</div>`
+              ${people.length ? `<div class="dv-chips">${people.filter((p) => !stale(p)).map((p) => `<label class="dv-chip ${p.view === x.id ? 'on' : ''}"><input type="checkbox" data-vuse="${esc(p.user_id)}" data-v="${esc(x.id)}" ${p.view === x.id ? 'checked' : ''}><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon>${esc(p.name)}${p.view && p.view !== x.id ? `<small>ahora: ${esc((views.find((y) => y.id === p.view) || {}).name || '—')}</small>` : ''}</label>`).join('')}</div>`
                 : '<p class="mut">Todavía no hay equipos vinculados (se vinculan desde «App del cliente»).</p>'}
               <p class="mut">Una persona con celular y tablet: marcá los dos. El celular usa el diseño de celular y la tablet el de tablet.</p></div>
             <label class="dv-sw"><input type="checkbox" data-vdef="${esc(x.id)}" ${isDef ? 'checked' : ''}><span>Usarlo como dashboard general (lo ven los equipos que no tienen uno propio)</span></label>
@@ -771,16 +776,17 @@
         <div class="dv-list">
           ${views.map(card).join('')}
           <div class="dv-auto"><span class="dv-ic"><ha-icon icon="mdi:auto-fix"></ha-icon></span><span class="dv-t"><b>Inicio automático</b><small class="mut" style="display:block">${r.default ? 'No se usa: hay un dashboard general.' : 'Lo ven los equipos sin dashboard. Se arma solo con los ambientes, escenas y cámaras de la casa.'}</small></span>
-            <button class="b" id="vauto"><ha-icon icon="mdi:pencil-ruler"></ha-icon>Personalizarlo</button></div>
+            ${r.default ? '' : '<button class="b" id="vauto"><ha-icon icon="mdi:pencil-ruler"></ha-icon>Personalizarlo</button>'}</div>
         </div>
         <div class="box dv-eq"><div class="bh"><h2>Qué ve cada equipo</h2></div>
-          ${people.map((p) => { const dup = people.filter((q) => q.name.toLowerCase() === p.name.toLowerCase()).length > 1;
+          ${people.map((p) => { const st = stale(p), dup = twinsOf(p).length > 0;
             const linked = p.created ? `vinculado el ${new Date(p.created * 1000).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
-            return `<div class="dv-row"><span class="dv-ic"><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon></span>
-            <span class="dv-t"><b>${esc(p.name)}</b>${dup ? ' <span class="dv-tag warn">mismo nombre que otro</span>' : ''}<small class="mut" style="display:block">${esc([p.model || 'sin avisos registrados', linked, ago(p.last_used)].filter(Boolean).join(' · '))}</small></span>
-            <select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select>
-            <button class="dv-chev" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" title="Desvincular este equipo" aria-label="Desvincular"><ha-icon icon="mdi:link-variant-off"></ha-icon></button></div>`; }).join('')}
-          ${people.some((p) => people.filter((q) => q.name.toLowerCase() === p.name.toLowerCase()).length > 1) ? '<div class="dv-note warnn"><b>Hay equipos con el mismo nombre.</b> Casi siempre es el mismo equipo vinculado dos veces (por ejemplo, al reinstalar la app): el que dice «sin avisos registrados» o el que se vinculó primero ya no se usa. Desvinculalo con <ha-icon icon="mdi:link-variant-off" style="--mdc-icon-size:16px"></ha-icon> y queda uno solo. Si te equivocás, ese equipo deja de entrar y se vuelve a vincular con un código nuevo.</div>' : ''}
+            return `<div class="dv-row ${st ? 'stale' : ''}"><span class="dv-ic"><ha-icon icon="${/tab|sm-x|sm-t|ipad/i.test(p.model + p.name) ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon></span>
+            <span class="dv-t"><b>${esc(p.name)}</b>${st ? ' <span class="dv-tag warn">vínculo viejo (duplicado)</span>' : dup ? ' <span class="dv-tag on">el que se usa</span>' : ''}<small class="mut" style="display:block">${esc([p.model || 'sin avisos registrados', linked, ago(p.last_used)].filter(Boolean).join(' · '))}</small></span>
+            ${st ? `<button class="b warn" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" data-stale="1"><ha-icon icon="mdi:link-variant-off"></ha-icon>Quitar duplicado</button>`
+              : `<select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select>
+            <button class="dv-chev" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" title="Desvincular este equipo" aria-label="Desvincular"><ha-icon icon="mdi:link-variant-off"></ha-icon></button>`}</div>`; }).join('')}
+          ${people.some(stale) ? '<div class="dv-note warnn"><b>Hay equipos vinculados dos veces.</b> Pasa al volver a vincular el mismo celular o tablet (por ejemplo, al reinstalar la app). El marcado como «vínculo viejo» es el que no se usa hace más tiempo: «Quitar duplicado» lo borra y su dashboard pasa al que queda. Desde esta versión, si un equipo se vuelve a vincular, la casa reemplaza el vínculo viejo sola.</div>' : ''}
           ${loose.map((d) => `<div class="dv-row"><span class="dv-ic"><ha-icon icon="mdi:cellphone-link"></ha-icon></span><span class="dv-t"><b>${esc(d.name)}</b><small class="mut" style="display:block">${esc(d.model || '')} · acceso compartido</small></span>
             <select data-asg="${esc(d.device_id)}">${viewOpts(d.view)}</select></div>`).join('')}
           ${people.length || loose.length ? '' : '<p class="mut">Todavía no hay equipos con la app.</p>'}
@@ -800,7 +806,7 @@
         const nv = await call({ type: 'matterai/views/save', view: { name, kind: 'phone', pinned: [] } }, 'Dashboard creado');
         if (nv) { this._vopen.add(nv.id); saveOpen(); await this._renderViews(); edit(nv.id); }
       };
-      $('vauto').onclick = async () => {
+      if ($('vauto')) $('vauto').onclick = async () => {
         const nv = await call({ type: 'matterai/views/save', view: { name: 'General', kind: 'phone', pinned: [] } });
         if (!nv) return;
         await call({ type: 'matterai/views/default', view_id: nv.id }, 'Listo: «General» es el dashboard de los equipos sin uno propio');
@@ -829,8 +835,17 @@
       }; });
       main.querySelectorAll('[data-asgu]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign_user', user_id: sel.dataset.asgu, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
       main.querySelectorAll('[data-unlink]').forEach((b) => { b.onclick = async () => {
-        if (!confirm(`¿Desvincular «${b.dataset.n}»? Ese equipo deja de entrar a la casa (se vuelve a vincular con un código nuevo).`)) return;
-        if (await call({ type: 'matterai/app/revoke', user_id: b.dataset.unlink }, 'Equipo desvinculado')) this._renderViews();
+        const p = people.find((q) => q.user_id === b.dataset.unlink); if (!p) return;
+        if (b.dataset.stale) {
+          if (!confirm(`¿Quitar el vínculo viejo de «${p.name}»? El equipo sigue andando con el vínculo que usa ahora.`)) return;
+          // su dashboard pasa al vínculo que queda (si ese no tiene uno)
+          const keep = twinsOf(p).sort((a, c) => fresh(c) - fresh(a))[0];
+          if (keep && p.view && !keep.view) await call({ type: 'matterai/views/assign_user', user_id: keep.user_id, view_id: p.view });
+          if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Duplicado quitado')) this._renderViews();
+          return;
+        }
+        if (!confirm(`¿Desvincular «${p.name}»? Ese equipo deja de entrar a la casa (se vuelve a vincular con un código nuevo).`)) return;
+        if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Equipo desvinculado')) this._renderViews();
       }; });
       main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
     }
