@@ -621,6 +621,9 @@
           ${voiceOn() ? `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>` : ''}
           <button data-scr="actividad">${ic('list')}Actividad</button>${m.f.music ? `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic('music')}Música</button>` : ''}`);
       }
+      // editor: el ambiente que se está editando se ve por dentro en la pantalla
+      if (editing() && ctx.edit.room) { if (X.sheet !== 'roomedit') openSheet('roomedit'); }
+      else if (X.sheet === 'roomedit') closeSheet();
       if (X.sheet) renderSheet();
     }
     /* La tablet se arma sobre un lienzo de tamaño fijo (como el diseño) y se escala a la pantalla:
@@ -687,7 +690,20 @@
             <button class="v-opt ghost" data-scr="seguridad">${ic('door')}Ver sensores y aberturas</button></div>`;
         }
       }
+      if (X.sheet === 'roomedit' && ctx.edit && ctx.edit.room) h = roomEditHTML(ctx.edit.room);
       if (sh.innerHTML !== h) sh.innerHTML = h;
+    }
+    /** Editor: el ambiente por dentro, con sus equipos en orden; se ordenan, sacan y agregan acá mismo. */
+    function roomEditHTML(R) {
+      const L = R.entities || [];
+      const rows = L.map((x, i) => {
+        const id = x && typeof x === 'object' ? x.entity : x, s = st(id) ? entState(id) : { on: false, txt: 'No existe en la casa' };
+        return `<div class="v-rer ${s.on ? 'on' : ''}"><span class="v-bic">${ic(defIcon(id))}</span><span class="v-tx"><b>${esc((x && x.name) || fname(id))}</b><span>${esc(s.txt)}</span></span>
+          <span class="v-ret">${i > 0 ? `<button data-rme="up" data-i="${i}" title="Subir">${ic('up')}</button>` : ''}${i < L.length - 1 ? `<button data-rme="down" data-i="${i}" title="Bajar">${ic('down')}</button>` : ''}<button data-rme="del" data-i="${i}" title="Sacar del ambiente">${ic('x')}</button></span></div>`;
+      }).join('');
+      return `<div class="v-grab"></div><div class="v-sh"><span class="v-ric on">${ic(roomIc(R))}</span><div><h2>${esc(R.name)}</h2><small>${L.length} equipo${L.length === 1 ? '' : 's'} · editando</small></div><button class="v-x" data-rme="close" aria-label="Cerrar">${ic('x')}</button></div>
+        <div class="v-list">${rows || '<p class="v-empty">Todavía no tiene equipos.</p>'}</div>
+        <button class="v-eadd" data-radd>+ Agregar un equipo</button>${R.dirty ? `<button class="v-rsave" data-rme="save">Guardar ambiente</button>` : ''}`;
     }
     function openSheet(k, arg) { X.sheet = k; X.sheetArg = arg || null; X.el.querySelector('#v-sheet').classList.add('show'); renderSheet(); }
     function closeSheet() { X.sheet = null; const s = X.el.querySelector('#v-sheet'); if (s) s.classList.remove('show'); }
@@ -720,10 +736,18 @@
       const t = e.target;
       if (editing()) {
         e.preventDefault();
+        // el ambiente abierto por dentro (se edita acá mismo)
+        const re = t.closest('[data-rme]'); if (re && ctx.edit.onRoom) return ctx.edit.onRoom(re.dataset.rme, +re.dataset.i);
+        if (t.closest('[data-radd]') && ctx.edit.onRoom) return ctx.edit.onRoom('add');
+        if (t.closest('#v-sheet')) { if (t.id === 'v-sheet' && ctx.edit.onRoom) ctx.edit.onRoom('close'); return; }
         const ea = t.closest('[data-eact]'), b = t.closest('[data-block]');
         if (ea && b && ctx.edit.onAction) return ctx.edit.onAction(b.dataset.block, ea.dataset.eact);
         const add = t.closest('[data-eadd]'); if (add && ctx.edit.onAdd) return ctx.edit.onAdd(+add.dataset.eadd);
-        if (ctx.edit.onSelect) ctx.edit.onSelect(b ? b.dataset.block : null);
+        // lo que se toca adentro de la tarjeta: un ambiente, un dato del resumen, un botón
+        let sub = null;
+        const rm = t.closest('[data-room]'), kt = t.closest('[data-kt]'), it = t.closest('[data-it]');
+        if (rm) sub = { room: rm.dataset.room }; else if (kt) sub = { item: +kt.dataset.kt }; else if (it) sub = { item: +it.dataset.it };
+        if (ctx.edit.onSelect) ctx.edit.onSelect(b ? b.dataset.block : null, sub);
         return;
       }
       if (t.id === 'v-sheet' || t.closest('[data-close]')) return closeSheet();

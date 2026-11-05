@@ -217,6 +217,14 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-imgc span{position:absolute;left:12px;bottom:10px;padding:4px 10px;border-radius:10px;background:rgba(10,12,16,.6);font-size:12.5px;font-weight:600}
 .v-imgc[data-btap]{cursor:pointer}
 /* ───── modo edición (vista previa del editor) ───── */
+.vista.editing .v-b [data-room],.vista.editing .v-b [data-kt],.vista.editing .v-b [data-it]{pointer-events:auto;cursor:pointer;transition:box-shadow .15s}
+.vista.editing .v-b [data-room]:hover,.vista.editing .v-b [data-kt]:hover,.vista.editing .v-b [data-it]:hover{box-shadow:0 0 0 2px var(--warm)}
+.vista.editing .v-sheet .v-sin{outline:2px solid var(--warm)}
+.v-rer{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.v-rer.on .v-bic{background:var(--warm-s);color:var(--warm)}
+.v-ret{display:flex;gap:2px;flex:none}.v-ret button{width:30px;height:30px;border-radius:9px!important;display:grid!important;place-items:center;color:var(--muted)}
+.v-ret button:hover{background:var(--card2)!important;color:var(--fg)}.v-ret .i{width:16px;height:16px}
+.v-rsave{display:block;width:100%;margin-top:4px;padding:13px!important;border-radius:14px;background:var(--warm)!important;color:#1b1408!important;font-weight:700!important;text-align:center!important}
 .vista.editing .v-b.hid{opacity:.4}.vista.editing .v-b.cond .v-btag{border-style:dashed}
 .vista.editing .v-b{position:relative;outline:1px dashed rgba(160,175,200,.35);outline-offset:4px;border-radius:14px;cursor:pointer;min-height:40px;margin-bottom:6px}
 .vista.editing .v-b:hover{outline-color:rgba(242,183,102,.6)}

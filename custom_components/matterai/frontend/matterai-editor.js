@@ -94,6 +94,14 @@
   .slot{display:flex;align-items:center;gap:8px;padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px}.slot img{width:44px;height:44px;object-fit:cover;border-radius:6px;background:#0d1116}.slot span{flex:1}
   .zl{padding:8px;border-radius:10px;background:#1e242e;margin-bottom:6px;border:1px solid transparent;cursor:pointer}.zl.sel{border-color:#f2b766}
   .toastE{position:fixed;z-index:70;left:50%;bottom:22px;transform:translateX(-50%);background:#262e3a;border:1px solid rgba(160,175,200,.2);padding:10px 16px;border-radius:12px;display:none}
+  .ed{grid-template-columns:270px minmax(0,1fr) 360px}.ed.nolist{grid-template-columns:0 minmax(0,1fr) 380px}.ed.nolist .ed-l{display:none}
+  .ed-c{min-width:0}.ed-top{min-width:0}.ed *{scrollbar-color:#3a4150 transparent;scrollbar-width:thin}
+  .eb.on{border-color:#f2b766;color:#f2b766}
+  .rme .dtag{max-width:86px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rme small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rme button{flex:none}
+  .it.focus{border-color:#f2b766;box-shadow:0 0 0 1px #f2b766}
+  .guide{padding:14px;border-radius:14px;background:#1e242e;border:1px solid rgba(160,175,200,.15);margin-bottom:12px}.guide b{display:block;margin-bottom:6px}
+  .guide ol{margin:0;padding-left:18px;color:#c4cad6;font-size:13px;line-height:1.6}
   .eseg.sim{align-items:center}.eseg.sim .lbl{padding:0 6px 0 8px;font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8f99ab}
   .eseg.sim button.on{background:#f2b766;color:#1b1408}
   .mbody{overflow:auto;padding:12px 16px 16px}
@@ -112,12 +120,16 @@
   .catg button{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;background:#1e242e;border:1px solid rgba(160,175,200,.15);text-align:left}
   .catg button:hover{border-color:#f2b766}.catg b{display:block;font-weight:600}.catg small{color:#8f99ab;font-size:12px}
   .cic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#262e3a}.cic svg{width:20px;height:20px;fill:none;stroke:#f2b766;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
-  @media (max-width:1100px){.ed{grid-template-columns:240px 1fr 300px}}`;
+  @media (max-width:1100px){.ed{grid-template-columns:230px minmax(0,1fr) 310px}.ed.nolist{grid-template-columns:0 minmax(0,1fr) 330px}}`;
 
   function open(panel, viewId) { return new Editor(panel, viewId).start(); }
 
   class Editor {
-    constructor(panel, viewId) { this.p = panel; this.hass = panel._hass; this.viewId = viewId; this.sel = null; this.undo = []; this.redo = []; }
+    constructor(panel, viewId) {
+      this.p = panel; this.hass = panel._hass; this.viewId = viewId; this.sel = null; this.undo = []; this.redo = [];
+      // la lista de tarjetas de la izquierda viene escondida: se edita tocando la pantalla del medio (como en Home Assistant)
+      try { this.showList = localStorage.getItem('matterai.editor.list') === '1'; } catch (_) { this.showList = false; }
+    }
 
     async start() {
       await loadScript(`${BASE}/vista.js?t=${Date.now()}`);
@@ -312,11 +324,13 @@
     draw() {
       const v = this.v, K = this.K, ori = this.lay().orientation || 'landscape', dirty = this.dirty();
       const other = K === 'tablet' ? 'phone' : 'tablet', hasOther = !!(((v.layouts || {})[other] || {}).blocks || []).length;
-      this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver (Esc)">← Volver</button><h2>${esc(v.name)}${dirty ? ' <span class="dirt" title="Hay cambios sin guardar">● sin guardar</span>' : ''}</h2>
+      this.$('#ed').classList.toggle('nolist', !this.showList);
+      this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver (Esc)">← Volver</button><button class="eb ico ${this.showList ? 'on' : ''}" data-e="list" title="Lista de tarjetas">☰</button><h2>${esc(v.name)}${dirty ? ' <span class="dirt" title="Hay cambios sin guardar">● sin guardar</span>' : ''}</h2>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
           <button class="eb pri2" data-e="add" title="Agregar una tarjeta">+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
-          <span class="eseg sim" title="Simular en la vista previa (no toca la casa)"><span class="lbl">Simular</span>${[['night', 'Noche'], ['alarm', 'Alarma'], ['music', 'Música'], ['gate', 'Portón']].map(([k, l]) => `<button data-sim="${k}" class="${(this.sim || {})[k] ? 'on' : ''}">${l}</button>`).join('')}</span>
+          <span class="emenu"><button class="eb ${Object.values(this.sim || {}).some(Boolean) ? 'pri2' : ''}" data-e="simm" title="Ver cómo queda en otras situaciones (no toca la casa)">Simular${Object.values(this.sim || {}).filter(Boolean).length ? ` (${Object.values(this.sim || {}).filter(Boolean).length})` : ''} ▾</button>${this.simOpen ? `<span class="emenu-l" style="left:0;right:auto">
+            ${[['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']].map(([k, l]) => `<button data-sim="${k}">${(this.sim || {})[k] ? '✓ ' : ''}${l}</button>`).join('')}</span>` : ''}</span>
           <span class="sp"></span>
           ${this.trying ? `<button class="eb warn" data-e="tryend" title="Los equipos vuelven al diseño guardado">Terminar prueba</button>` : '<button class="eb" data-e="try" title="Los equipos con este dashboard muestran este diseño (sin guardar) por 15 minutos">Probar en el equipo</button>'}
           <button class="eb ico" data-e="undo" ${this.undo.length ? '' : 'disabled'} title="Deshacer (Ctrl+Z)">↶</button><button class="eb ico" data-e="redo" ${this.redo.length ? '' : 'disabled'} title="Rehacer (Ctrl+Y)">↷</button>
@@ -394,15 +408,54 @@
     }
     /** Lo que la vista previa puede hacer en el editor: elegir, la barra de la tarjeta, arrastrar y agregar. */
     editCtx() {
-      return { selected: this.sel, onSelect: (x) => this.pick(x), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
-        onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col) };
+      const R = this.rdraft;
+      return { selected: this.sel, onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => { this.sel = id; this.blockAct(id, a); },
+        onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col), onRoom: (a, i) => this.roomAct(a, i),
+        room: R ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
     }
-    pick(id) {
+    /** Tocar algo en la pantalla del medio: la tarjeta, y si fue un ambiente, se abre por dentro para editarlo. */
+    pick(id, sub) {
       id = id || null;
-      if (id !== this.sel) { this.roomEd = null; this.rdraft = null; }
-      this.sel = id; this.drawList(); this.drawProps();
-      if (this.vista) this.vista.setCtx({ edit: this.editCtx() });
-      this.bind();
+      if (id !== this.sel || !(sub && sub.room)) { this.roomEd = null; this.rdraft = null; }
+      this.sel = id; this.focus = sub && sub.item != null ? sub.item : null;
+      if (sub && sub.room) {
+        const r = (this.model() || { byId: {} }).byId[sub.room];
+        if (r) { this.roomEd = r.name; this.rdraft = null; this.ensureDraft(); }
+      }
+      this.drawList(); this.drawProps(); this.syncPreview(); this.bind();
+      const f = this.$('#edr .it.focus'); if (f && f.scrollIntoView) f.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+    syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.editCtx() }); }
+    roomDirty() {
+      const R = this.rdraft; if (!R) return false;
+      if (R._orig == null) return true;
+      const o = this.roomsCfg().find((x) => x.name === R._orig) || {};
+      return JSON.stringify([o.name, o.icon || '', o.entities || []]) !== JSON.stringify([R.name, R.icon || '', R.entities || []]);
+    }
+    ensureDraft() {
+      if (this.rdraft) return this.rdraft;
+      const list = this.roomsCfg(), i = list.findIndex((x) => x.name === this.roomEd);
+      this.rdraft = i >= 0 ? clone(list[i]) : { name: this.roomEd || 'Ambiente nuevo', entities: [] };
+      this.rdraft._orig = i >= 0 ? list[i].name : null;
+      return this.rdraft;
+    }
+    /** Lo que se hace desde el ambiente abierto en la pantalla del medio. */
+    roomAct(a, i) {
+      const R = this.rdraft; if (!R) return;
+      const L = R.entities = R.entities || [];
+      const redraw = () => { this.drawProps(); this.syncPreview(); this.bind(); };
+      if (a === 'close') { this.roomEd = null; this.rdraft = null; return redraw(); }
+      if (a === 'save') return this.saveRoom(false);
+      if (a === 'del') { L.splice(i, 1); return redraw(); }
+      if (a === 'up' || a === 'down') { const j = i + (a === 'up' ? -1 : 1); if (j < 0 || j >= L.length) return undefined; [L[i], L[j]] = [L[j], L[i]]; return redraw(); }
+      if (a === 'add') {
+        return this.openCB(null, ROOM_DOMAINS, (id) => {
+          if (!id) return;
+          if (L.some((y) => (y && y.entity) === id || y === id)) { this.toast('Ya está en este ambiente'); return; }
+          L.push(id); redraw();
+        }, false);
+      }
+      return undefined;
     }
 
     /* ───────── propiedades ───────── */
@@ -444,9 +497,14 @@
       box.className = 'cbp';
       box.innerHTML = `<input placeholder="Buscar por nombre, ambiente o tipo…" autocomplete="off"><div class="cbl"></div>`;
       this.wrap.appendChild(box);
-      const r = anchor.getBoundingClientRect(), H = Math.min(420, innerHeight - 20);
-      box.style.left = `${Math.max(10, Math.min(r.left, innerWidth - 370))}px`;
-      box.style.top = `${r.bottom + 6 + H > innerHeight ? Math.max(10, r.top - H - 6) : r.bottom + 6}px`;
+      const H = Math.min(420, innerHeight - 20);
+      if (anchor) {
+        const r = anchor.getBoundingClientRect();
+        box.style.left = `${Math.max(10, Math.min(r.left, innerWidth - 370))}px`;
+        box.style.top = `${r.bottom + 6 + H > innerHeight ? Math.max(10, r.top - H - 6) : r.bottom + 6}px`;
+      } else { // pedido desde la pantalla del medio: en el centro
+        box.style.left = `${Math.max(10, (innerWidth - 360) / 2)}px`; box.style.top = `${Math.max(10, (innerHeight - H) / 3)}px`;
+      }
       const inp = box.querySelector('input'), list = box.querySelector('.cbl');
       let res = [], cur = 0;
       const paint = () => {
@@ -469,7 +527,7 @@
         else if (e.key === 'Escape') { this.closeCB(); e.stopPropagation(); }
       };
       list.onclick = (e) => { const b = e.target.closest('[data-i]'); if (b) pick(+b.dataset.i); };
-      this.cbOut = (e) => { if (!e.composedPath().includes(box) && !e.composedPath().includes(anchor)) this.closeCB(); };
+      this.cbOut = (e) => { if (!e.composedPath().includes(box) && !(anchor && e.composedPath().includes(anchor))) this.closeCB(); };
       setTimeout(() => document.addEventListener('pointerdown', this.cbOut, true), 0);
       this.cb = box; paint(); inp.focus();
     }
@@ -489,7 +547,7 @@
     items(b, opts) {
       const items = (b.cfg.items || []);
       const ICONS = window.MaeVista.ICONS;
-      return `<h4>${esc(opts.title)}</h4>${items.map((it, i) => `<div class="it"><div class="row"><b>${esc(it.name || (it.kind ? (KPI_KINDS.find((k) => k[0] === it.kind) || [, it.kind])[1] : '') || this.fname(it.entity) || 'Elemento ' + (i + 1))}</b>
+      return `<h4>${esc(opts.title)}</h4>${items.map((it, i) => `<div class="it ${this.focus === i ? 'focus' : ''}"><div class="row"><b>${esc(it.name || (it.kind ? (KPI_KINDS.find((k) => k[0] === it.kind) || [, it.kind])[1] : '') || this.fname(it.entity) || 'Elemento ' + (i + 1))}</b>
           <button class="eb sm" data-imv="${i}" data-d="-1">↑</button><button class="eb sm" data-imv="${i}" data-d="1">↓</button><button class="eb sm warn" data-idel="${i}">✕</button></div>
         ${opts.kpi ? `<label class="fld"><span>Qué muestra</span><select data-f="cfg.items.${i}.kind">${KPI_KINDS.map(([k, l]) => `<option value="${k}" ${it.kind === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
         ${!opts.kpi || it.kind === 'entity' ? this.ent('Equipo', 'it', it.entity, null, `cfg.items.${i}.entity`) : ''}
@@ -507,9 +565,13 @@
       const b = this.blocks().find((x) => x.id === this.sel);
       const r = this.$('#edr');
       if (!b) {
-        r.innerHTML = `<h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}"></label>
-          <p class="hint">Estás editando el diseño para <b>${this.K === 'tablet' ? 'la tablet' : 'el celular'}</b>. Cambiá arriba entre Celular y Tablet: cada uno tiene el suyo, y los dos se guardan juntos.</p>
-          <p class="hint">Tocá una tarjeta en la vista previa (o en la lista) para editarla. Al guardar, les llega a los equipos con este dashboard al instante, sin actualizar la app.</p>`;
+        r.innerHTML = `<div class="guide"><b>Cómo se edita</b><ol>
+            <li><b style="display:inline">Tocá cualquier cosa</b> en la pantalla del medio: una tarjeta, un ambiente, un dato del resumen o un botón. Acá aparece para editarla.</li>
+            <li>Tocá un <b style="display:inline">ambiente</b> para abrirlo por dentro: ordená, sacá o agregá sus equipos.</li>
+            <li>Arrastrá las tarjetas para moverlas. Con <b style="display:inline">+ Agregar tarjeta</b> sumás una nueva.</li>
+            <li><b style="display:inline">Guardar</b> (arriba a la derecha) se lo manda a los equipos al instante.</li></ol></div>
+          <h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}"></label>
+          <p class="hint">Estás editando el diseño para <b>${this.K === 'tablet' ? 'la tablet' : 'el celular'}</b>. Cambiá arriba entre Celular y Tablet: cada uno tiene el suyo, y los dos se guardan juntos.</p>`;
         return;
       }
       b.cfg = b.cfg || {};
@@ -604,15 +666,14 @@
       return rooms.filter((x) => x.entities.length).map(({ _a, ...x }) => x); // eslint-disable-line no-unused-vars
     }
     roomEditor() {
-      if (!this.rdraft) {
-        const list = this.roomsCfg(), i = list.findIndex((x) => x.name === this.roomEd);
-        this.rdraft = i >= 0 ? clone(list[i]) : { name: this.roomEd || 'Ambiente nuevo', entities: [] };
-        this.rdraft._orig = i >= 0 ? list[i].name : null;
-      }
+      this.ensureDraft();
       const R = this.rdraft, eid = (x) => (x && typeof x === 'object' ? x.entity : x), ICONS = window.MaeVista.ICONS;
       const manual = Array.isArray(this.cfg.rooms) && this.cfg.rooms.length;
+      const b = this.selBlock(), inCard = b && b.type === 'rooms' && R._orig && ((b.cfg && b.cfg.rooms) || []).includes(R._orig);
       return `<button class="eb sm" data-rx="back">‹ Volver a la tarjeta</button><h4>Ambiente</h4>
+        <p class="hint" style="margin-top:0">Lo ves abierto en la pantalla del medio: ordená, sacá o agregá equipos ahí o acá.</p>
         ${manual ? '' : '<div class="warnbox">Hoy los ambientes salen solos de las Áreas de Home Assistant. Al guardar, quedan armados a mano (con lo mismo que se ve ahora) y desde ahí se editan acá.</div>'}
+        ${inCard ? '<button class="eb sm" data-rx="unpin" style="margin-bottom:10px">Sacarlo de esta tarjeta (sigue en «Toda la casa»)</button>' : ''}
         <label class="fld"><span>Nombre</span><input data-rn="name" value="${esc(R.name)}" maxlength="40"></label>
         <label class="fld"><span>Ícono</span><select data-rn="icon"><option value="">Automático</option>${ICONS.map((n) => `<option ${R.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
         <h4>Equipos (en este orden)</h4>
@@ -639,7 +700,7 @@
           ((this.v.plan || {}).zones || []).forEach((z) => { if (z.room === orig) z.room = R.name; });
         }
         this.toast(del ? 'Ambiente borrado' : 'Ambiente guardado: ya se ve en la app');
-        this.roomEd = null; this.rdraft = null; setTimeout(() => this.draw(), 150);
+        this.roomEd = null; this.rdraft = null; setTimeout(() => this.draw(), 150); this.syncPreview();
       } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
     }
 
@@ -655,7 +716,7 @@
       const W = this.wrap;
       W.querySelectorAll('[data-e]').forEach((x) => { x.onclick = () => this.cmd(x.dataset.e); });
       const ed = W.querySelector('#ed');
-      if (ed) ed.onclick = (e) => { if (this.moreOpen && !e.composedPath().some((x) => x.classList && x.classList.contains('emenu'))) { this.moreOpen = false; this.draw(); } };
+      if (ed) ed.onclick = (e) => { if ((this.moreOpen || this.simOpen) && !e.composedPath().some((x) => x.classList && x.classList.contains('emenu'))) { this.moreOpen = false; this.simOpen = false; this.draw(); } };
       W.querySelectorAll('[data-kind]').forEach((x) => { x.onclick = () => {
         if (x.dataset.kind === this.K) return;
         this.K = x.dataset.kind; this.sel = null; this.roomEd = null; this.rdraft = null;
@@ -705,10 +766,10 @@
         this.change(() => this.setPath(b, path, id || ''));
       }); });
       // ambientes por dentro
-      W.querySelectorAll('#edr [data-red]').forEach((x) => { x.onclick = () => { this.roomEd = x.dataset.red; this.rdraft = null; this.drawProps(); this.bind(); }; });
-      const R = this.rdraft, redraw = () => { this.drawProps(); this.bind(); };
+      W.querySelectorAll('#edr [data-red]').forEach((x) => { x.onclick = () => { this.roomEd = x.dataset.red; this.rdraft = null; this.ensureDraft(); this.drawProps(); this.syncPreview(); this.bind(); }; });
+      const R = this.rdraft, redraw = () => { this.drawProps(); this.syncPreview(); this.bind(); };
       if (R) {
-        W.querySelectorAll('#edr [data-rn]').forEach((x) => { x.onchange = () => { R[x.dataset.rn] = x.value; }; });
+        W.querySelectorAll('#edr [data-rn]').forEach((x) => { x.onchange = () => { R[x.dataset.rn] = x.dataset.rn === 'name' ? (x.value.trim() || R.name) : x.value; this.syncPreview(); }; });
         W.querySelectorAll('#edr [data-rdel]').forEach((x) => { x.onclick = () => { R.entities.splice(+x.dataset.rdel, 1); redraw(); }; });
         W.querySelectorAll('#edr [data-rmv]').forEach((x) => { x.onclick = () => { const i = +x.dataset.rmv, j = i + +x.dataset.d; if (j < 0 || j >= R.entities.length) return; [R.entities[i], R.entities[j]] = [R.entities[j], R.entities[i]]; redraw(); }; });
         W.querySelectorAll('#edr [data-radd]').forEach((x) => { x.onclick = () => this.openCB(x, ROOM_DOMAINS, (id) => {
@@ -719,6 +780,7 @@
         W.querySelectorAll('#edr [data-rx]').forEach((x) => { x.onclick = () => {
           const k = x.dataset.rx;
           if (k === 'back') { this.roomEd = null; this.rdraft = null; redraw(); }
+          if (k === 'unpin') { const bb = this.selBlock(), orig = R._orig; this.roomEd = null; this.rdraft = null; this.change(() => { bb.cfg.rooms = (bb.cfg.rooms || []).filter((n) => n !== orig); bb.cfg.auto = false; }); }
           if (k === 'save') this.saveRoom(false);
           if (k === 'del' && confirm(`¿Borrar el ambiente «${R._orig}»? Sus equipos no se borran.`)) this.saveRoom(true);
         }; });
@@ -790,8 +852,11 @@
     }
     async cmd(k) {
       if (k !== 'more' && this.moreOpen) this.moreOpen = false;
+      if (k !== 'simm' && this.simOpen) this.simOpen = false;
       if (k === 'close') return this.close();
       if (k === 'more') { this.moreOpen = !this.moreOpen; this.draw(); return; }
+      if (k === 'simm') { this.simOpen = !this.simOpen; this.draw(); return; }
+      if (k === 'list') { this.showList = !this.showList; try { localStorage.setItem('matterai.editor.list', this.showList ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } this.draw(); this.sizeFrame(); return; }
       if (k === 'add') return this.openCatalog(null);
       if (k === 'copy') return this.copyFrom(this.K === 'tablet' ? 'phone' : 'tablet');
       const fix = () => { if (this.sel && !this.blocks().some((b) => b.id === this.sel)) this.sel = null; this.roomEd = null; this.rdraft = null; this.draw(); };
