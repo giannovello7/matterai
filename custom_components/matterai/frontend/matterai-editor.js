@@ -91,7 +91,12 @@
   .ord{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:9px;background:#1e242e;margin-bottom:4px}.ord span{flex:1}
   .ord button{border:0;background:none;color:#8f99ab}
   .hint{color:#8f99ab;font-size:12.5px}
-  .pe{position:fixed;inset:0;z-index:60;background:rgba(5,7,10,.92);display:grid;grid-template-columns:1fr 340px}
+  .pe{position:fixed;inset:0;z-index:60;background:rgba(5,7,10,.94);display:grid;grid-template-columns:1fr 360px;color:#e9ecf2;font:14px/1.4 "Red Hat Display",system-ui,sans-serif}
+  .pe *{box-sizing:border-box}.pe button{font:inherit;color:inherit;cursor:pointer}.pe h3,.pe h4{font-family:inherit}
+  .pe-lbl{position:absolute;transform:translate(-50%,-50%);padding:3px 10px;border-radius:10px;background:rgba(22,27,33,.85);color:#e9ecf2;font-size:12.5px;font-weight:600;white-space:nowrap;pointer-events:none}
+  .pe-lbl.sel{background:#f2b766;color:#1b1408}
+  .pe-tip{position:absolute;left:50%;top:10px;transform:translateX(-50%);padding:7px 14px;border-radius:999px;background:rgba(22,27,33,.92);border:1px solid rgba(160,175,200,.25);font-size:12.5px;color:#c4cad6;white-space:nowrap;pointer-events:none}
+  .zl{display:flex;align-items:center;gap:6px}.zl .tx{flex:1;min-width:0}.zl .zx{border:0;background:none;color:#8f99ab;padding:3px 7px;border-radius:7px}.zl .zx:hover{background:#262e3a;color:#f08a7c}
   .pe-c{overflow:auto;display:flex;align-items:center;justify-content:center;padding:20px}
   .pe-img{position:relative;display:inline-block;max-height:calc(100vh - 40px)}
   .pe-img img{display:block;max-height:calc(100vh - 40px);max-width:100%;user-select:none;-webkit-user-drag:none}
@@ -222,9 +227,11 @@
         return this.close();
       }
       if (mod && k === 's') { e.preventDefault(); if (this.dirty()) this.cmd('save'); return undefined; }
-      if (typing || this.pe) return undefined;
-      if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); return this.cmd('undo'); }
-      if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); return this.cmd('redo'); }
+      if (typing) return undefined;
+      const again = () => { if (this.pe) { if (this.zsel != null && !((this.v.plan || {}).zones || [])[this.zsel]) this.zsel = null; this.drawPlan(); } };
+      if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); return this.cmd('undo').then(again); }
+      if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); return this.cmd('redo').then(again); }
+      if (this.pe) return undefined;
       if (!this.sel || this.dlgOpen()) return undefined;
       if (mod && k === 'd') { e.preventDefault(); return this.blockAct(this.sel, 'dup'); }
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); return this.blockAct(this.sel, 'del'); }
@@ -1512,19 +1519,25 @@
       const Z = P.zones || (P.zones = []);
       const z = this.zsel != null ? Z[this.zsel] : null;
       const lights = Object.keys(this.states()).filter((e) => /^(light|switch)\./.test(e)).sort();
-      this.pe.innerHTML = `<div class="pe-c">${src ? `<div class="pe-img"><img id="peimg" src="${esc(src)}" alt="" draggable="false"><svg id="pesvg" viewBox="0 0 1000 1000" preserveAspectRatio="none"></svg></div>` : '<p class="hint">Subí primero la imagen apagada (o de noche) del render.</p>'}</div>
+      const cen = (q) => [q.poly.reduce((a, t) => a + t[0], 0) / q.poly.length, q.poly.reduce((a, t) => a + t[1], 0) / q.poly.length];
+      const lbls = Z.map((q, i) => { const [cx, cy] = cen(q); return `<span class="pe-lbl ${i === this.zsel ? 'sel' : ''}" style="left:${(cx * 100).toFixed(2)}%;top:${(cy * 100).toFixed(2)}%">${esc(q.name)}</span>`; }).join('');
+      const tip = this.drawing ? 'Tocá cada esquina del ambiente · doble clic (o «Terminar») para cerrarlo'
+        : z ? 'Arrastrá los puntos · el «+» de cada lado agrega un punto · doble clic en un punto lo borra · arrastrá adentro para moverlo'
+          : 'Tocá un ambiente para editarlo · Ctrl+Z deshace';
+      this.pe.innerHTML = `<div class="pe-c">${src ? `<div class="pe-img"><img id="peimg" src="${esc(src)}" alt="" draggable="false"><svg id="pesvg" viewBox="0 0 1000 1000" preserveAspectRatio="none"></svg>${lbls}<span class="pe-tip">${tip}</span></div>` : '<p class="hint">Subí primero la imagen apagada (o de noche) del render.</p>'}</div>
         <div class="pe-r"><div class="row" style="display:flex;gap:8px;align-items:center"><h3 style="margin:0;flex:1">Plano</h3><button class="eb pri" data-pe="done">Listo</button></div>
           <h4>Imágenes</h4>${await slot('image', 'Apagado / de noche')}${await slot('image_on', 'Con las luces prendidas')}${await slot('image_day', 'De día (opcional)')}
           <p class="hint">Mismo tamaño y encuadre en las tres. JPG, PNG o WebP, hasta 12 MB. Quedan guardadas en la casa, privadas.</p>
           <h4>Ambientes en el plano</h4>
-          ${Z.map((q, i) => `<div class="zl ${i === this.zsel ? 'sel' : ''}" data-zsel="${i}"><b>${esc(q.name)}</b> <small class="hint">${q.lights.length} luces${q.room ? ' · ' + esc(q.room) : ''}</small></div>`).join('') || '<p class="hint">Todavía no dibujaste ningún ambiente.</p>'}
+          ${Z.map((q, i) => `<div class="zl ${i === this.zsel ? 'sel' : ''}" data-zsel="${i}"><span class="tx"><b>${esc(q.name)}</b> <small class="hint">${q.lights.length} luces${q.room ? ' · ' + esc(q.room) : ''}</small></span><button class="zx" data-zx="${i}" title="Borrar este ambiente">✕</button></div>`).join('') || '<p class="hint">Todavía no dibujaste ningún ambiente.</p>'}
+          ${Z.length > 1 && !this.drawing ? '<button class="eb sm warn" data-pe="clear" style="margin-bottom:8px">Borrar todos los ambientes</button>' : ''}
           <button class="eb" data-pe="new" ${src ? '' : 'disabled'}>${this.drawing ? 'Dibujando… tocá los vértices y «Terminar»' : '+ Dibujar un ambiente'}</button>
           ${this.drawing ? '' : '<button class="eb" data-pe="import" title="Cargar los ambientes ya dibujados (archivo ambientes.json)">Importar ambientes (archivo)</button>'}
           ${this.drawing ? '<button class="eb pri" data-pe="finish">Terminar</button> <button class="eb" data-pe="cancel">Cancelar</button>' : ''}
           ${z ? `<h4>«${esc(z.name)}»</h4><label class="fld"><span>Nombre</span><input data-z="name" value="${esc(z.name)}"></label>
             <label class="fld"><span>Ambiente que abre al mantener</span><select data-z="room"><option value="">—</option>${rooms.map((r) => `<option ${z.room === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
             <h4>Luces que lo iluminan</h4><div class="ml">${lights.map((e) => `<label><input type="checkbox" data-zl="${esc(e)}" ${z.lights.includes(e) ? 'checked' : ''}> ${esc(this.fname(e))}</label>`).join('')}</div>
-            <p class="hint">Arrastrá los puntos para ajustar la forma.</p><button class="eb warn" data-pe="zdel">Borrar este ambiente</button>` : ''}</div>`;
+            <p class="hint">Arrastrá los puntos para ajustar la forma. Con el «+» del medio de cada lado agregás un punto (para ambientes de más de 4 paredes); doble clic o clic derecho en un punto lo borra. Arrastrando desde adentro movés el ambiente entero.</p><button class="eb warn" data-pe="zdel">Borrar este ambiente</button>` : ''}</div>`;
       this.bindPlan();
     }
     bindPlan() {
@@ -1534,20 +1547,54 @@
       const paint = () => {
         if (!svg) return;
         svg.innerHTML = (P.zones || []).map((q, i) => `<polygon points="${ptsOf(q.poly)}" fill="${i === this.zsel ? 'rgba(242,183,102,.28)' : 'rgba(124,196,240,.16)'}" stroke="${i === this.zsel ? '#f2b766' : '#7cc4f0'}" stroke-width="3" vector-effect="non-scaling-stroke" data-zp="${i}"/>`).join('')
-          + (this.zsel != null && P.zones[this.zsel] ? P.zones[this.zsel].poly.map(([x, y], j) => `<circle cx="${x * 1000}" cy="${y * 1000}" r="9" fill="#f2b766" data-vx="${j}" style="cursor:move"/>`).join('') : '')
+          + (this.zsel != null && P.zones[this.zsel] ? (() => {
+            const poly = P.zones[this.zsel].poly;
+            // «+» en el medio de cada lado: arrastrándolo se crea un punto nuevo (ambientes de más de 4 paredes)
+            const mids = poly.map(([x, y], j) => { const [x2, y2] = poly[(j + 1) % poly.length]; return `<g data-mid="${j}" style="cursor:copy"><circle cx="${((x + x2) / 2) * 1000}" cy="${((y + y2) / 2) * 1000}" r="8" fill="#161b21" stroke="#f2b766" stroke-width="2" vector-effect="non-scaling-stroke"/><text x="${((x + x2) / 2) * 1000}" y="${((y + y2) / 2) * 1000 + 4}" text-anchor="middle" font-size="13" font-weight="700" fill="#f2b766" style="pointer-events:none">+</text></g>`; }).join('');
+            return mids + poly.map(([x, y], j) => `<circle cx="${x * 1000}" cy="${y * 1000}" r="9" fill="#f2b766" stroke="#1b1408" stroke-width="2" vector-effect="non-scaling-stroke" data-vx="${j}" style="cursor:move"/>`).join('');
+          })() : '')
           + (this.drawing ? `<polyline points="${ptsOf(this.drawing)}" fill="rgba(242,183,102,.15)" stroke="#f2b766" stroke-width="3" vector-effect="non-scaling-stroke"/>${this.drawing.map(([x, y]) => `<circle cx="${x * 1000}" cy="${y * 1000}" r="7" fill="#f2b766"/>`).join('')}` : '');
       };
       if (img) img.onload = () => { if (img.naturalWidth && img.naturalHeight) P.aspect = Math.round((img.naturalWidth / img.naturalHeight) * 1000) / 1000; };
       const norm = (e) => { const r = svg.getBoundingClientRect(); return [Math.min(1, Math.max(0, (e.clientX - r.left) / r.width)), Math.min(1, Math.max(0, (e.clientY - r.top) / r.height))].map((v) => Math.round(v * 10000) / 10000); };
       if (svg) {
+        const zone = () => P.zones[this.zsel];
         svg.onpointerdown = (e) => {
-          const vx = e.target.closest('[data-vx]');
-          if (vx && this.zsel != null) { this.dragVx = +vx.dataset.vx; svg.setPointerCapture(e.pointerId); return; }
+          if (e.button === 2) return; // el clic derecho borra un punto (contextmenu)
+          const vx = e.target.closest('[data-vx]'), mid = e.target.closest('[data-mid]');
+          if (vx && this.zsel != null) { this.push(); this.dragVx = +vx.dataset.vx; svg.setPointerCapture(e.pointerId); return; }
+          if (mid && this.zsel != null) { // agrega un punto en el medio de ese lado y lo empieza a arrastrar
+            this.push(); const j = +mid.dataset.mid, poly = zone().poly, a = poly[j], b = poly[(j + 1) % poly.length];
+            poly.splice(j + 1, 0, [Math.round(((a[0] + b[0]) / 2) * 10000) / 10000, Math.round(((a[1] + b[1]) / 2) * 10000) / 10000]);
+            this.dragVx = j + 1; svg.setPointerCapture(e.pointerId); paint(); return;
+          }
           if (this.drawing) { this.drawing.push(norm(e)); paint(); return; }
-          const zp = e.target.closest('[data-zp]'); if (zp) { this.zsel = +zp.dataset.zp; this.drawPlan(); }
+          const zp = e.target.closest('[data-zp]');
+          if (zp && +zp.dataset.zp === this.zsel) { this.push(); this.dragZone = { at: norm(e), poly: zone().poly.map((q) => q.slice()) }; svg.setPointerCapture(e.pointerId); return; }
+          if (zp) { this.zsel = +zp.dataset.zp; this.drawPlan(); }
         };
-        svg.onpointermove = (e) => { if (this.dragVx == null) return; P.zones[this.zsel].poly[this.dragVx] = norm(e); paint(); };
-        svg.onpointerup = () => { if (this.dragVx != null) { this.dragVx = null; this.drawPreview(); } };
+        svg.onpointermove = (e) => {
+          if (this.dragVx != null) { zone().poly[this.dragVx] = norm(e); paint(); return; }
+          if (this.dragZone) { // mover el ambiente entero (sin salirse de la imagen)
+            const [x, y] = norm(e), D = this.dragZone, xs = D.poly.map((q) => q[0]), ys = D.poly.map((q) => q[1]);
+            const dx = Math.max(-Math.min(...xs), Math.min(1 - Math.max(...xs), x - D.at[0])), dy = Math.max(-Math.min(...ys), Math.min(1 - Math.max(...ys), y - D.at[1]));
+            zone().poly = D.poly.map(([px, py]) => [Math.round((px + dx) * 10000) / 10000, Math.round((py + dy) * 10000) / 10000]); paint();
+          }
+        };
+        svg.onpointerup = () => { if (this.dragVx != null || this.dragZone) { this.dragVx = null; this.dragZone = null; this.drawPlan(); this.drawPreview(); } };
+        const dropVx = (e) => {
+          const vx = e.target.closest('[data-vx]'); if (!vx || this.zsel == null) return false;
+          const poly = zone().poly; if (poly.length <= 3) { this.toast('Un ambiente necesita al menos 3 puntos'); return true; }
+          this.push(); poly.splice(+vx.dataset.vx, 1); this.drawPlan(); this.drawPreview(); return true;
+        };
+        svg.ondblclick = (e) => {
+          if (this.drawing) { // doble clic: cierra el ambiente que se está dibujando (el doble clic sumó 2 puntos iguales)
+            e.preventDefault(); this.drawing.splice(-1, 1);
+            const fin = this.pe.querySelector('[data-pe="finish"]'); if (fin) fin.click(); return;
+          }
+          dropVx(e);
+        };
+        svg.oncontextmenu = (e) => { if (dropVx(e)) e.preventDefault(); };
       }
       paint();
       pe.querySelectorAll('[data-up]').forEach((x) => { x.onchange = async () => {
@@ -1556,7 +1603,11 @@
         try { const p = await this.upload(f); this.push(); P[x.dataset.up] = p; this.toast('Imagen subida'); await this.drawPlan(); this.drawPreview(); } catch (e) { this.toast(`No se pudo subir: ${e.message || e}`); }
       }; });
       pe.querySelectorAll('[data-rmimg]').forEach((x) => { x.onclick = async () => { this.push(); delete P[x.dataset.rmimg]; await this.drawPlan(); this.drawPreview(); }; });
-      pe.querySelectorAll('[data-zsel]').forEach((x) => { x.onclick = () => { this.zsel = +x.dataset.zsel; this.drawPlan(); }; });
+      pe.querySelectorAll('[data-zsel]').forEach((x) => { x.onclick = (e) => {
+        const zx = e.target.closest('[data-zx]');
+        if (zx) { this.push(); P.zones.splice(+zx.dataset.zx, 1); if (this.zsel != null && this.zsel >= P.zones.length) this.zsel = null; this.drawPlan(); this.drawPreview(); this.toast('Ambiente borrado · Ctrl+Z para deshacer'); return; }
+        this.zsel = +x.dataset.zsel; this.drawPlan();
+      }; });
       pe.querySelectorAll('[data-pe]').forEach((x) => { x.onclick = async () => {
         const k = x.dataset.pe;
         if (k === 'done') { this.closePlan(); return; }
@@ -1569,6 +1620,7 @@
           this.push(); P.zones.push({ name: `Ambiente ${(P.zones || []).length + 1}`, room: null, lights: [], poly: this.drawing }); this.zsel = P.zones.length - 1; this.drawing = null;
           await this.drawPlan(); this.drawPreview(); return;
         }
+        if (k === 'clear') { if (!confirm(`¿Borrar los ${P.zones.length} ambientes del plano? (Se puede deshacer con Ctrl+Z)`)) return; this.push(); P.zones = []; this.zsel = null; await this.drawPlan(); this.drawPreview(); return; }
         if (k === 'zdel' && this.zsel != null) { this.push(); P.zones.splice(this.zsel, 1); this.zsel = null; await this.drawPlan(); this.drawPreview(); }
       }; });
       pe.querySelectorAll('[data-z]').forEach((x) => { x.onchange = async () => {
