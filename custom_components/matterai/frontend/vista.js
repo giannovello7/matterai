@@ -587,7 +587,7 @@
         <image href="${esc(isDay ? day : off)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" data-planimg="1"/>
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
         ${zones.map((z, i) => `<polygon class="v-hit${editing() && ctx.edit.pz === i && ctx.edit.selected === X.curB ? ' zsel' : ''}" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
-        </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}" data-zpin="1">${pinIcons(z, n, m)}<b>${esc(z.name)}</b></span>`; }).join('')}
+        </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}" data-zpin="1"${z.pin ? ' data-man="1"' : ''}>${pinIcons(z, n, m)}<b>${esc(z.name)}</b></span>`; }).join('')}
         ${editing() ? '' : '<span class="v-ptag">Tocá un ambiente para prender o apagar · tocá su nombre para ver todo</span>'}</div>${elAdd('Dibujar un ambiente en el plano')}`;
     }
 
@@ -751,6 +751,35 @@
       if (X.sheet) renderSheet();
       mountLive();
       editMarks();
+      spreadPins();
+    }
+    /** Carteles del plano que se pisan (ambientes angostos o pegados): se separan solos, uno hacia arriba y otro hacia
+     *  abajo. Los que el instalador ubicó a mano (arrastrándolos en el editor) quedan donde están. */
+    function spreadPins() {
+      if (!X.el.querySelectorAll) return;
+      X.el.querySelectorAll('.v-plan').forEach((pl) => {
+        const R = pl.getBoundingClientRect && pl.getBoundingClientRect(); if (!R || !R.height) return;
+        const pins = [...pl.querySelectorAll('.v-pin')];
+        pins.forEach((q) => { if (q.dataset.oy) q.style.top = q.dataset.oy; else q.dataset.oy = q.style.top; });
+        const free = (q) => !q.dataset.man;
+        for (let pass = 0; pass < 8; pass++) {
+          let moved = false;
+          for (let i = 0; i < pins.length; i++) {
+            for (let j = i + 1; j < pins.length; j++) {
+              const a = pins[i].getBoundingClientRect(), b = pins[j].getBoundingClientRect();
+              if (!(a.right > b.left + 2 && b.right > a.left + 2 && a.bottom > b.top + 2 && b.bottom > a.top + 2)) continue;
+              const [up, dn] = a.top <= b.top ? [pins[i], pins[j]] : [pins[j], pins[i]];
+              const ov = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top) + 4;
+              const both = free(up) && free(dn), pct = ((both ? ov / 2 : ov) / R.height) * 100;
+              if (!free(up) && !free(dn)) continue;
+              if (free(up)) up.style.top = `${(parseFloat(up.style.top) - (both ? pct : pct)).toFixed(2)}%`;
+              if (free(dn) && (both || !free(up))) dn.style.top = `${(parseFloat(dn.style.top) + pct).toFixed(2)}%`;
+              moved = true;
+            }
+          }
+          if (!moved) break;
+        }
+      });
     }
     /** Editor: marca el encabezado o la barra si están elegidos, y trae a la vista la tarjeta elegida (columnas que se desplazan). */
     function editMarks() {
