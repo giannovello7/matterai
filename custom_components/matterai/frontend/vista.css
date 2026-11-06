@@ -273,7 +273,8 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .vista.editing .v-b .v-ecard,.vista.editing .v-b .v-ecard *{pointer-events:auto}
 .v-ecard button{width:32px;height:32px;border-radius:50%!important;display:grid!important;place-items:center;background:var(--card2)!important;border:1px solid var(--line)!important;color:var(--fg);box-shadow:0 4px 14px rgba(0,0,0,.35);cursor:pointer}
 .v-ecard button:first-child{background:var(--warm)!important;color:#1b1408;border:0!important}.v-ecard .i{width:16px;height:16px}
-.vista.editing .v-b .v-btag{right:auto;left:8px}
+/* el cartel con el tipo de tarjeta va a la derecha (al lado de ✎ y ⋮): así no tapa el título de la tarjeta */
+.vista.editing .v-b .v-btag{left:auto;right:74px;max-width:calc(100% - 90px);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .vista.editing .v-b[draggable="true"]{cursor:grab}.vista.editing .v-b[draggable="true"]:active{cursor:grabbing}
 .vista.editing .v-b.hid{opacity:.4}.vista.editing .v-b.cond .v-btag{border-style:dashed}
 .vista.editing .v-b{position:relative;outline:1px dashed rgba(160,175,200,.35);outline-offset:4px;border-radius:14px;cursor:pointer;min-height:40px;margin-bottom:6px}

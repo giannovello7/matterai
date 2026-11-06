@@ -780,6 +780,11 @@
   ${HIST_CSS}
   .act-search{display:flex;align-items:center;gap:10px;margin-top:12px;padding:0 14px;border-radius:14px;background:rgba(255,255,255,.06);border:1px solid var(--line)}
   .act-search .ic{width:17px;height:17px;color:var(--mut)}
+  .act-ents{margin-top:8px;max-height:46vh;overflow:auto;padding:6px;border-radius:14px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+  .act-ents>button[data-v]:not(.tbtn){display:flex;align-items:center;gap:10px;width:100%;padding:9px 8px;border-radius:10px;text-align:left}
+  .act-ents>button.on{background:rgba(255,255,255,.07)}.act-ents .tx{flex:1;min-width:0}.act-ents b{display:block;font-size:13.5px;font-weight:600}
+  .act-ents small{display:block;font-size:11.5px;opacity:.65}
+  .act-ents .ck{width:20px;height:20px;border-radius:6px;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;flex:none}.act-ents button.on .ck{background:#fff;color:#0b0e1a;border-color:#fff}
   .act-search input{flex:1;min-width:0;height:42px;border:0;background:none;outline:none;color:var(--txt);font:inherit;font-size:14px}
   .act-f{flex-wrap:nowrap;align-items:center}
   .act-sum{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:6px 0 4px}
@@ -4037,6 +4042,7 @@
       if (a.entity) evs = evs.filter((e) => e.entity_id === a.entity);
       else {
         evs = evs.filter((e) => inRoom(e));
+        if (a.ents && a.ents.length) evs = evs.filter((e) => a.ents.includes(e.entity_id));
         if (q) evs = evs.filter((e) => norm(this._name(e.entity_id, meta[e.entity_id] && meta[e.entity_id].room)).includes(q) || norm(meta[e.entity_id] && meta[e.entity_id].room && meta[e.entity_id].room.name).includes(q));
       }
       const counts = {}; ACT_CATS.forEach(([k]) => { counts[k] = evs.filter((e) => inCat(e, k)).length; });
@@ -4063,6 +4069,19 @@
         h += `<div class="act-search">${ic('search')}<input id="actq" type="search" placeholder="Buscar un dispositivo o ambiente…" value="${esc(a.q || '')}" autocomplete="off"></div>
           <div class="act-f scroll">${ACT_CATS.filter(([k]) => k === 'all' || counts[k]).map(([k, l, i]) => chip('actcat', k, l, a.cat === k, i, counts[k])).join('')}</div>
           <div class="act-f scroll">${chip('actroom', '', 'Toda la casa', !a.room, 'home')}${m.rooms.map((r) => chip('actroom', r.id, r.name, a.room === r.id, r.icon)).join('')}</div>`;
+        // equipos: elegir uno o varios (como el historial de Home Assistant)
+        const sel = a.ents || [];
+        h += `<div class="act-f scroll">${chip('actentsp', '', sel.length ? `Equipos · ${sel.length}` : 'Elegir equipos', !!a.entsOpen || sel.length > 0, 'plug')}
+          ${sel.map((id) => `<button class="chip on" data-action="actentx" data-v="${esc(id)}">${esc(this._name(id, meta[id] && meta[id].room))} ✕</button>`).join('')}
+          ${sel.length ? '<button class="chip" data-action="actentclear" data-v="">Todos</button>' : ''}</div>`;
+        if (a.entsOpen) {
+          const n = {}; (a.events || []).forEach((e) => { n[e.entity_id] = (n[e.entity_id] || 0) + 1; });
+          const ids = Object.keys(meta).filter((id) => !a.room || (meta[id].room && meta[id].room.id === a.room))
+            .sort((x, y) => (n[y] || 0) - (n[x] || 0) || this._name(x, meta[x].room).localeCompare(this._name(y, meta[y].room), 'es'));
+          h += `<div class="act-ents">${ids.map((id) => `<button class="${sel.includes(id) ? 'on' : ''}" data-action="actentx" data-v="${esc(id)}"><span class="ck">${sel.includes(id) ? '✓' : ''}</span>
+            <span class="tx"><b>${esc(this._name(id, meta[id].room))}</b><small>${esc([meta[id].room && meta[id].room.name, n[id] ? `${n[id]} cambio${n[id] > 1 ? 's' : ''}` : 'sin cambios'].filter(Boolean).join(' · '))}</small></span></button>`).join('') || '<p class="mut" style="padding:8px">No hay equipos en este ambiente.</p>'}
+            <button class="tbtn" data-action="actentsp" data-v="" style="margin:8px auto 2px;display:block">Listo</button></div>`;
+        }
       }
       h += '</div><div class="act-body">';
       if (a.loading) h += `<div class="ev-empty">${ic('history')}Buscando lo que pasó en la casa…</div>`;
@@ -4412,6 +4431,9 @@
         case 'actnav': if (this._act) { const np = MatterAIHomeCard.shiftPeriod(this._act.period, Number(d.d)); if (np !== this._act.period) { this._act.period = np; this._act.stale = !!this._act.events; this._act.shown = 150; this._loadAct(); } } break;
         case 'actcat': if (this._act) { this._act.cat = d.v; this._act.shown = 150; this._renderAct(); } break;
         case 'actroom': if (this._act) { this._act.room = d.v || null; this._act.shown = 150; this._renderAct(); } break;
+        case 'actentsp': if (this._act) { this._act.entsOpen = !this._act.entsOpen; this._renderAct(); } break;
+        case 'actentx': if (this._act) { const L = this._act.ents = this._act.ents || [], i = L.indexOf(d.v); if (i >= 0) L.splice(i, 1); else L.push(d.v); this._act.shown = 150; this._renderAct(); } break;
+        case 'actentclear': if (this._act) { this._act.ents = []; this._act.shown = 150; this._renderAct(); } break;
         case 'actent': if (this._act) { this._act.from = { cat: this._act.cat, room: this._act.room, top: this._els.act.scrollTop }; this._act.entity = d.eid; this._act.typing = 0; this._renderAct(); this._els.act.scrollTop = 0; this._loadEntHist(); } break;
         case 'actback': if (this._act) { const f = this._act.from || {}; this._act.entity = null; this._renderAct(); this._els.act.scrollTop = f.top || 0; } break;
         case 'actmore': if (this._act) { this._act.shown += 150; this._renderAct(); } break;
