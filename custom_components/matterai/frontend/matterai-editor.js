@@ -1465,6 +1465,35 @@
       if (!path.startsWith('/api/matterai/media/')) return path;
       return (await this.hass.callWS({ type: 'auth/sign_path', path, expires: 7200 })).path;
     }
+    /** Ambientes del plano ya dibujados (archivo ambientes.json): nombre, ambiente de la casa, luces y forma.
+     *  Las luces que no existen en esta casa se sacan; si un ambiente no trae luces, toma las de su ambiente de la casa. */
+    importZones() {
+      const inp = document.createElement('input');
+      inp.type = 'file'; inp.accept = 'application/json,.json';
+      inp.onchange = async () => {
+        const f = inp.files[0]; if (!f) return;
+        let d = null;
+        try { d = JSON.parse(await f.text()); } catch (_) { d = null; }
+        if (!d || d.format !== 'matterai-plan-zones' || !Array.isArray(d.zones)) { this.toast('Ese archivo no tiene ambientes del plano de MatterAI'); return; }
+        const S = this.states(), m = this.model() || { rooms: [] };
+        let miss = 0;
+        const zones = d.zones.filter((z) => z && Array.isArray(z.poly) && z.poly.length >= 3).slice(0, 60).map((z) => {
+          const room = z.room && m.rooms.find((r) => r.name.toLowerCase() === String(z.room).toLowerCase());
+          let lights = (z.lights || []).filter((id) => { const ok = !!S[id]; if (!ok) miss++; return ok; });
+          if (!lights.length && room && room.lightsCtl) lights = room.lightsCtl.slice(0, 24);
+          return { name: String(z.name || 'Ambiente').slice(0, 40), room: room ? room.name : null, lights,
+            poly: z.poly.map((q) => [Math.min(1, Math.max(0, +q[0] || 0)), Math.min(1, Math.max(0, +q[1] || 0))]) };
+        });
+        if (this.v.plan.zones && this.v.plan.zones.length && !confirm(`¿Reemplazar los ${this.v.plan.zones.length} ambientes del plano por los ${zones.length} del archivo?`)) return;
+        this.push();
+        this.v.plan.zones = zones;
+        if (d.aspect) this.v.plan.aspect = Math.round(+d.aspect * 1000) / 1000;
+        this.zsel = null;
+        await this.drawPlan(); this.drawPreview();
+        this.toast(`Listo: ${zones.length} ambientes${miss ? `. ${miss} luz${miss > 1 ? 'ces' : ''} no existe${miss > 1 ? 'n' : ''} en la casa: tocá cada ambiente para elegir sus luces` : ''}`);
+      };
+      inp.click();
+    }
     closePlan() { if (this.pe) { this.pe.remove(); this.pe = null; } this.drawing = null; this.draw(); }
     async planEditor() {
       if (this.pe) return;
@@ -1490,6 +1519,7 @@
           <h4>Ambientes en el plano</h4>
           ${Z.map((q, i) => `<div class="zl ${i === this.zsel ? 'sel' : ''}" data-zsel="${i}"><b>${esc(q.name)}</b> <small class="hint">${q.lights.length} luces${q.room ? ' · ' + esc(q.room) : ''}</small></div>`).join('') || '<p class="hint">Todavía no dibujaste ningún ambiente.</p>'}
           <button class="eb" data-pe="new" ${src ? '' : 'disabled'}>${this.drawing ? 'Dibujando… tocá los vértices y «Terminar»' : '+ Dibujar un ambiente'}</button>
+          ${this.drawing ? '' : '<button class="eb" data-pe="import" title="Cargar los ambientes ya dibujados (archivo ambientes.json)">Importar ambientes (archivo)</button>'}
           ${this.drawing ? '<button class="eb pri" data-pe="finish">Terminar</button> <button class="eb" data-pe="cancel">Cancelar</button>' : ''}
           ${z ? `<h4>«${esc(z.name)}»</h4><label class="fld"><span>Nombre</span><input data-z="name" value="${esc(z.name)}"></label>
             <label class="fld"><span>Ambiente que abre al mantener</span><select data-z="room"><option value="">—</option>${rooms.map((r) => `<option ${z.room === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
@@ -1531,6 +1561,7 @@
         const k = x.dataset.pe;
         if (k === 'done') { this.closePlan(); return; }
         if (k === 'new') { this.drawing = []; this.zsel = null; await this.drawPlan(); return; }
+        if (k === 'import') { this.importZones(); return; }
         if (k === 'cancel') { this.drawing = null; await this.drawPlan(); return; }
         if (k === 'finish') {
           if (!this.drawing || this.drawing.length < 3) { this.toast('Marcá al menos 3 puntos'); return; }
