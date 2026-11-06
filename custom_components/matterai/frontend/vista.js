@@ -294,6 +294,17 @@
       return autoIds.filter((id) => st(id)).slice(0, max || 24).map((e) => ({ entity: e }));
     }
     const nameIn = (c, id) => { const x = (c.items || []).find((y) => y && y.entity === id); return (x && x.name) || ''; };
+    /** Las rutinas de una tarjeta (las elegidas, o las automatizaciones de la casa) y sus filas con interruptor o «Ejecutar». */
+    function routineList(c, max) {
+      const S = (hass() || {}).states || {};
+      return listOf(c, Object.keys(S).filter((x) => x.startsWith('automation.')), max).filter((x) => S[x.entity] || editing());
+    }
+    function routineRows(list, withEl) {
+      const S = (hass() || {}).states || {};
+      const last = (s) => (s && s.attributes.last_triggered ? 'Última: ' + new Date(s.attributes.last_triggered).toLocaleString('es-AR', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Nunca se ejecutó');
+      return list.map((x, i) => { const s = S[x.entity], run = x.mode === 'run' || x.entity.startsWith('script.');
+        return `<div class="v-rti"${withEl ? EL(i) : ''}><span class="v-tx"><b>${esc(x.name || fname(x.entity))}</b><span>${esc(s ? last(s) : 'No existe en la casa')}</span></span>${run ? `<button class="v-btn1" data-run="${esc(x.entity)}">Ejecutar</button>` : `<button class="v-pw ${s && s.state === 'on' ? 'on' : ''}" data-auto="${esc(x.entity)}" aria-label="Activar o desactivar"></button>`}</div>`; }).join('');
+    }
     function roomRow(r, mark, i) {
       const n = r.lightsOn.length, hasL = r.lightsCtl.length > 0, bits = [n ? `${n} prendida${n > 1 ? 's' : ''}` : (r.count ? 'Apagado' : '')];
       if (r.temp != null) bits.push(`${dec(r.temp)}°`);
@@ -449,12 +460,17 @@
         }
         case 'routines': {
           const S = (hass() || {}).states || {};
-          const list = listOf(c, Object.keys(S).filter((x) => x.startsWith('automation.')), 4).filter((x) => S[x.entity] || editing());
+          const asList = c.style === 'list';
+          // por defecto es un botón que abre todas las rutinas (no se activan o desactivan desde la pantalla principal)
+          const list = routineList(c, asList ? 4 : 200);
           X.shown[b.id] = list;
           if (!list.length) return editing() ? `${t}<p class="v-empty">Esta tarjeta no tiene rutinas todavía.</p>${elAdd('Agregar una rutina')}` : '';
-          const last = (s) => (s && s.attributes.last_triggered ? 'Última: ' + new Date(s.attributes.last_triggered).toLocaleString('es-AR', { weekday: 'short', hour: '2-digit', minute: '2-digit', hour12: false }) : 'Nunca se ejecutó');
-          return `<div class="v-card">${t}<div class="v-rt">${list.map((x, i) => { const s = S[x.entity], run = x.mode === 'run' || x.entity.startsWith('script.');
-            return `<div class="v-rti"${EL(i)}><span class="v-tx"><b>${esc(x.name || fname(x.entity))}</b><span>${esc(s ? last(s) : 'No existe en la casa')}</span></span>${run ? `<button class="v-btn1" data-run="${esc(x.entity)}">Ejecutar</button>` : `<button class="v-pw ${s && s.state === 'on' ? 'on' : ''}" data-auto="${esc(x.entity)}" aria-label="Activar o desactivar"></button>`}</div>`; }).join('')}</div>${elAdd('Agregar una rutina')}</div>`;
+          if (!asList) {
+            const on = list.filter((x) => (S[x.entity] || {}).state === 'on').length;
+            return `<div class="v-card v-rbtn" data-rsheet="${esc(b.id)}"><div class="v-row"><span class="v-bic">${ic('robot')}</span><span class="v-tx"><b>${esc(b.title || 'Rutinas')}</b>
+              <span>${list.length} rutina${list.length === 1 ? '' : 's'}${on ? ` · ${on} activa${on === 1 ? '' : 's'}` : ''}</span></span><span class="v-chev">${ic('chev')}</span></div></div>`;
+          }
+          return `<div class="v-card">${t}<div class="v-rt">${routineRows(list, true)}</div>${elAdd('Agregar una rutina')}</div>`;
         }
         case 'music': {
           const p = player();
@@ -874,6 +890,12 @@
         }
       }
       if (X.sheet === 'roomedit' && ctx.edit && ctx.edit.room) h = roomEditHTML(ctx.edit.room);
+      if (X.sheet === 'rutinas') {
+        const b = (X.layout.blocks || []).find((y) => y.id === X.sheetArg), list = b ? routineList(b.cfg || {}, 200) : [];
+        const on = list.filter((x) => (st(x.entity) || {}).state === 'on').length;
+        h = hd(b && b.title ? b.title : 'Rutinas', `${list.length} rutina${list.length === 1 ? '' : 's'} · ${on} activa${on === 1 ? '' : 's'}`) + `<div class="v-rt">${routineRows(list, false)}</div>
+          <p class="v-note">Activá o desactivá cada rutina, o tocá «Ejecutar» para hacerla ahora.</p>`;
+      }
       if (sh.innerHTML !== h) sh.innerHTML = h;
     }
     /** Editor: el ambiente por dentro, con sus equipos en orden; se ordenan, sacan y agregan acá mismo. */
@@ -968,6 +990,7 @@
       const gate = t.closest('[data-gate]'); if (gate) { vib(); return c.access(gate.dataset.gate); }
       const alb = t.closest('[data-alarm]'); if (alb) return openSheet('alarm', alb.dataset.alarm);
       const en = t.closest('[data-ent]'); if (en) { const id = en.dataset.ent, d = id.split('.')[0]; vib(); return c.call(d === 'scene' || d === 'script' ? d : 'homeassistant', d === 'scene' || d === 'script' ? 'turn_on' : 'toggle', { entity_id: id }); }
+      const rs = t.closest('[data-rsheet]'); if (rs) { vib(); return openSheet('rutinas', rs.dataset.rsheet); }
       const rn = t.closest('[data-run]'); if (rn) { vib(); const id = rn.dataset.run; toast(`«${fname(id)}» en marcha`); return id.startsWith('script.') ? c.call('script', 'turn_on', { entity_id: id }) : c.call('automation', 'trigger', { entity_id: id }); }
       const au = t.closest('[data-auto]'); if (au) { vib(); const s = st(au.dataset.auto); return c.call('automation', s && s.state === 'on' ? 'turn_off' : 'turn_on', { entity_id: au.dataset.auto }); }
       const mp = t.closest('[data-mp]'); if (mp) { vib(); return c.call('media_player', 'media_play_pause', { entity_id: mp.dataset.mp }); }

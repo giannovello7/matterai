@@ -768,7 +768,10 @@
           h += this.elemSection(b);
           h += '<p class="hint">Cada persona también puede fijar o sacar ambientes desde su celular (mantener apretado).</p>';
           break;
-        case 'scenes': case 'routines': h += this.elemSection(b); break;
+        case 'scenes': h += this.elemSection(b); break;
+        case 'routines':
+          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="">Un botón que abre todas las rutinas</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Lista en la pantalla (las primeras 4)</option></select></label>`;
+          h += this.elemSection(b); break;
         case 'buttons':
           h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="grid" ${c.style !== 'list' ? 'selected' : ''}>Grilla</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Lista</option></select></label>`;
           h += this.elemSection(b); break;
