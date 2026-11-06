@@ -555,6 +555,22 @@
     }
 
     /* ───────── plano: imagen apagada + prendida por ambiente, según las luces ───────── */
+    /** Cartel de cada ambiente del plano: la luz siempre (prendida o apagada) y, si están andando, el aire, la música,
+     *  el ventilador, las cortinas abiertas, la cerradura abierta y las aberturas abiertas (como en la demo). */
+    function pinIcons(z, n, m) {
+      const ico = (name, cls, title) => ic(name).replace('class="i"', `class="i ${cls}"`).replace('<svg ', `<svg aria-label="${title}" `);
+      let h = ico('bulb', n ? 'on' : '', n ? 'Luz prendida' : 'Luz apagada');
+      const r = roomByName(m, z.room || z.name); if (!r) return h;
+      const S = (hass() || {}).states || {};
+      if ((r.climOn || []).length) h += ico('snow', 'ac', 'Aire prendido');
+      if ((r.mediaOn || []).length) h += ico('music', 'mu', 'Música sonando');
+      if ((r.fansOn || []).length) h += ico('fan', 'ac', 'Ventilador prendido');
+      if ((r.covers || []).some((id) => { const s = st(id); return s && s.state === 'open' && !['gate', 'garage', 'door'].includes(s.attributes.device_class); })) h += ico('curt', 'ac', 'Cortina abierta');
+      if ((r.locks || []).some((id) => (st(id) || {}).state === 'unlocked')) h += ico('unlock', 'al', 'Cerradura abierta');
+      if ((r.openNow || []).length) h += ico('door', 'al', 'Abertura abierta');
+      void S;
+      return h;
+    }
     function planHTML(m) {
       const p = X.layout.plan;
       if (!p || !p.image) return editing() ? '<div class="v-plan empty"><p>Subí el render de la casa en «Plano» para verlo acá.</p></div>' : '';
@@ -571,8 +587,8 @@
         <image href="${esc(isDay ? day : off)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" data-planimg="1"/>
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
         ${zones.map((z, i) => `<polygon class="v-hit${editing() && ctx.edit.pz === i && ctx.edit.selected === X.curB ? ' zsel' : ''}" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
-        </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}">${ic('bulb')}<b>${esc(z.name)}</b></span>`; }).join('')}
-        ${editing() ? '' : '<span class="v-ptag">Tocá un ambiente · mantené para ver todo</span>'}</div>${elAdd('Dibujar un ambiente en el plano')}`;
+        </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}" data-zpin="1">${pinIcons(z, n, m)}<b>${esc(z.name)}</b></span>`; }).join('')}
+        ${editing() ? '' : '<span class="v-ptag">Tocá un ambiente para prender o apagar · tocá su nombre para ver todo</span>'}</div>${elAdd('Dibujar un ambiente en el plano')}`;
     }
 
     /* ───────── avisos de la casa (campanita) ───────── */
@@ -941,6 +957,9 @@
       const bt = t.closest('[data-btap]'); if (bt) { const b = blockOf(bt); if (b && b.cfg && b.cfg.tap) run(b.cfg.tap, { entity: b.cfg.entity, name: b.title }); return undefined; }
       const mo = t.closest('[data-more]'); if (mo) return ctx.openEntity(mo.dataset.more);
       const cam = t.closest('[data-cam]'); if (cam) return openCam(cam.dataset.cam);
+      // el cartel (nombre o íconos) abre el ambiente con todo lo que tiene; la zona prende o apaga sus luces
+      const zpin = t.closest('[data-zpin]');
+      if (zpin) { const zz = X.zonePolys[+zpin.dataset.zone], r = zz && roomByName(m, zz.room || zz.name); if (r) { vib(); return c.openRoom(r.id); } }
       const z = t.closest('[data-zone]'); if (z) { const zz = X.zonePolys[+z.dataset.zone]; if (zz && zz.lights.length) { const any = zz.lights.some((id) => (st(id) || {}).state === 'on'); vib(); c.call('homeassistant', any ? 'turn_off' : 'turn_on', { entity_id: zz.lights }); toast(`${zz.name}: ${any ? 'apagado' : 'prendido'}`); } else if (zz && zz.room) { const r = roomByName(m, zz.room); if (r) c.openRoom(r.id); } return; }
       const room = t.closest('[data-room]'); if (room) { if (X.sheet === 'casa') closeSheet(); return c.openRoom(room.dataset.room); }
       const scr = t.closest('[data-scr]');
