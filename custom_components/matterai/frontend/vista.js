@@ -285,7 +285,7 @@
       return `<button class="v-kpi ${alert ? 'alert' : ''}" data-kt="${i}"${EL(i)}><span class="l">${ic(it.icon || ico)}<span>${esc(lbl)}</span></span><span class="v ${cls}">${esc(val)}</span></button>`;
     }
     /* Editor: cada cosa de adentro de una tarjeta (un dato, una escena, un ambiente…) se toca, se elige y se edita sola */
-    const EL = (i) => (editing() ? ` data-el="${i}"${ctx.edit.selected === X.curB && ctx.edit.el != null && String(ctx.edit.el) === String(i) ? ' data-elsel="1"' : ''}` : '');
+    const EL = (i) => (editing() ? ` data-el="${i}"${i !== 'cam' ? ' draggable="true"' : ''}${ctx.edit.selected === X.curB && ctx.edit.el != null && String(ctx.edit.el) === String(i) ? ' data-elsel="1"' : ''}` : '');
     const elAdd = () => ''; // lo de adentro se agrega en la ventana de la tarjeta (como en Lovelace)
     /** La lista de una tarjeta: la armada a mano (con nombre, ícono, modo) o la que elige la app sola. */
     function listOf(c, autoIds, max) {
@@ -400,8 +400,15 @@
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
           const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}">${photo}</div>` : photo;
           const badge = !cam ? '' : video ? (live ? '' : '<span class="v-live"><i></i>EN VIVO</span>') : '<span class="v-live photo">FOTO · cada 10 s</span>';
-          return `${t}<div class="v-cam ${live && !editing() ? 'is-live' : ''}">${feed}${badge}${list.length > 1 && !(live && !editing()) ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
-            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${live && card() && card()._config && card()._config.camera_card ? `<button class="v-cbtn" data-camall="1">${ic('film')}Grabaciones</button>` : ''}${extra}${g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : ''}</span></div>${elAdd('Agregar un botón')}`;
+          const gateBtn = g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : '';
+          if (video) {
+            // en video, nada encima de la imagen (como la tarjeta de Frigate original): el visor trae sus flechas y su menú.
+            // La tarjeta «Cámaras en vivo (Frigate)» es sólo el visor; la del portero lleva sus botones debajo del video.
+            const bar = b.type === 'frigate' ? '' : `${extra}${gateBtn}`;
+            return `${t}<div class="v-cam clean ${live ? 'is-live' : ''}">${feed}${badge}</div>${bar ? `<div class="v-cbar">${bar}</div>` : ''}`;
+          }
+          return `${t}<div class="v-cam">${feed}${badge}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
+            <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${b.type === 'frigate' ? '' : extra + gateBtn}</span></div>`;
         }
         case 'rooms': {
           const names = (c.rooms && c.rooms.length) ? c.rooms : m.rooms.slice(0, 4).map((r) => r.name);
@@ -1010,6 +1017,29 @@
       const d = pinDrag; pinDrag = null;
       if (d && d.moved && d.pos) { X.held = true; ctx.edit.onPin(d.i, d.pos); }
     });
+    // editor: lo de adentro de una tarjeta (cada ambiente, escena, botón…) se arrastra solo, no la tarjeta entera
+    let elDrag = null;
+    el.addEventListener('dragstart', (e) => {
+      const it = editing() && e.target.closest && e.target.closest('[data-el]'); if (!it || it.dataset.el === 'cam') return;
+      const sec = it.closest('[data-block]'); if (!sec) return;
+      elDrag = { b: sec.dataset.block, i: +it.dataset.el }; it.classList.add('dragging'); e.stopPropagation();
+      try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', 'e'); } catch (_) { /* viejo */ }
+    }, true);
+    el.addEventListener('dragover', (e) => {
+      if (!elDrag) return;
+      const it = e.target.closest('[data-el]'), sec = it && it.closest('[data-block]');
+      X.el.querySelectorAll('[data-el].dropb').forEach((x) => x.classList.remove('dropb'));
+      if (it && sec && sec.dataset.block === elDrag.b) { e.preventDefault(); e.stopPropagation(); it.classList.add('dropb'); }
+    }, true);
+    el.addEventListener('drop', (e) => {
+      if (!elDrag) return;
+      e.preventDefault(); e.stopPropagation();
+      const d = elDrag; elDrag = null;
+      const it = e.target.closest('[data-el]'), sec = it && it.closest('[data-block]');
+      X.el.querySelectorAll('[data-el]').forEach((x) => x.classList.remove('dropb', 'dragging'));
+      if (it && sec && sec.dataset.block === d.b && +it.dataset.el !== d.i && ctx.edit.onElem) ctx.edit.onElem(d.b, 'move', { from: d.i, to: +it.dataset.el });
+    }, true);
+    el.addEventListener('dragend', () => { elDrag = null; X.el.querySelectorAll('[data-el]').forEach((x) => x.classList.remove('dropb', 'dragging')); }, true);
     // editor: los equipos del ambiente abierto se ordenan arrastrándolos
     let riDrag = null;
     el.addEventListener('dragstart', (e) => { const r = editing() && e.target.closest && e.target.closest('[data-ri]'); if (!r) return; riDrag = +r.dataset.ri; r.classList.add('dragging'); e.stopPropagation(); try { e.dataTransfer.setData('text/plain', 'r'); } catch (_) { /* viejo */ } }, true);

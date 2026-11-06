@@ -127,6 +127,7 @@
   .elr.drag,.rme.drag{opacity:.4}.elr.over,.rme.over{box-shadow:0 -3px 0 #f2b766}
   .mlist{display:flex;flex-direction:column;gap:4px}.mlist button{border:0;background:#1e242e;text-align:left;padding:12px 14px;border-radius:10px;font-weight:600}
   .mlist button:hover{background:#262e3a}.mlist button.warn{color:#f08a7c}
+  .ed.playing .frame{box-shadow:0 0 0 3px #7fd6a4,0 30px 80px rgba(0,0,0,.6)}
   .autobox{padding:10px 12px;border-radius:10px;background:rgba(124,196,240,.08);border:1px solid rgba(124,196,240,.3);font-size:12.5px;color:#c4cad6;margin-bottom:10px}
   .elist{display:flex;flex-direction:column;gap:5px;margin-bottom:8px}
   .elr{display:flex;align-items:center;gap:4px;padding:8px 6px 8px 10px;border-radius:10px;background:#1e242e;border:1px solid transparent;cursor:pointer}
@@ -401,7 +402,8 @@
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
           <span class="eseg" title="Modo de día o de noche de este diseño (el cliente también lo puede cambiar en Opciones)">${[['dark', '☾ Oscuro'], ['light', '☀ Claro'], ['auto', 'Auto']].map(([k, l]) => `<button data-theme="${k}" class="${(this.lay().theme || 'dark') === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           <button class="eb ico" data-e="dash" title="Opciones del dashboard (nombre, tema)">⚙</button>
-          <button class="eb pri2" data-e="add" title="Agregar una tarjeta">+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
+          <button class="eb ${this.playing ? 'pri' : ''}" data-e="play" title="${this.playing ? 'Volver a editar' : 'Usar la pantalla como en el celular (prender luces, cambiar de cámara, entrar a un ambiente)'}">${this.playing ? '✎ Editar' : '▶ Probar'}</button>
+          <button class="eb pri2" data-e="add" title="Agregar una tarjeta" ${this.playing ? 'disabled' : ''}>+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
           <span class="emenu"><button class="eb ${Object.values(this.sim || {}).some(Boolean) ? 'pri2' : ''}" data-e="simm" title="Ver cómo queda en otras situaciones (no toca la casa)">Simular${Object.values(this.sim || {}).filter(Boolean).length ? ` (${Object.values(this.sim || {}).filter(Boolean).length})` : ''} ▾</button>${this.simOpen ? `<span class="emenu-l" style="left:0;right:auto">
             ${[['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']].map(([k, l]) => `<button data-sim="${k}">${(this.sim || {})[k] ? '✓ ' : ''}${l}</button>`).join('')}</span>` : ''}</span>
           <span class="sp"></span>
@@ -414,7 +416,9 @@
           <span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span>
           <button class="eb pri" data-e="close" title="Terminar de editar">Listo</button>`;
       const hint = this.$('#ehint');
-      if (hint) hint.innerHTML = this.dlgOpen() ? '' : 'Tocá una tarjeta para editarla · Arrastrala para moverla · <b>+ Agregar tarjeta</b> al final de cada columna · Tocá arriba o la barra de abajo para cambiarlas';
+      this.$('#ed').classList.toggle('playing', !!this.playing);
+      if (hint && this.playing) hint.innerHTML = 'Modo prueba: usalo como en el celular (luces, cámaras, ambientes). Los equipos se mueven de verdad. <b>✎ Editar</b> vuelve al editor.';
+      else if (hint) hint.innerHTML = this.dlgOpen() ? '' : 'Tocá una tarjeta para editarla · Arrastrala para moverla · <b>+ Agregar tarjeta</b> al final de cada columna · Tocá arriba o la barra de abajo para cambiarlas';
       this.drawPreview(); this.drawProps(); this.drawDlg(); this.bind();
     }
     blocks() { const l = this.lay(); return l.blocks || (l.blocks = []); }
@@ -460,7 +464,7 @@
      *  ancho se comportan como en el equipo, y los estilos del panel no la tocan. */
     drawPreview() {
       const size = this.sizeFrame(), fr = this.$('#frame');
-      const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: this.editCtx(), sim: this.sim || null });
+      const ctx = () => ({ kind: this.K, orientation: this.lay().orientation || 'landscape', edit: this.playing ? null : this.editCtx(), sim: this.sim || null });
       if (this.vista && this.ifr && this.ifr.isConnected) { this.vista.setCtx(ctx()); this.vista.setView(this.viewFor()); this.previewRoom(); return; }
       if (!this.card) { fr.innerHTML = '<p style="padding:20px;color:#8f99ab">La vista previa necesita la tarjeta MatterAI (recargá la página).</p>'; return; }
       fr.innerHTML = '';
@@ -545,7 +549,7 @@
         else this.blockAct(id, k);
       });
     }
-    syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.editCtx() }); this.previewRoom(); }
+    syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.playing ? null : this.editCtx() }); if (!this.playing) this.previewRoom(); }
     /** El ambiente que se edita se ve abierto en la pantalla, como lo ve el cliente (la ventana de la app), con los
      *  cambios que se van haciendo (todavía sin guardar en la casa). */
     previewRoom() {
@@ -849,6 +853,7 @@
       const b = this.selBlock(); if (!b) return;
       if (act === 'add' && b.type === 'plan') { this.planEditor().then(() => { this.drawing = []; this.zsel = null; return this.drawPlan(); }); return; }
       if (act === 'add') { this.elemAdd(b); return; }
+      if (act === 'move' && i && typeof i === 'object') { this.change(() => { this.materialize(b); const L = this.elemList(b); if (i.from < L.length && i.to < L.length) { const [x] = L.splice(i.from, 1); L.splice(i.to, 0, x); } }); return; }
       if (i == null || i === 'cam') return;
       this.change(() => {
         this.materialize(b);
@@ -1247,6 +1252,13 @@
       if (k !== 'simm' && this.simOpen) this.simOpen = false;
       if (k === 'close') return this.close();
       if (k === 'more') { this.moreOpen = !this.moreOpen; this.draw(); return; }
+      if (k === 'play') {
+        if (this.dlgOpen()) await this.dlgOk();
+        this.playing = !this.playing;
+        this.draw();
+        this.toast(this.playing ? 'Modo prueba: tocá como en el celular' : 'De vuelta al editor');
+        return;
+      }
       if (k === 'dash') return this.pick(null, { zone: 'dash' });
       if (k === 'simm') { this.simOpen = !this.simOpen; this.draw(); return; }
       if (k === 'list') { this.showList = !this.showList; try { localStorage.setItem('matterai.editor.list', this.showList ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } this.draw(); this.sizeFrame(); return; }
