@@ -95,9 +95,10 @@ Las tarjetas «en automático» se arman solas con lo que tiene la casa. Si eleg
 - **Música**: como Spotify, sobre Music Assistant: cola, parlantes, pasar la música de uno a otro, volumen grande.
 - **Cámaras**: el visor de Frigate en vivo, con eventos y grabaciones.
 - **Actividad**: qué pasó en la casa, por equipo, día, tipo y ambiente.
-- **Agenda, clima, avisos (campanita), voz** (el micrófono; el asistente se va a llamar «Mate»).
+- **Agenda, clima y avisos** (la campanita).
+- **Voz: «Mate»**. Tocás el micrófono y pedís («prendé la luz del living», «poné música en el quincho»). Con **«Escuchar «Mate»»** prendido (Opciones → Pantalla, o en la pantalla de voz) no hace falta tocar nada: decís **«Mate»**, suena un tilín y pedís. Escucha en el equipo, sin internet (el audio no sale de la tablet o el celular), mientras la app está abierta: ideal para la tablet de pared. La primera vez baja la voz en español (unos 40 MB). «Mate» se activa sola al principio de la frase, así que «tomamos mate» no la despierta.
 - **Opciones**: pantalla (modo claro u oscuro, protector, tablet de pared), conexión (local o remota), huella, accesos rápidos (widgets, botones rápidos, NFC), agregar otro celular y desvincular.
-- **Tablet de pared**: queda siempre prendida, fijada en la app, con protector de pantalla, y se despierta al acercarse. El portero aparece como una llamada.
+- **Tablet de pared**: queda siempre prendida, fijada en la app, con protector de pantalla, se despierta al acercarse y escucha «Mate». El portero aparece como una llamada.
 - **Android Auto**: botones del portón, luces y escenas en el auto.
 
 # Avisos con la app cerrada

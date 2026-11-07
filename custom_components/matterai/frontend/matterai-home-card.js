@@ -2996,15 +2996,25 @@
         synth.speak(u);
       } catch (_) { done && done(); }
     }
-    /* ---- Manos libres: "Hey Matte" con la app abierta (ideal para la tablet de pared) ----
+    /* ---- Manos libres: «Mate» con la app abierta (ideal para la tablet de pared) ----
      * Se activa por dispositivo. Escucha continuo con el reconocimiento del navegador y sólo
      * reacciona a "hey/oye/che matte" (con prefijo: "mate" solo aparece en cualquier charla). */
     _isNative() { return !!(typeof window !== 'undefined' && window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()); }
-    _hfSupported() { return this._voiceAvailable() && !!this._speechRec() && !this._isNative(); }
+    _hfMate() { return this._isNative() && !!window.MaeMate; }
+    _hfSupported() { return this._voiceAvailable() && !!this._speechRec() && (!this._isNative() || this._hfMate()); }
     _hfEnabled() { try { return localStorage.getItem('matterai.handsfree') === '1'; } catch (_) { return false; } }
     _hfSet(on) {
-      try { localStorage.setItem('matterai.handsfree', on ? '1' : '0'); } catch (_) { /* sin almacenamiento */ }
-      if (on) { this._hfStart(); this._toast(`${ic('mic')} Decí <b>&nbsp;«Hey Matte»&nbsp;</b> y lo que necesites`); } else { this._hfStop(); this._toast(`${ic('mic')} Manos libres apagado`); }
+      const save = (v) => { try { localStorage.setItem('matterai.handsfree', v ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } };
+      if (on && this._hfMate()) {
+        // la primera vez se baja la voz de Mate (unos 40 MB, sin internet después)
+        this._toast(`${ic('mic')} Preparando «Mate»…`);
+        window.MaeMate.ensure((p) => this._toast(`${ic('mic')} Bajando la voz de Mate: ${p}%`))
+          .then(() => { save(true); this._hfStart(); this._toast(`${ic('mic')} Decí <b>&nbsp;«Mate»&nbsp;</b>, esperá el tilín y pedí lo que necesites`); this._hfMark(); })
+          .catch((e) => { save(false); this._toast(`${ic('alert')} No se pudo preparar «Mate»: ${esc((e && e.message) || e)}`); this._hfMark(); });
+        return;
+      }
+      save(on);
+      if (on) { this._hfStart(); this._toast(`${ic('mic')} Decí <b>&nbsp;«Mate»&nbsp;</b> y lo que necesites`); } else { this._hfStop(); this._toast(`${ic('mic')} Manos libres apagado`); }
       this._hfMark();
     }
     _hfMark() {
@@ -3012,13 +3022,25 @@
       if (b) b.classList.toggle('hf', !!(this._hf && this._hf.on));
     }
     static wakeSplit(text) {
-      // devuelve el pedido que sigue a la palabra de activación ('' si sólo dijo "hey matte"), o null si no la dijo
+      // devuelve el pedido que sigue a la palabra de activación ('' si sólo dijo «Mate»), o null si no la dijo.
+      // «Mate» sola sólo al principio de la frase (así no se activa con «tomamos mate»); con «hey / oye / che» en cualquier parte
       const t = String(text || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[,.!¡?¿]/g, ' ');
-      const m = t.match(/(?:^|\s)(?:hey|ei|ey|he|oye|che)\s+mat+(?:e|i|ei)?(?=\s|$)/);
+      const m = t.match(/^\s*mat+(?:e|i|ei)?(?=\s|$)/) || t.match(/(?:^|\s)(?:hey|ei|ey|he|oye|che)\s+mat+(?:e|i|ei)?(?=\s|$)/);
       return m ? t.slice(m.index + m[0].length).trim() : null;
     }
     _hfStart() {
       if (!this._hfSupported() || !this._hfEnabled() || this._vo) return;
+      if (this._hfMate()) {
+        // app Android: escucha el equipo (MateWake); al oír «Mate» abre el asistente
+        const M = window.MaeMate;
+        if (M.listening) return;
+        this._hf = { on: true, native: true };
+        M.onWake = () => { if (this._hf && this._hf.native && !this._vo) { this._hf.on = false; this._voiceStart(); } };
+        M.onRestart = () => this._hfStart();
+        M.start().catch((e) => { this._hf = null; this._hfMark(); if (!document.hidden) this._toast(`${ic('alert')} «Mate» no puede escuchar: ${esc((e && e.message) || e)}`); });
+        this._hfMark();
+        return;
+      }
       if (this._hf && this._hf.on) return;
       const SR = this._speechRec();
       const hf = this._hf = { on: true, rec: new SR() };
@@ -3037,7 +3059,7 @@
         }
       };
       rec.onerror = (e) => {
-        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { hf.on = false; this._hfSet(false); this._toast(`${ic('alert')} Permití el micrófono para usar «Hey Matte»`); }
+        if (e.error === 'not-allowed' || e.error === 'service-not-allowed') { hf.on = false; this._hfSet(false); this._toast(`${ic('alert')} Permití el micrófono para usar «Mate»`); }
       };
       rec.onend = () => { // el navegador corta cada tanto: se vuelve a escuchar
         if (this._hf === hf && hf.on) setTimeout(() => { if (this._hf === hf && hf.on && !this._vo && !(typeof document !== 'undefined' && document.hidden)) { try { rec.start(); } catch (_) { /* ya estaba */ } } }, 350);
@@ -3045,7 +3067,12 @@
       try { rec.start(); } catch (_) { hf.on = false; }
       this._hfMark();
     }
-    _hfStop() { const hf = this._hf; this._hf = null; if (hf) { hf.on = false; try { hf.rec.abort(); } catch (_) { /* ya terminó */ } } this._hfMark(); }
+    _hfStop() {
+      const hf = this._hf; this._hf = null;
+      if (hf && hf.native && window.MaeMate) { window.MaeMate.stop(); window.MaeMate.onWake = null; window.MaeMate.onRestart = null; }
+      else if (hf) { hf.on = false; try { hf.rec.abort(); } catch (_) { /* ya terminó */ } }
+      this._hfMark();
+    }
 
     _voiceAutoClose(ms) { const vo = this._vo; clearTimeout(this._voT); this._voT = setTimeout(() => { if (this._vo === vo) this._voiceStop(true); }, ms); }
     _voiceStop(close) {
@@ -3072,7 +3099,7 @@
         ${vo.state === 'error' && vo.go ? `<a class="vo-go" href="${esc(vo.go)}" target="_self">${ic('mic')} Abrir con micrófono</a>` : ''}
         ${vo.state === 'error' ? `<div class="vo-retry">Tocá el círculo para probar de nuevo</div>` : ''}
         ${vo.state === 'done' && ok ? `<div class="vo-a">${ic('sparkle')} ${ok} ${ok === 1 ? 'acción' : 'acciones'}</div>` : ''}
-        ${this._hfSupported() ? `<button class="vo-hf ${this._hfEnabled() ? 'on' : ''}" data-action="handsfree">${ic('mic')} ${this._hfEnabled() ? 'Manos libres activo en este dispositivo · apagar' : 'Activar «Hey Matte» en este dispositivo'}</button>` : ''}
+        ${this._hfSupported() ? `<button class="vo-hf ${this._hfEnabled() ? 'on' : ''}" data-action="handsfree">${ic('mic')} ${this._hfEnabled() ? '«Mate» escuchando en este equipo · apagar' : 'Activar «Mate» en este equipo (decís «Mate» y pedís, sin tocar)'}</button>` : ''}
       </div>`;
       if (open) el.classList.add('open');
     }

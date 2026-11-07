@@ -33,7 +33,7 @@ GROUPS = [
 MANUAL = [
     ("m_push", "entrega", "Probar un aviso en su celular", "Equipos → «Probar…» → «Mostrar un aviso», y uno con la app cerrada (por ejemplo, abrir el portón).", False),
     ("m_explain", "entrega", "Explicarle la app", "Inicio, ambientes (tocar = luces, mantener = fijar), escenas, avisos, voz y Opciones → Conexión.", False),
-    ("m_tablet", "entrega", "Dejar la tablet de pared lista", "Opciones de la app → Pantalla: modo tablet, fijar la app y protector de pantalla.", True),
+    ("m_tablet", "entrega", "Dejar la tablet de pared lista", "Opciones de la app → Pantalla: modo tablet, fijar la app, protector de pantalla y «Escuchar «Mate»».", True),
     ("m_guest", "entrega", "Accesos de invitado (si los pidió)", "Equipos → Acceso de invitado, o el portón para invitados en Automatizaciones.", True),
     ("m_notes", "entrega", "Guardar los datos de la casa en tu gestor", "Dirección remota, usuario de Home Assistant y clave del panel central de esta casa.", False),
 ]
