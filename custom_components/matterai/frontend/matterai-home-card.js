@@ -3014,9 +3014,11 @@
     _hfSet(on) {
       const save = (v) => { try { localStorage.setItem('matterai.handsfree', v ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } };
       if (on && this._hfMate()) {
-        // la primera vez se baja la voz de Mate (unos 40 MB, sin internet después)
-        this._toast(`${ic('mic')} Preparando «Mate»…`);
-        window.MaeMate.ensure((p) => this._toast(`${ic('mic')} Bajando la voz de Mate: ${p}%`))
+        // la primera vez se baja la voz de Mate (unos 40 MB, sin internet después): el % queda en el botón
+        if (window.MaeMate.dl != null) return; // ya se está bajando
+        const show = (p) => { this._mateDl = p; if (this._vo) this._voiceRender(); this._toast(`${ic('mic')} Bajando la voz de Mate: ${p}%`); };
+        window.MaeMate.ensure(show)
+          .finally(() => { this._mateDl = null; if (this._vo) this._voiceRender(); })
           .then(() => { save(true); this._hfStart(); this._toast(`${ic('mic')} Decí <b>&nbsp;«Mate»&nbsp;</b>, esperá el tilín y pedí lo que necesites`); this._hfMark(); })
           .catch((e) => { save(false); this._toast(`${ic('alert')} No se pudo preparar «Mate»: ${esc((e && e.message) || e)}`); this._hfMark(); });
         return;
@@ -3107,7 +3109,8 @@
         ${vo.state === 'error' && vo.go ? `<a class="vo-go" href="${esc(vo.go)}" target="_self">${ic('mic')} Abrir con micrófono</a>` : ''}
         ${vo.state === 'error' ? `<div class="vo-retry">Tocá el círculo para probar de nuevo</div>` : ''}
         ${vo.state === 'done' && ok ? `<div class="vo-a">${ic('sparkle')} ${ok} ${ok === 1 ? 'acción' : 'acciones'}</div>` : ''}
-        ${this._hfSupported() ? `<button class="vo-hf ${this._hfEnabled() ? 'on' : ''}" data-action="handsfree">${ic('mic')} ${this._hfEnabled() ? '«Mate» escuchando en este equipo · apagar' : 'Activar «Mate» en este equipo (decís «Mate» y pedís, sin tocar)'}</button>` : ''}
+        ${this._hfSupported() ? (this._mateDl != null ? `<button class="vo-hf dl" disabled>${ic('mic')} Bajando la voz de Mate… ${this._mateDl}% <small>(unos 40 MB, una sola vez)</small></button>`
+          : `<button class="vo-hf ${this._hfEnabled() ? 'on' : ''}" data-action="handsfree">${ic('mic')} ${this._hfEnabled() ? '«Mate» escuchando en este equipo · apagar' : 'Activar «Mate» en este equipo (decís «Mate» y pedís, sin tocar)'}</button>`) : ''}
       </div>`;
       if (open) el.classList.add('open');
     }
