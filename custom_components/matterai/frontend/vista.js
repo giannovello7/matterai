@@ -141,7 +141,14 @@
     const hass = () => ctx.hass && ctx.hass();
     const M = () => { const c = card(); return c && c.model ? c.model() : null; };
     // en el editor se pueden simular estados (noche, alarma disparada, música, portón abierto) sin tocar la casa
-    const st = (id) => { if (id && X.simOver && X.simOver[id]) return X.simOver[id]; const h = hass(); return (id && h && h.states && h.states[id]) || null; };
+    const st = (id) => {
+      if (id && X.simOver && X.simOver[id]) return X.simOver[id];
+      const h = hass(), real = (id && h && h.states && h.states[id]) || null;
+      // play/pausa al instante: se ve ya lo que se tocó, hasta que la casa lo confirma (o pasan 4 s)
+      const o = id && X.opt && X.opt[id];
+      if (o && real) { if (Date.now() < o.until && real.state !== o.state && real.last_updated === o.from) return Object.assign({}, real, { state: o.state }); delete X.opt[id]; }
+      return real;
+    };
     const now = () => { if (ctx.sim && ctx.sim.night) { const d = new Date(); d.setHours(23, 30, 0, 0); return d; } return new Date(); };
     const isNight = () => { const h = now().getHours(); return h < 7 || h >= 20; };
     const fname = (id) => { const s = st(id); return (s && s.attributes.friendly_name) || id || ''; };
@@ -411,7 +418,7 @@
           // en video: el visor de Frigate en el equipo; mientras carga (y en el editor) el video continuo de la cámara
           const photo = !cam ? '<div class="v-feed none"></div>' : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
-          const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}">${photo}</div>` : photo;
+          const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>` : photo;
           // en video no va ningún cartel encima (como el visor de Frigate original); en modo foto se avisa que es foto
           const badge = !cam || video ? '' : '<span class="v-live photo">FOTO · cada 10 s</span>';
           const gateBtn = g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : '';
@@ -686,14 +693,30 @@
           const k = `${sel}|${x.key}`;
           if (X.partCache[k] === x.html) return;
           const tpl = document.createElement('template'); tpl.innerHTML = x.html;
-          const nu = tpl.content.firstElementChild; if (nu) e.children[i].replaceWith(nu);
+          const nu = tpl.content.firstElementChild; if (nu && !keepLive(e.children[i], nu)) e.children[i].replaceWith(nu);
         });
       } else e.innerHTML = html;
       X.cache[sel] = html; X.colSig[sel] = sig;
       parts.forEach((x) => { X.partCache[`${sel}|${x.key}`] = x.html; });
     }
+    /** Actualiza una tarjeta sin tocar el visor en vivo que tiene adentro (si es la misma cámara). Devuelve false si no se pudo
+     *  (entonces se reemplaza entera, como siempre). */
+    function keepLive(old, nu) {
+      const os = old.querySelector && old.querySelector('[data-live]'), ns = nu.querySelector && nu.querySelector('[data-live]');
+      if (!os || !ns || os.dataset.key !== ns.dataset.key || os.dataset.live !== ns.dataset.live) return false;
+      const swap = (o, n) => {
+        if (o === os) return;
+        if (!o.contains(os)) { o.replaceWith(n); return; }
+        [...o.attributes].forEach((a) => { if (!n.hasAttribute(a.name)) o.removeAttribute(a.name); });
+        [...n.attributes].forEach((a) => { if (o.getAttribute(a.name) !== a.value) o.setAttribute(a.name, a.value); });
+        const oc = [...o.children], nc = [...n.children];
+        if (oc.length !== nc.length) throw new Error('distinto');
+        oc.forEach((c2, k) => swap(c2, nc[k]));
+      };
+      try { swap(old, nu); return true; } catch (_) { return false; }
+    }
     /** ¿Se puede mostrar video en vivo? (la tarjeta MatterAI sabe armar el visor de Frigate) */
-    function liveOk() { const c = card(); return !!(c && typeof c.liveCam === 'function'); }
+    function liveOk() { const c = card(); return !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
     /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
     function mountLive() {
       if (!X.el.querySelectorAll || editing()) return;
@@ -714,7 +737,8 @@
     function waitLive() {
       if (X.liveWait || typeof customElements === 'undefined') return;
       X.liveWait = true;
-      customElements.whenDefined('advanced-camera-card').then(() => { X.liveWait = false; X.cache = {}; X.partCache = {}; render(); });
+      const t = setTimeout(() => { if (!customElements.get('advanced-camera-card')) { X.liveFail = true; X.cache = {}; X.partCache = {}; render(); } }, 20000);
+      customElements.whenDefined('advanced-camera-card').then(() => { clearTimeout(t); X.liveWait = false; X.liveFail = false; X.cache = {}; X.partCache = {}; render(); });
     }
     /** En el editor: al final de cada columna, «+ Agregar tarjeta» (como en Home Assistant). */
     const addSlot = (col) => (editing() && ctx.edit.onAdd ? `<button class="v-eadd" data-eadd="${col}">+ Agregar tarjeta</button>` : '');
@@ -842,9 +866,8 @@
     function drawPlayer() {
       const p = player();
       if (!p) X.hidePlayer = false;
-      // en la tablet, si el diseño ya tiene la tarjeta de música, la barra no se repite
-      const hasCard = kind() === 'tablet' && X.layout && (X.layout.blocks || []).some((b) => b.type === 'music');
-      const shown = !!p && !X.hidePlayer && !hasCard, pl = X.el.querySelector('#v-player');
+      // la barra de música aparece siempre que haya música (en el celular y en la tablet), arriba de la barra de abajo
+      const shown = !!p && !X.hidePlayer, pl = X.el.querySelector('#v-player');
       if (pl) pl.classList.toggle('hide', !shown);
       X.el.classList.toggle('with-player', shown);
       if (p) {
@@ -996,7 +1019,11 @@
       const rs = t.closest('[data-rsheet]'); if (rs) { vib(); return openSheet('rutinas', rs.dataset.rsheet); }
       const rn = t.closest('[data-run]'); if (rn) { vib(); const id = rn.dataset.run; toast(`«${fname(id)}» en marcha`); return id.startsWith('script.') ? c.call('script', 'turn_on', { entity_id: id }) : c.call('automation', 'trigger', { entity_id: id }); }
       const au = t.closest('[data-auto]'); if (au) { vib(); const s = st(au.dataset.auto); return c.call('automation', s && s.state === 'on' ? 'turn_off' : 'turn_on', { entity_id: au.dataset.auto }); }
-      const mp = t.closest('[data-mp]'); if (mp) { vib(); return c.call('media_player', 'media_play_pause', { entity_id: mp.dataset.mp }); }
+      const mp = t.closest('[data-mp]'); if (mp) {
+        vib(); const id = mp.dataset.mp, s0 = st(id);
+        if (s0) { X.opt = X.opt || {}; X.opt[id] = { state: s0.state === 'playing' ? 'paused' : 'playing', until: Date.now() + 4000, from: s0.last_updated }; X.cache = {}; render(); }
+        return c.call('media_player', 'media_play_pause', { entity_id: id });
+      }
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
       const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, 1);
       if (t.closest('[data-camall]')) return c.openCameras();

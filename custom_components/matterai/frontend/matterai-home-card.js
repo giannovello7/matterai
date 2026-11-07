@@ -404,6 +404,8 @@
   .wbig b{font-size:60px;font-weight:200;letter-spacing:-.04em;line-height:1}
   .wbig span{display:flex;flex-direction:column;font-size:16px;font-weight:600}.wbig small{font-size:12.5px;font-weight:400;color:var(--mut);margin-top:3px}
   .wchips{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .wloc{display:flex;align-items:flex-start;gap:10px;margin:12px 2px 4px;font-size:13px;color:rgba(255,255,255,.8)}.wloc .ic{width:17px;height:17px;flex:none;margin-top:1px;opacity:.75}
+  .wloc b{font-weight:600}.wloc small{display:block;font-size:11.5px;opacity:.6;margin-top:2px}
   .wchips span{display:inline-flex;align-items:center;gap:6px;padding:8px 12px;border-radius:999px;background:rgba(255,255,255,.05);border:1px solid var(--line);font-size:12.5px;color:var(--mut)}
   .wchips b{color:var(--txt)}.wchips .ic{width:15px;height:15px}
   .hrs{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding-bottom:4px}.hrs::-webkit-scrollbar{display:none}
@@ -964,12 +966,23 @@
   .mn-r .mvol{flex:0 1 110px;min-width:56px;margin:0}.mn-r .mvol input{min-width:0;width:100%}
   .mn-r .mf-dev{flex:0 1 auto;min-width:0;max-width:130px}
   .mn-r .mt-x{flex:none}
+  /* reproductor de arriba rediseñado: el parlante se lee entero y el volumen tiene su fila, ancha y con el porcentaje */
+  .mn{grid-template-columns:56px minmax(0,1fr) minmax(0,1.25fr) minmax(230px,1fr)}
+  .mn-a{width:56px;height:56px}
+  .mn-r{flex-direction:column;align-items:stretch;justify-content:center;gap:4px}
+  .mn-r1{display:flex;align-items:center;gap:2px;min-width:0}
+  .mn-r1 .mf-dev{flex:1;min-width:0;max-width:none;justify-content:flex-start}
+  .mn-r1 .mf-dev span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mn-r .mvol{flex:none;width:100%;margin:0;gap:6px}
+  .mvol.big input{height:6px;border-radius:6px}
+  .mvol.big input::-webkit-slider-thumb{width:18px;height:18px}.mvol.big input::-moz-range-thumb{width:18px;height:18px}
+  .mv-p{flex:none;min-width:34px;text-align:right;font-size:11.5px;color:rgba(255,255,255,.75);font-variant-numeric:tabular-nums}
   .mcar.drag{cursor:grabbing}.mcar.drag *{pointer-events:none}
   .mcar{user-select:none;-webkit-user-select:none}
   @container (min-width:720px){
     .mu-top{display:flex;position:absolute;left:0;right:0;top:0;height:64px;z-index:4;align-items:center;gap:10px;padding:0 18px 0 22px;border-bottom:1px solid rgba(255,255,255,.06)}
-    .mu-now{display:block;position:absolute;left:0;right:0;top:64px;height:84px;z-index:4;padding:10px 18px}
-    .mu-main{top:148px;padding:4px 26px 28px}
+    .mu-now{display:block;position:absolute;left:0;right:0;top:64px;height:96px;z-index:4;padding:10px 18px}
+    .mu-main{top:160px;padding:4px 26px 28px}
     .mu-mini,.mu-nav,.mu-search,.mu-head .mu-logo,.mu-head .mt-x,.mu-head .mu-hi small{display:none}
     .mu-head{padding:14px 0 6px}.mu-head h2,.mu-head .mu-hi h2{font-size:22px}
     .mq{grid-template-columns:repeat(4,1fr);gap:8px}.mq-i{height:48px}.mq-i span{width:48px;height:48px}
@@ -1318,6 +1331,7 @@
         if (t.dataset && (t.dataset.mvol || t.dataset.mseek)) {
           t.style.setProperty('--p', `${(t.value / (t.max || 100) * 100).toFixed(1)}%`);
           if (t.dataset.mseek) { const t0 = t.previousElementSibling; if (t0) t0.textContent = mmss(Number(t.value)); }
+          if (t.dataset.mvol) { const pv = t.nextElementSibling; if (pv && pv.classList && pv.classList.contains('mv-p')) pv.textContent = `${t.value}%`; }
         }
       });
       root.addEventListener('change', (e) => {
@@ -1928,6 +1942,10 @@
           ${a.uv_index != null ? `<span>${ic('sun')}UV <b>${fmt(a.uv_index, 0)}</b></span>` : ''}
           ${a.pressure != null ? `<span>${ic('gauge')}Presión <b>${fmt(a.pressure, 0)} ${esc(a.pressure_unit || 'hPa')}</b></span>` : ''}
         </div></div>`;
+      // de dónde sale el pronóstico: la ubicación de la casa en Home Assistant y el servicio del clima
+      const hc = (this._hass && this._hass.config) || {}, lat = Number(hc.latitude), lon = Number(hc.longitude);
+      const where = [hc.location_name, Number.isFinite(lat) && Number.isFinite(lon) && (lat || lon) ? `${lat.toFixed(2)}, ${lon.toFixed(2)}` : ''].filter(Boolean).join(' · ');
+      h += `<div class="wloc">${ic('home')}<span>Pronóstico para <b>${esc(where || 'la ubicación de la casa')}</b>${a.attribution ? `<small>${esc(a.attribution)} · ${esc(a.friendly_name || w.entity_id)}</small>` : `<small>${esc(a.friendly_name || w.entity_id)}</small>`}</span></div>`;
       if (st.loading && !daily.length) return h + '<div class="pempty">Buscando el pronóstico…</div>';
       if (hourly.length) {
         h += `<div class="blk"><div class="blk-h"><h4>${ic('history')}Próximas horas</h4></div><div class="hrs">${hourly.slice(0, 24).map((f) => {
@@ -3170,7 +3188,17 @@
     }
 
     /* ---- utilidades ---- */
-    _muSt() { const u = this._mus; return u && u.player && this._hass.states[u.player]; }
+    _muSt() {
+      const u = this._mus, real = u && u.player && this._hass.states[u.player];
+      // respuesta al instante: lo que se tocó (play/pausa, aleatorio, repetir, silencio) se ve ya, sin esperar a Music Assistant;
+      // cuando llega el estado de verdad (o pasan 4 s) manda el estado real
+      const o = this._musOpt;
+      if (!real || !o || o.player !== u.player) return real;
+      const done = Date.now() > o.until || (o.state && real.state === o.state && real.last_updated !== o.from) ||
+        (o.attrs && Object.keys(o.attrs).every((k) => real.attributes[k] === o.attrs[k]));
+      if (done) { this._musOpt = null; return real; }
+      return Object.assign({}, real, { state: o.state || real.state, attributes: Object.assign({}, real.attributes, o.attrs || {}) });
+    }
     _musPos(st) {
       const a = st.attributes;
       if (a.media_position == null) return null;
@@ -3425,11 +3453,11 @@
             <input type="range" min="0" max="${Math.round(dur || 1)}" value="${Math.round(pos || 0)}" data-mseek="1" style="--p:${dur ? ((pos || 0) / dur * 100).toFixed(2) : 0}%" aria-label="Posición" ${dur && f & 2 ? '' : 'disabled'}>
             <span>${dur ? mmss(dur) : '–:––'}</span></div></div>
         <div class="mn-r">
-          <button class="mf-dev" data-action="m_sheet" data-v="devices" title="Parlante">${ic('speaker')}<span>${esc(this._label(u.player))}</span></button>
-          ${vol != null ? `<div class="mvol"><button class="mt-x sm" data-action="m_ctl" data-v="mute" aria-label="Silenciar">${ic(a.is_volume_muted ? 'mute' : 'vol')}</button>
-            <input type="range" min="0" max="100" value="${vol}" data-mvol="${u.player}" style="--p:${vol}%" aria-label="Volumen"></div>` : ''}
-          <button class="mt-x sm" data-action="m_sheet" data-v="queue" aria-label="Cola" title="Cola">${ic('queue')}</button>
-          <button class="mt-x sm" data-action="m_nowmenu" aria-label="Más opciones" ${has ? '' : 'disabled'}>${ic('dots')}</button></div></div>`;
+          <div class="mn-r1"><button class="mf-dev" data-action="m_sheet" data-v="devices" title="Elegir parlante: ${esc(this._label(u.player))}">${ic('speaker')}<span>${esc(this._label(u.player))}</span></button>
+            <button class="mt-x sm" data-action="m_sheet" data-v="queue" aria-label="Cola" title="Cola">${ic('queue')}</button>
+            <button class="mt-x sm" data-action="m_nowmenu" aria-label="Más opciones" ${has ? '' : 'disabled'}>${ic('dots')}</button></div>
+          ${vol != null ? `<div class="mvol big"><button class="mt-x sm" data-action="m_ctl" data-v="mute" aria-label="Silenciar">${ic(a.is_volume_muted ? 'mute' : 'vol')}</button>
+            <input type="range" min="0" max="100" value="${vol}" data-mvol="${u.player}" style="--p:${vol}%" aria-label="Volumen"><span class="mv-p">${a.is_volume_muted ? '—' : `${vol}%`}</span></div>` : ''}</div></div>`;
     }
     _hMuNav() {
       const u = this._mus, p = u.stack.length ? '' : u.page;
@@ -3593,6 +3621,11 @@
     _musCtl(v) {
       const st = this._muSt(); if (!st) return;
       const a = st.attributes, E = { entity_id: this._mus.player };
+      const opt = (state, attrs) => { this._musOpt = { player: this._mus.player, until: Date.now() + 4000, from: (this._hass.states[this._mus.player] || {}).last_updated, state, attrs }; this._muLive(); };
+      if (v === 'media_play_pause') opt(st.state === 'playing' ? 'paused' : 'playing');
+      else if (v === 'shuffle') opt(null, { shuffle: !a.shuffle });
+      else if (v === 'repeat') opt(null, { repeat: ({ off: 'all', all: 'one', one: 'off' })[a.repeat || 'off'] || 'off' });
+      else if (v === 'mute') opt(null, { is_volume_muted: !a.is_volume_muted });
       if (v === 'shuffle') return this._call('media_player', 'shuffle_set', Object.assign({ shuffle: !a.shuffle }, E));
       if (v === 'repeat') return this._call('media_player', 'repeat_set', Object.assign({ repeat: ({ off: 'all', all: 'one', one: 'off' })[a.repeat || 'off'] || 'off' }, E));
       if (v === 'mute') return this._call('media_player', 'volume_mute', Object.assign({ is_volume_muted: !a.is_volume_muted }, E));

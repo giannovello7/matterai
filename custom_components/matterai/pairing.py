@@ -196,6 +196,22 @@ async def ws_app_invite(hass: HomeAssistant, connection: websocket_api.ActiveCon
     connection.send_result(msg["id"], link)
 
 
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/net"})
+@callback
+def ws_app_net(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Cómo llegar a la casa: dirección de internet, dirección local y wifi de la casa (los equipos vinculados antes de
+    cargar la dirección local la aprenden al conectarse, y se enteran si cambia)."""
+    rt = _rt(hass)
+    user = connection.user
+    if rt is None or not (user.is_admin or rt["house"].is_app_user(user.id)):
+        connection.send_error(msg["id"], "unauthorized", "Este usuario no es un equipo de la casa")
+        return
+    entry = rt["entry"]
+    nets = [w.strip() for w in str(_opt(entry, CONF_WIFI) or "").split(",") if w.strip()]
+    connection.send_result(msg["id"], {"remote": str(_opt(entry, CONF_URL) or "").rstrip("/"),
+                                       "local": str(_opt(entry, CONF_LOCAL_URL) or "").rstrip("/"), "wifi": nets})
+
+
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/forget_me"})
 @websocket_api.async_response
 async def ws_app_forget_me(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
@@ -247,4 +263,4 @@ async def ws_app_shared_off(hass: HomeAssistant, connection: websocket_api.Activ
     connection.send_result(msg["id"], {"ok": True})
 
 
-WS_COMMANDS = (ws_app_upgrade, ws_app_invite, ws_app_forget_me, ws_app_access, ws_app_revoke, ws_app_shared_off)
+WS_COMMANDS = (ws_app_upgrade, ws_app_invite, ws_app_net, ws_app_forget_me, ws_app_access, ws_app_revoke, ws_app_shared_off)

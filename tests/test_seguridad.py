@@ -349,3 +349,20 @@ async def test_security_alerts(hass, hass_admin_user) -> None:
     await _shared(hass, house)
     keys = {a["key"] for a in await async_security_alerts(hass)}
     assert "security:shared" in keys, "acceso compartido prendido que ya nadie usa: sugiere apagarlo"
+
+
+async def test_app_learns_local_address(hass, hass_ws_client, hass_client_no_auth, hass_read_only_access_token) -> None:
+    """Un equipo vinculado antes de cargar la dirección local la aprende al conectarse (y si cambia, también)."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    _, p = await _pair(client, decode((await _link(ws))["code"])["c"], "Celu")
+    entry = hass.data[DOMAIN]["entry"]
+    hass.config_entries.async_update_entry(entry, options={**entry.options, "local_url": "http://192.168.1.10:8123", "wifi": "CasaWifi, CasaWifi_5G"})
+    msg = await _ws(hass_ws_client, hass, p["token"], 2, {"type": "matterai/app/net"})
+    assert msg["success"], msg
+    r = msg["result"]
+    assert r["local"] == "http://192.168.1.10:8123" and r["wifi"] == ["CasaWifi", "CasaWifi_5G"] and r["remote"].startswith("https://")
+    # NEGATIVO: un usuario que no es un equipo de la casa no la puede pedir
+    msg = await _ws(hass_ws_client, hass, hass_read_only_access_token, 3, {"type": "matterai/app/net"})
+    assert not msg["success"]
