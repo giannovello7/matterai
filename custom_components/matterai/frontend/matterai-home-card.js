@@ -2829,6 +2829,14 @@
       };
       rec.onerror = (e) => {
         if (this._vo !== vo) return;
+        // despertado con «Mate»: el permiso del micrófono ya está dado (Mate estaba escuchando). Si falla al arrancar es
+        // que Android todavía no lo soltó: se reintenta solo, sin mostrar «no tengo permiso»
+        if (vo.mate && !vo.text && e.error !== 'no-speech' && e.error !== 'aborted' && (this._mateTry || 0) < 3) {
+          this._mateTry = (this._mateTry || 0) + 1;
+          this._vo = null;
+          setTimeout(() => { if (this._vo) return; this._voiceStart(); if (this._vo) this._vo.mate = true; }, 700);
+          return;
+        }
         // el reconocimiento del celular falló por algo que no es el permiso: se graba y lo transcribe la casa
         if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed' && e.error !== 'no-speech' && e.error !== 'aborted' && this._canRecord()) {
           clearTimeout(this._voWD); this._vo = null; this._recStart(); return;
@@ -3035,7 +3043,7 @@
         const M = window.MaeMate;
         if (M.listening) return;
         this._hf = { on: true, native: true };
-        M.onWake = () => { if (this._hf && this._hf.native && !this._vo) { this._hf.on = false; this._voiceStart(); } };
+        M.onWake = () => { if (this._hf && this._hf.native && !this._vo) { this._hf.on = false; this._mateTry = 0; this._voiceStart(); if (this._vo) this._vo.mate = true; } };
         M.onRestart = () => this._hfStart();
         M.start().catch((e) => { this._hf = null; this._hfMark(); if (!document.hidden) this._toast(`${ic('alert')} «Mate» no puede escuchar: ${esc((e && e.message) || e)}`); });
         this._hfMark();
@@ -3156,6 +3164,11 @@
       const base = this._config.camera_card || {}, known = base.cameras || [];
       let cfg = Object.assign({}, base, { cameras: ids.map((id) => known.find((k) => k && k.camera_entity === id) || { camera_entity: id }) });
       if (typeof window.__maeAdaptCamera === 'function') cfg = window.__maeAdaptCamera(cfg); // app: modo de video que anda fuera de HA
+      // en el dashboard el recuadro manda (16:9): el visor lo llena entero y el video lo cubre. Si no, en la tablet
+      // (que escala la pantalla) el visor queda un par de píxeles más bajo y se ve una línea negra abajo.
+      cfg.dimensions = Object.assign({}, cfg.dimensions, { aspect_ratio_mode: 'unconstrained', height: '100%' });
+      cfg.cameras = cfg.cameras.map((c) => { const d = c.dimensions || {}, L = d.layout || {};
+        return Object.assign({}, c, { dimensions: Object.assign({}, d, { layout: Object.assign({ fit: 'cover' }, L) }) }); });
       const el = document.createElement(TAG);
       try { el.setConfig(Object.assign(cfg, { type: `custom:${TAG}` })); } catch (_) { return null; }
       el.hass = this._hass;

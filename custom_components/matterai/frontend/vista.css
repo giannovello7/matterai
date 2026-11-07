@@ -45,9 +45,9 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-gate.open{background:var(--red)!important;color:#1d0e0b!important}.v-gate.mv{background:var(--card2)!important;color:var(--fg)!important}
 .v-dots{position:absolute;z-index:1;top:12px;right:12px;display:flex;gap:5px;pointer-events:none}.v-dots b{width:7px;height:7px;border-radius:50%;background:rgba(255,255,255,.3)}.v-dots b.on{background:#fff}
 .v-cam{touch-action:pan-y}
-.v-lslot{cursor:default;background:#0b0e12}
+.v-lslot{cursor:default;background:#0b0e12;overflow:hidden}
 /* el visor de Frigate fuera de Home Assistant viene con fondo blanco: se le da el fondo oscuro y la proporción del video */
-.v-lslot>advanced-camera-card{display:block;width:100%;height:100%;background:#0b0e12;--ha-card-background:#0b0e12;--card-background-color:#0b0e12;
+.v-lslot>advanced-camera-card{display:block;width:100%;height:calc(100% + 2px);margin-bottom:-2px;background:#0b0e12;--ha-card-background:#0b0e12;--card-background-color:#0b0e12;
   --primary-background-color:#0b0e12;--secondary-background-color:#0b0e12;--ha-card-border-width:0;--ha-card-border-radius:0}
 .v-cam.is-live,.k-tablet .v-cam.is-live{aspect-ratio:16/9;background:#0b0e12}
 .v-cam.is-live::after{height:28%}
