@@ -171,6 +171,74 @@ async def test_bad_request_rejected(hass, hass_client_no_auth) -> None:
     assert r.status == 400
 
 
+# ---------------------------------------------------------------- invitados
+async def test_guest_access_expires_alone(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """Un acceso de invitado entra con su perfil y se corta solo al vencer; los demás siguen."""
+    from custom_components.matterai.pairing import async_expire_guests
+
+    house = await _setup(hass)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "matterai/pairing", "guest_hours": 24, "profile": "kids"})
+    g = (await ws.receive_json())["result"]
+    assert g["guest"]["profile"] == "kids" and g["guest"]["until"] > time.time() + 23 * 3600
+    client = await hass_client_no_auth()
+    status, guest = await _pair(client, decode(g["code"])["c"], "Abuela")
+    assert status == 200
+    _, ana = await _pair(client, decode((await _link(ws, 2))["code"])["c"], "Ana")
+    d = house.devices[guest["user_id"]]
+    assert d["via"] == "guest" and d["profile"] == "kids" and d.get("until")
+    # entra con el perfil del link mientras el instalador no le elija otro
+    msg = await _ws(hass_ws_client, hass, guest["token"], 1, {"type": "matterai/app/me", "device_id": "dev-abuela"})
+    assert msg["result"]["profile"] == "kids"
+    assert await async_expire_guests(hass) == 0, "todavía no venció"
+    d["until"] = time.time() - 1
+    assert await async_expire_guests(hass) == 1
+    await hass.async_block_till_done()
+    assert await _valid(hass, guest["token"]) is None  # NEGATIVO: vencido, no entra más
+    assert await _valid(hass, ana["token"]) is not None, "los demás siguen andando"
+
+
+async def test_guest_link_rejects_bad_values(hass, hass_ws_client) -> None:
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    for i, bad in enumerate([{"guest_hours": 0}, {"guest_hours": 24 * 365}, {"guest_hours": 5, "profile": "admin"}]):
+        await ws.send_json({"id": i + 1, "type": "matterai/pairing", **bad})
+        assert not (await ws.receive_json())["success"], bad  # NEGATIVO
+
+
+async def test_remote_test_and_message_only_installer(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """Probar un equipo y mandar un mensaje: sólo el instalador; le llega al equipo que está escuchando."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    _, ana = await _pair(client, decode((await _link(ws, 1))["code"])["c"], "Ana")
+    app = await hass_ws_client(hass, ana["token"])
+    await app.send_json({"id": 1, "type": "matterai/app/subscribe", "device_id": "dev-ana", "name": "Ana"})
+    assert (await app.receive_json())["success"]
+    assert hass.data[DOMAIN]["app_devices"].online.get("dev-ana") == 1
+    await ws.send_json({"id": 2, "type": "matterai/app/test", "device_id": "dev-ana", "command": "hello"})
+    res = await ws.receive_json()
+    assert res["success"] and res["result"]["online"]
+    ev = await app.receive_json()
+    assert ev["event"]["command"] == "hello" and ev["event"]["target"] == ["dev-ana"]
+    await ws.send_json({"id": 3, "type": "matterai/app/message", "text": "  Mañana  paso a revisar "})
+    res = await ws.receive_json()
+    assert res["success"] and res["result"]["online"] == 1
+    ev = await app.receive_json()
+    assert ev["event"]["message"] == "Mañana paso a revisar"
+    # NEGATIVO: un equipo no puede probar ni mandar mensajes a los demás
+    await app.send_json({"id": 4, "type": "matterai/app/message", "text": "hola"})
+    assert not (await app.receive_json())["success"]
+    await app.send_json({"id": 5, "type": "matterai/app/test", "device_id": "dev-ana", "command": "reload"})
+    assert not (await app.receive_json())["success"]
+    # NEGATIVO: sólo las pruebas conocidas
+    await ws.send_json({"id": 6, "type": "matterai/app/test", "device_id": "dev-ana", "command": "screen_off"})
+    assert not (await ws.receive_json())["success"]
+    await app.close()
+    await hass.async_block_till_done()
+    assert "dev-ana" not in hass.data[DOMAIN]["app_devices"].online, "al cerrar la app deja de figurar conectada"
+
+
 # ---------------------------------------------------------------- desvincular
 async def test_revoke_cuts_only_that_phone(hass, hass_ws_client, hass_client_no_auth) -> None:
     await _setup(hass)

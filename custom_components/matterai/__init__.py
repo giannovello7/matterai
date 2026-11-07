@@ -117,6 +117,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     await views.async_load()
     rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices, audit=audit, privacy=privacy, views=views)
     async_register_service(hass)
+    from datetime import timedelta  # noqa: PLC0415
+
+    from homeassistant.helpers.event import async_track_time_interval  # noqa: PLC0415
+
+    from .pairing import async_expire_guests  # noqa: PLC0415
+
+    async def _guests(_now=None) -> None:
+        await async_expire_guests(hass)
+
+    entry.async_on_unload(async_track_time_interval(hass, _guests, timedelta(minutes=5)))
+    entry.async_on_unload(async_at_started(hass, _guests))
 
 
     # la página carga el cargador (dirección fija); él trae la última versión de la tarjeta aunque no se reinicie HA

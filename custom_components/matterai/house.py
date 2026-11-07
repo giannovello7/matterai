@@ -114,7 +114,8 @@ class House:
         ih = (self.devices.get(user_id) or {}).get("install")
         return [u for u, d in self.devices.items() if ih and u != user_id and d.get("install") == ih]
 
-    async def _async_new_device(self, name: str, via: str, by: str | None, install: str | None = None) -> tuple[str, str]:
+    async def _async_new_device(self, name: str, via: str, by: str | None, install: str | None = None,
+                                guest: dict[str, Any] | None = None) -> tuple[str, str]:
         """Usuario + acceso de un equipo. Devuelve (user_id, token)."""
         auth = self.hass.auth
         name = _clean_name(name)
@@ -127,6 +128,11 @@ class House:
         )
         token = auth.async_create_access_token(rt)
         self.devices[user.id] = {"name": name, "created": time.time(), "via": via, "by": by, "refresh_id": rt.id}
+        if guest:
+            # invitado: el acceso se corta solo al vencer (ver pairing.async_expire_guests)
+            self.devices[user.id]["until"] = float(guest["until"])
+            if guest.get("profile"):
+                self.devices[user.id]["profile"] = guest["profile"]
         ih = _install_hash(install)
         if ih:
             self.devices[user.id]["install"] = ih
@@ -152,8 +158,17 @@ class House:
             rt = self.hass.auth.async_get_refresh_token(d.get("refresh_id") or "")
             last = rt.last_used_at.timestamp() if rt and rt.last_used_at else None
             out.append({"user_id": uid, "name": d.get("name"), "created": d.get("created"), "via": d.get("via"), "last_used": last,
-                        "install": bool(d.get("install"))})
+                        "install": bool(d.get("install")), "until": d.get("until"), "profile": d.get("profile")})
         return sorted(out, key=lambda x: x.get("created") or 0)
+
+    def expired(self) -> list[str]:
+        """Invitados con el acceso vencido."""
+        now = time.time()
+        return [u for u, d in self.devices.items() if d.get("until") and d["until"] <= now]
+
+    def device_profile(self, user_id: str | None) -> str | None:
+        """El perfil con el que se vinculó el equipo (invitados), si el instalador no le eligió otro."""
+        return (self.devices.get(user_id or "") or {}).get("profile")
 
     # ------------------------------------------------------------ códigos de vinculación
     def _codes(self) -> dict[str, dict[str, Any]]:
@@ -162,13 +177,15 @@ class House:
         self.data["codes"] = codes
         return codes
 
-    async def async_new_code(self, by: str | None = None) -> tuple[str, float]:
+    async def async_new_code(self, by: str | None = None, guest: dict[str, Any] | None = None) -> tuple[str, float]:
         codes = self._codes()
         while len(codes) >= MAX_CODES:  # no crece sin límite: se descarta el más viejo
             codes.pop(min(codes, key=lambda h: codes[h]["exp"]))
         code = secrets.token_urlsafe(18)
         exp = time.time() + CODE_HOURS * 3600
         codes[_hash(code)] = {"exp": exp, "by": by}
+        if guest:
+            codes[_hash(code)]["guest"] = guest
         await self._save()
         return code, exp
 
@@ -181,7 +198,10 @@ class House:
         if hit is None:
             return None
         await self._save()  # de un solo uso: se borra antes de crear el acceso
-        return await self._async_new_device(name, "invite" if hit.get("by") else "pair", hit.get("by"), install)
+        guest = hit.get("guest") if isinstance(hit.get("guest"), dict) else None
+        if guest and float(guest.get("until") or 0) <= time.time():
+            return None  # el acceso de invitado ya venció antes de usarse
+        return await self._async_new_device(name, "guest" if guest else "invite" if hit.get("by") else "pair", hit.get("by"), install, guest)
 
     async def async_upgrade(self, user_id: str, name: str, install: str | None = None) -> tuple[str, str] | None:
         """Un equipo con el acceso compartido (versión anterior) pasa a tener el suyo."""
@@ -209,17 +229,18 @@ class House:
         rt = self.hass.auth.async_get_refresh_token(self.data.get("refresh_id") or "")
         return {"active": rt is not None, "last_used": rt.last_used_at.timestamp() if rt and rt.last_used_at else None}
 
-    async def async_pairing(self, url: str, name: str, support: str | None, local: str = "", wifi: str = "", by: str | None = None) -> dict[str, Any]:
+    async def async_pairing(self, url: str, name: str, support: str | None, local: str = "", wifi: str = "", by: str | None = None,
+                            guest: dict[str, Any] | None = None) -> dict[str, Any]:
         """Link y QR para vincular un celular: llevan un código de un solo uso, nunca el acceso.
 
         Con dirección local, la app nativa se conecta directo a la casa cuando el celular está en su wifi
         (como la app de Home Assistant) y por la dirección remota cuando está afuera."""
-        code, exp = await self.async_new_code(by)
+        code, exp = await self.async_new_code(by, guest)
         nets = [w.strip() for w in (wifi or "").split(",") if w.strip()]
         payload = encode_pairing({"u": url.rstrip("/"), "c": code, "n": name, "s": support or None,
                                   "l": (local or "").rstrip("/") or None, "w": nets or None})
         return {"code": payload, "link": f"{APP_URL}#v={payload}", "url": url.rstrip("/"), "name": name,
-                "expires": exp, "hours": CODE_HOURS}
+                "expires": min(exp, guest["until"]) if guest else exp, "hours": CODE_HOURS, "guest": guest}
 
 
 __all__ = ["APP_USER_NAME", "House"]

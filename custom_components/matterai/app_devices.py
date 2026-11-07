@@ -40,6 +40,8 @@ PROFILES = {
     "basic": "Sólo luces y clima",
 }
 COMMANDS = ["screen_on", "screen_off", "brightness", "open", "camera", "tts", "reload", "saver", "doorbell", "doorbell_end"]
+# pruebas a distancia desde el panel (Equipos): un aviso en pantalla, recargar la app o prender la pantalla
+TESTS = ["hello", "reload", "screen_on"]
 
 
 def app_entries(hass: HomeAssistant) -> list:
@@ -67,6 +69,9 @@ class AppDevices:
         self._store: Store = Store(hass, 1, STORAGE_KEY)
         self.devices: dict[str, dict[str, Any]] = {}
         self.actions: deque[dict[str, Any]] = deque(maxlen=MAX_ACTIONS)
+        # equipos con la app abierta ahora (escuchando órdenes): device_id -> conexiones
+        self.online: dict[str, int] = {}
+        self.last_seen: dict[str, float] = {}
         self._unsub = None
 
     async def async_load(self) -> None:
@@ -124,6 +129,8 @@ class AppDevices:
                 "app_version": e.data.get("app_version") or "",
                 "push": bool((e.data.get("app_data") or {}).get("push_token")),
                 "notify": f"notify.{notify}" if self.hass.services.has_service("notify", notify) else None,
+                "online": self.online.get(dev_id, 0) > 0,
+                "seen": self.last_seen.get(dev_id),
                 **self.profile(dev_id),
             })
         return out
@@ -141,6 +148,11 @@ def ws_app_me(hass: HomeAssistant, connection: websocket_api.ActiveConnection, m
     ad = _rt_devices(hass)
     out = ad.profile(msg["device_id"]) if ad else {"profile": "full", "secure": False}
     house = (hass.data.get(DOMAIN) or {}).get("house")
+    # un invitado entra con el perfil de su link mientras el instalador no le elija otro
+    if house is not None and ad is not None and not (ad.devices.get(msg["device_id"]) or {}).get("profile"):
+        gp = house.device_profile(connection.user.id)
+        if gp in PROFILES:
+            out["profile"] = gp
     if house is not None and (connection.user.is_admin or house.is_app_user(connection.user.id)):
         # firma de los accesos rápidos / stickers NFC de esta casa, y si todavía usa el acceso compartido viejo
         out["run_key"] = house.run_key
@@ -209,7 +221,27 @@ def ws_app_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveConnec
         if _targets_me(d.get("target"), msg["device_id"], msg["name"]):
             connection.send_message(websocket_api.event_message(msg["id"], dict(d)))
 
-    connection.subscriptions[msg["id"]] = hass.bus.async_listen(EVENT_COMMAND, _fwd)
+    unsub = hass.bus.async_listen(EVENT_COMMAND, _fwd)
+    ad, dev = _rt_devices(hass), msg["device_id"][:64]
+    if ad is None or not dev:
+        connection.subscriptions[msg["id"]] = unsub
+        connection.send_result(msg["id"])
+        return
+    # mientras la app escucha, el panel la muestra «conectada ahora»
+    ad.online[dev] = ad.online.get(dev, 0) + 1
+    ad.last_seen[dev] = time.time()
+
+    @callback
+    def _bye() -> None:
+        unsub()
+        ad.last_seen[dev] = time.time()
+        n = ad.online.get(dev, 0) - 1
+        if n > 0:
+            ad.online[dev] = n
+        else:
+            ad.online.pop(dev, None)
+
+    connection.subscriptions[msg["id"]] = _bye
     connection.send_result(msg["id"])
 
 
@@ -226,7 +258,41 @@ def ws_app_notify_action(hass: HomeAssistant, connection: websocket_api.ActiveCo
     connection.send_result(msg["id"], {"ok": True})
 
 
-WS_COMMANDS = (ws_app_me, ws_app_actions, ws_app_devices, ws_app_device_set, ws_app_subscribe, ws_app_notify_action)
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/app/test",
+    vol.Required("device_id"): str,
+    vol.Required("command"): vol.In(TESTS),
+})
+@websocket_api.require_admin
+@callback
+def ws_app_test(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Prueba a distancia desde el panel: le llega sólo a ese equipo (si tiene la app abierta)."""
+    ad = _rt_devices(hass)
+    online = bool(ad and ad.online.get(msg["device_id"], 0) > 0)
+    fire_command(hass, msg["command"], [msg["device_id"]], message="Prueba desde el panel MatterAI: este equipo recibe las órdenes de la casa.")
+    connection.send_result(msg["id"], {"ok": True, "online": online})
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/app/message",
+    vol.Required("text"): vol.All(str, vol.Length(min=1, max=300)),
+    vol.Optional("target", default="all"): vol.Any("all", [str]),
+})
+@websocket_api.require_admin
+@callback
+def ws_app_message(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Un aviso del instalador en la pantalla de la app (los equipos con la app abierta lo ven al instante)."""
+    ad = _rt_devices(hass)
+    target = msg["target"]
+    ids = list(ad.online) if (ad and target == "all") else [t for t in (target if isinstance(target, list) else []) if ad and ad.online.get(t)]
+    fire_command(hass, "hello", target, message=" ".join(msg["text"].split()))
+    from .audit import log as audit_log  # noqa: PLC0415
+
+    audit_log(hass, "access", "mensaje a la app", "todos" if target == "all" else f"{len(target)} equipos", "instalador")
+    connection.send_result(msg["id"], {"ok": True, "online": len(ids)})
+
+
+WS_COMMANDS = (ws_app_me, ws_app_actions, ws_app_devices, ws_app_device_set, ws_app_subscribe, ws_app_notify_action, ws_app_test, ws_app_message)
 
 
 @callback

@@ -4847,7 +4847,10 @@
     _url(u) { const b = this._cfg && this._cfg.base_url; return u && b && u.charAt(0) === '/' ? b.replace(/\/+$/, '') + u : u; }
 
     _html() {
-      const tabs = [['general', 'home', 'General'], ['layout', 'menu', 'Diseño'], ['rooms', 'sofa', 'Ambientes'], ['plan', 'window', 'Plano'], ['security', 'shield', 'Seguridad'], ['features', 'sparkle', 'Secciones']];
+      // el panel MatterAI puede mostrar sólo algunas pestañas (La casa: datos; Inicio clásico: el diseño viejo)
+      const tabs = [['general', 'home', 'General'], ['layout', 'menu', 'Diseño'], ['rooms', 'sofa', 'Ambientes'], ['plan', 'window', 'Plano'], ['security', 'shield', 'Seguridad'], ['features', 'sparkle', 'Secciones']]
+        .filter(([k]) => !Array.isArray(this.onlyTabs) || this.onlyTabs.includes(k));
+      if (!tabs.some(([k]) => k === this._tab) && tabs.length) this._tab = tabs[0][0];
       const body = this._tab === 'layout' ? this._tLayout() : this._tab === 'rooms' ? this._tRooms() : this._tab === 'plan' ? this._tPlan() : this._tab === 'security' ? this._tSecurity() : this._tab === 'features' ? this._tFeatures() : this._tGeneral();
       return `<style>${ED_CSS}</style><div class="edw"><div class="tabs">${tabs.map(([k, i, l]) => `<button data-a="tab" data-v="${k}" class="${this._tab === k ? 'on' : ''}">${ic(i)}${l}</button>`).join('')}</div><div id="body">${body}</div></div>`;
     }

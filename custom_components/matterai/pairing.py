@@ -38,8 +38,12 @@ def _opt(entry, key: str, default: Any = "") -> Any:
     return entry.options.get(key, entry.data.get(key, default))
 
 
-async def async_pairing_link(hass: HomeAssistant, by: str | None = None) -> dict[str, Any]:
-    """Link y QR de vinculación (código de un solo uso) con los datos de la casa."""
+async def async_pairing_link(hass: HomeAssistant, by: str | None = None, guest_hours: int | None = None,
+                             profile: str | None = None) -> dict[str, Any]:
+    """Link y QR de vinculación (código de un solo uso) con los datos de la casa.
+
+    Con guest_hours es un acceso de invitado: el equipo queda afuera solo cuando vence."""
+    guest = {"until": time.time() + guest_hours * 3600, "profile": profile} if guest_hours else None
     rt = _rt(hass)
     if rt is None:
         raise ValueError("La integración MatterAI no está configurada")
@@ -48,7 +52,21 @@ async def async_pairing_link(hass: HomeAssistant, by: str | None = None) -> dict
     if not url:
         raise ValueError("Falta la dirección remota de la casa (Configurar → Dirección)")
     return await rt["house"].async_pairing(url, _opt(entry, CONF_NAME), _opt(entry, CONF_SUPPORT, None),
-                                           _opt(entry, CONF_LOCAL_URL), _opt(entry, CONF_WIFI), by=by)
+                                           _opt(entry, CONF_LOCAL_URL), _opt(entry, CONF_WIFI), by=by, guest=guest)
+
+
+async def async_expire_guests(hass: HomeAssistant) -> int:
+    """Corta los accesos de invitado vencidos (se llama cada pocos minutos)."""
+    rt = _rt(hass)
+    if rt is None:
+        return 0
+    n = 0
+    for uid in rt["house"].expired():
+        name = (rt["house"].devices.get(uid) or {}).get("name", "")
+        if await async_forget(hass, uid):
+            audit_log(hass, "access", "acceso de invitado vencido", name)
+            n += 1
+    return n
 
 
 async def async_forget(hass: HomeAssistant, user_id: str) -> bool:
@@ -137,7 +155,8 @@ class PairView(HomeAssistantView):
             return self.json({"ok": False, "msg": "Este código ya se usó o venció. Pedí uno nuevo."}, status_code=403, headers=headers)
         user_id, token = got
         d = rt["house"].devices.get(user_id) or {}
-        audit_log(self.hass, "access", "equipo vinculado", d.get("name", ""), "QR del instalador" if d.get("via") == "pair" else "agregado desde la app", f"desde {ip}")
+        via = {"pair": "QR del instalador", "guest": "invitado del instalador"}.get(d.get("via"), "agregado desde la app")
+        audit_log(self.hass, "access", "equipo vinculado", d.get("name", ""), via, f"desde {ip}")
         await async_replace_twins(self.hass, user_id)
         return self.json({"ok": True, "token": token, "user_id": user_id}, headers=headers)
 

@@ -1,7 +1,7 @@
 /*
  * MatterAI · editor de dashboards (modo edición, como el de Home Assistant).
  *
- *   window.MaeEditor.open(panel, viewId)
+ *   window.MaeEditor.open(panel, viewId[, 'phone' | 'tablet'])
  *
  * - Vista previa real (el mismo motor que la app: vista.js) del celular o la tablet, horizontal o vertical.
  * - Tarjetas: agregar del catálogo, mover arrastrando con el mouse o con flechas, pasar de columna, duplicar, borrar.
@@ -162,10 +162,11 @@
   .cic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#262e3a}.cic svg{width:20px;height:20px;fill:none;stroke:#f2b766;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   @media (max-width:1100px){.ed{grid-template-columns:230px minmax(0,1fr) 310px}.ed.nolist{grid-template-columns:0 minmax(0,1fr) 330px}}`;
 
-  function open(panel, viewId) { return new Editor(panel, viewId).start(); }
+  function open(panel, viewId, kind) { return new Editor(panel, viewId, kind).start(); }
 
   class Editor {
-    constructor(panel, viewId) {
+    constructor(panel, viewId, kind) {
+      this.k0 = kind === 'tablet' || kind === 'phone' ? kind : null;
       this.p = panel; this.hass = panel._hass; this.viewId = viewId; this.sel = null; this.undo = []; this.redo = []; this.tab = 'cfg';
     }
 
@@ -177,7 +178,7 @@
       if (!v) { this.p._toast('Ese dashboard no existe'); return; }
       this.cfg = cfg.config || {};
       this.v = Editor.normalize(clone(v));
-      this.K = v.kind || 'phone';
+      this.K = this.k0 || v.kind || 'phone';
       this.saved = clone(this.v);
       // la tarjeta MatterAI sin dibujarse: da el modelo de la casa (ambientes, luces, cámaras…)
       const Card = customElements.get('matterai-home-card');

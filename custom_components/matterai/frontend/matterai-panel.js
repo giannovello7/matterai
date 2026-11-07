@@ -40,10 +40,10 @@
   const NAV = [
     { k: 'home', l: 'Resumen', i: 'mdi:view-dashboard-outline' },
     { g: 'App del cliente', d: 'Lo que configurás para la app MatterAI' },
-    { k: 'dash', l: 'Diseño de la app', i: 'mdi:cellphone-cog' },
-    { k: 'auto', l: 'Automatizaciones', i: 'mdi:robot-outline' },
     { k: 'views', l: 'Dashboards', i: 'mdi:view-dashboard-edit-outline' },
-    { k: 'app', l: 'Vincular celulares', i: 'mdi:qrcode' },
+    { k: 'casa', l: 'La casa', i: 'mdi:home-edit-outline' },
+    { k: 'app', l: 'Equipos', i: 'mdi:cellphone-link' },
+    { k: 'auto', l: 'Automatizaciones', i: 'mdi:robot-outline' },
     { g: 'Sistema MatterAI', d: 'Control interno de la instalación' },
     { k: 'health', l: 'Salud y avisos', i: 'mdi:heart-pulse' },
     { k: 'wd', l: 'Mantenimiento', i: 'mdi:shield-sync-outline' },
@@ -56,10 +56,11 @@
   ];
   const PAGES = {
     home: ['Resumen', 'Cómo está esta casa de un vistazo.', null],
-    dash: ['Diseño de la app', 'Ambientes, equipos y cámaras que ve la familia. Los cambios llegan a la app recién al tocar Guardar.', 'client'],
+    casa: ['La casa', 'Los datos de la casa que usan todos los dashboards: tu marca y soporte, personas, ambientes con sus equipos, alarma, portones y cámaras, y qué secciones tiene la app.', 'client'],
+    dash: ['Inicio clásico', 'La pantalla anterior a los dashboards (con el plano viejo). Sólo para equipos que todavía la usan (Opciones de la app → Diseño del inicio → Clásico).', 'client'],
     auto: ['Automatizaciones', 'Las del cliente y los equipos del instalador (portón inteligente, sensor de ocupación), que el cliente no ve.', 'client'],
     views: ['Dashboards', 'Qué ve cada persona en su celular y en su tablet. Lo diseñás acá y les llega al instante; lo que fijen desde la app también queda acá.', 'client'],
-    app: ['Vincular celulares', 'Código QR y link para que la familia conecte la app MatterAI a esta casa.', 'client'],
+    app: ['Equipos', 'Los celulares y tablets de la familia: vincular uno nuevo, qué dashboard ve cada uno, su perfil y su acceso.', 'client'],
     health: ['Salud y avisos', 'Todo lo que hay que atender en esta casa. Lo mismo le llega al panel central.', 'system'],
     wd: ['Mantenimiento', 'Los servicios que MatterAI vigila y recupera solo: complementos e integraciones.', 'system'],
     backup: ['Copias de seguridad', 'El diseño de la app, las automatizaciones y sus ajustes. Restaurar todo o algunas.', 'system'],
@@ -73,6 +74,14 @@
   const AUTO_REFRESH = new Set(['home', 'health', 'wd']);
 
   const CSS = `
+  /* modo día / noche del panel (Auto = el tema de Home Assistant) */
+  :host([data-mt="light"]){color-scheme:light;--primary-background-color:#f3f4f7;--secondary-background-color:#eceef2;--card-background-color:#fff;--primary-text-color:#1b1c1f;--secondary-text-color:#5c6066;--divider-color:rgba(0,0,0,.11);--app-header-background-color:#fff;--app-header-text-color:#1b1c1f;--ha-card-box-shadow:0 1px 3px rgba(0,0,0,.06);--input-fill-color:#f3f4f7;--mdc-text-field-fill-color:#f3f4f7}
+  :host([data-mt="dark"]){color-scheme:dark;--primary-background-color:#111214;--secondary-background-color:#25262a;--card-background-color:#1c1d20;--primary-text-color:#ececee;--secondary-text-color:#a2a4aa;--divider-color:rgba(255,255,255,.1);--app-header-background-color:#1c1d20;--app-header-text-color:#fff;--ha-card-box-shadow:none;--input-fill-color:#25262a;--mdc-text-field-fill-color:#25262a}
+  :host([data-mt="light"]) header{box-shadow:0 1px 0 rgba(0,0,0,.08)}
+  .mt{display:inline-flex;padding:3px;border-radius:999px;background:rgba(127,127,127,.18);gap:2px}
+  .mt button{border:0;background:none;color:inherit;font:inherit;font-size:12.5px;font-weight:600;padding:4px 10px;border-radius:999px;cursor:pointer;opacity:.7;white-space:nowrap}
+  .mt button.on{background:var(--card-background-color,#1c1c1e);color:var(--primary-text-color,#eee);opacity:1;box-shadow:0 1px 3px rgba(0,0,0,.2)}
+  @media (max-width:600px){.mt button{padding:4px 8px}.mt .tx{display:none}}
   :host{display:block;min-height:100vh;background:var(--primary-background-color,#111);color:var(--primary-text-color,#eee);font-family:var(--paper-font-body1_-_font-family,system-ui,sans-serif)}
   header{position:sticky;top:0;z-index:6;box-sizing:border-box;height:56px;display:flex;align-items:center;gap:12px;padding:0 16px;background:var(--app-header-background-color,#1c1c1e);color:var(--app-header-text-color,#fff);box-shadow:0 2px 8px rgba(0,0,0,.25)}
   header .brand{display:flex;align-items:baseline;gap:8px;flex:1;min-width:0;white-space:nowrap;overflow:hidden}
@@ -128,6 +137,15 @@
   .qr svg,.qr img{width:100%;height:100%}
   .link{word-break:break-all;font-size:12px;opacity:.8;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);margin:8px 0}
   .row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 2px}
+  .eq2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:18px 0}
+  @media (max-width:1000px){.eq2{grid-template-columns:minmax(0,1fr)}}
+  .gform{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px}
+  .gform label{display:flex;flex-direction:column;gap:4px;font-size:12px;font-weight:600}.gform label span{opacity:.7}
+  .gform select,#mtext{padding:8px 10px;border-radius:10px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:var(--secondary-background-color,transparent);color:inherit;font:inherit;font-size:14px}
+  #mtext{width:100%;box-sizing:border-box;resize:vertical;margin-top:8px}
+  .gres{display:grid;grid-template-columns:auto minmax(0,1fr);gap:16px;margin-top:14px;align-items:start}
+  .qr.sm{width:140px;height:140px;padding:8px}
+  #eqv{margin-bottom:18px}
   h2{margin:0 0 8px;font-size:17px;font-weight:600}h3{margin:18px 0 6px;font-size:15px}
   .bh{display:flex;align-items:center;gap:10px;margin-bottom:8px}.bh h2{margin:0;flex:1}
   p{margin:6px 0;line-height:1.5}.mut{opacity:.7;font-size:13px}
@@ -200,12 +218,21 @@
       const nav = NAV.map((n) => (n.g ? `<div class="g">${esc(n.g)}<small>${esc(n.d)}</small></div>`
         : `<button data-tab="${n.k}" class="${n.k === this._tab ? 'on' : ''}"><ha-icon icon="${n.i}"></ha-icon><span>${esc(n.l)}</span><i class="cnt" id="cnt_${n.k}" hidden></i></button>`)).join('');
       this.shadowRoot.innerHTML = `<style>${CSS}</style>
-        <header><button class="menu" id="menu" title="Menú">☰</button><div class="brand"><b>MatterAI</b><span id="hname"></span></div><button class="pill" id="pill" hidden></button><small id="ver"></small></header>
+        <header><button class="menu" id="menu" title="Menú">☰</button><div class="brand"><b>MatterAI</b><span id="hname"></span></div><button class="pill" id="pill" hidden></button><div class="mt" id="mt" role="group" aria-label="Modo del panel"><button data-mt="light" title="Claro">☀<span class="tx"> Claro</span></button><button data-mt="dark" title="Oscuro">☾<span class="tx"> Oscuro</span></button><button data-mt="" title="Como Home Assistant">Auto</button></div><small id="ver"></small></header>
         <div class="shell"><aside>${nav}</aside><main id="main"><p class="mut">Cargando…</p></main></div>`;
       const $ = (id) => this.shadowRoot.getElementById(id);
       $('menu').onclick = () => this.dispatchEvent(new Event('hass-toggle-menu', { bubbles: true, composed: true }));
       this.shadowRoot.querySelector('aside').onclick = (e) => { const b = e.target.closest('[data-tab]'); if (b) this._go(b.dataset.tab); };
       $('pill').onclick = () => this._go('health');
+      // modo día / noche: se guarda en este navegador
+      const setMt = (m) => {
+        if (m) this.setAttribute('data-mt', m); else this.removeAttribute('data-mt');
+        $('mt').querySelectorAll('button').forEach((b) => b.classList.toggle('on', b.dataset.mt === (m || '')));
+        try { localStorage.setItem('matterai.panel.theme', m || ''); } catch (_) { /* sin almacenamiento */ }
+      };
+      let mt0 = ''; try { mt0 = localStorage.getItem('matterai.panel.theme') || ''; } catch (_) { /* sin almacenamiento */ }
+      setMt(['light', 'dark'].includes(mt0) ? mt0 : '');
+      $('mt').onclick = (e) => { const b = e.target.closest('[data-mt]'); if (b) setMt(b.dataset.mt); };
       // atajos dentro de las páginas: cualquier botón con data-go
       $('main').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) this._go(b.dataset.go); });
       try {
@@ -225,7 +252,7 @@
     }
     _go(tab) {
       if (!PAGES[tab]) tab = 'home';
-      if (this._tab === 'dash' && tab !== 'dash' && this._dirty() && !confirm('Hay cambios sin guardar en el diseño de la app. ¿Salir igual?')) return;
+      if ((this._tab === 'dash' || this._tab === 'casa') && tab !== this._tab && this._dirty() && !confirm('Hay cambios sin guardar en los datos de la casa. ¿Salir igual?')) return;
       this._tab = tab;
       try { localStorage.setItem(STORE_KEY, tab); } catch (_) { /* sin almacenamiento */ }
       this.shadowRoot.querySelectorAll('aside [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
@@ -241,7 +268,7 @@
       this._timer = setInterval(() => { if (!document.hidden && AUTO_REFRESH.has(this._tab)) this._render(this._tab, true); }, 30000);
     }
     _render(tab, quiet = false) {
-      const R = { home: this._renderHome, dash: this._renderDash, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
+      const R = { home: this._renderHome, dash: this._renderDash, casa: this._renderCasa, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
         backup: () => this._renderCopias('backup'), tpl: () => this._renderCopias('tpl'), conn: this._renderConn, voice: this._renderVoice, house: this._renderHouse, sec: this._renderSec, views: this._renderViews };
       const main = this.shadowRoot.getElementById('main');
       if (!quiet) main.innerHTML = `${this._head(tab)}<div class="box"><p class="mut">Cargando…</p></div>`;
@@ -323,7 +350,7 @@
             <div class="kv"><span>Automatizaciones</span><b>${st.automations != null ? st.automations : '—'}</b></div>
             <div class="kv"><span>Control por voz</span><b>${!s.voice.on ? 'Desactivado' : s.voice.ai ? (s.voice.mode === 'ai' ? 'Con IA' : 'Gratis + IA') : 'Gratis'}</b></div>
             <div class="kv"><span>WhatsApp de soporte</span><b>${esc(s.support_phone || '—')}</b></div>
-            <div class="row"><button class="b" data-go="dash">Diseño de la app</button><button class="b" data-go="auto">Automatizaciones</button><button class="b" data-go="app">Vincular celulares</button></div></div>
+            <div class="row"><button class="b" data-go="views">Dashboards</button><button class="b" data-go="casa">La casa</button><button class="b" data-go="app">Equipos</button><button class="b" data-go="auto">Automatizaciones</button></div></div>
           <div class="box"><div class="bh"><h2>Avisos</h2><button class="lnk" data-go="health">Ver todos</button></div>${this._alerts(al, 5)}</div>
           <div class="box"><div class="bh"><h2>Servicios</h2><button class="lnk" data-go="wd">Mantenimiento</button></div>
             ${svcs.length ? svcs.map((x) => `<div class="kv"><span>${esc(x.name)}</span><b class="${SVC_CLS[x.status] || ''}">${esc(x.status_text)}</b></div>`).join('') : '<p class="mut">Nada para vigilar en esta casa.</p>'}
@@ -563,11 +590,27 @@
     }
 
     /* ---------- Diseño de la app: editor + vista previa ---------- */
+    /** La casa: los datos que usan todos los dashboards (sin el diseño viejo, que quedó en «Inicio clásico»). */
+    _renderCasa() {
+      const main = this._page('casa', `<div class="dash casa"><div class="box" id="edbox"></div><div class="box side">
+          <h2>¿Qué se arma acá?</h2>
+          <p class="mut">Los datos de la casa: <b>ambientes y sus equipos</b>, personas, alarma, portones y cerraduras, cámaras, y qué secciones tiene la app. Los usan todos los dashboards y la app.</p>
+          <p class="mut">Lo que ve cada persona en su pantalla (tarjetas, orden, plano) se diseña en <b>Dashboards</b>.</p>
+          <div class="row"><button class="b pri" data-go="views"><ha-icon icon="mdi:view-dashboard-edit-outline"></ha-icon>Ir a Dashboards</button></div>
+          <p class="mut" style="margin-top:18px">¿Algún equipo usa todavía la pantalla anterior? Su diseño está en <button class="lnk" data-go="dash">Inicio clásico</button>.</p></div></div>`);
+      if (!main) return;
+      this._mountEditor(main, ['general', 'rooms', 'security', 'features'], false);
+    }
+    /** Inicio clásico: el diseño viejo (con su vista previa), para quien todavía lo usa. */
     _renderDash() {
       const main = this._page('dash', '<div class="dash"><div class="box" id="edbox"></div><div class="box prev" id="prev"></div></div>');
       if (!main) return;
+      this._mountEditor(main, ['layout', 'plan'], true);
+    }
+    _mountEditor(main, tabs, preview) {
       const Ed = customElements.get('matterai-home-card-editor');
       this._editor = new Ed();
+      this._editor.onlyTabs = tabs;
       this._editor.hass = this._hass;
       this._editor.setConfig(this._draft);
       this._editor.addEventListener('config-changed', (e) => {
@@ -578,10 +621,12 @@
       const edbox = main.querySelector('#edbox');
       edbox.appendChild(this._editor);
       const bar = document.createElement('div'); bar.className = 'bar'; bar.id = 'bar'; edbox.appendChild(bar);
-      this._card = document.createElement('matterai-home-card');
-      this._card.setConfig(this._draft);
-      this._card.hass = this._hass;
-      main.querySelector('#prev').appendChild(this._card);
+      if (preview) {
+        this._card = document.createElement('matterai-home-card');
+        this._card.setConfig(this._draft);
+        this._card.hass = this._hass;
+        main.querySelector('#prev').appendChild(this._card);
+      }
       this._bar();
     }
     _bar() {
@@ -589,7 +634,7 @@
       const d = this._dirty();
       bar.innerHTML = `<span>${d ? 'Cambios sin guardar · la app de los clientes no los ve todavía' : 'Todo guardado · la app muestra esto'}</span>
         <button class="b" id="undo" ${d ? '' : 'disabled'}>Descartar</button><button class="b pri" id="save" ${d ? '' : 'disabled'}>Guardar</button>`;
-      bar.querySelector('#undo').onclick = () => { this._draft = JSON.parse(this._saved); this._renderDash(); };
+      bar.querySelector('#undo').onclick = () => { this._draft = JSON.parse(this._saved); this._render(this._tab); };
       bar.querySelector('#save').onclick = async () => {
         try {
           await this._hass.callWS({ type: 'matterai/config/save', config: this._draft });
@@ -598,7 +643,7 @@
       };
     }
 
-    /* ---------- Vincular celulares: QR ---------- */
+    /* ---------- Equipos: vincular (QR), qué ve cada uno, perfiles y accesos ---------- */
     async _renderApp(regenerate = false) {
       try {
         await loadScript(`${BASE}/qrcode.js`);
@@ -617,9 +662,23 @@
         <p class="mut">Cada código sirve para <b>un solo celular</b> y vence en ${esc(String(p.hours || 24))} horas: cada equipo queda con su propio acceso, que no vence nunca. Desde la app, quien ya está vinculado puede agregar otros celulares (Opciones → Agregar otro celular).</p>
         <div class="link">${esc(p.link)}</div>
         <div class="row"><button class="b pri" id="copy">Copiar link</button><a class="b" href="${esc(wa)}" target="_blank" rel="noopener">Mandar por WhatsApp</a><button class="b" id="print">Imprimir</button><button class="b" id="regen">Otro código</button></div></div></div>
+        <div class="eq2">
+          <div class="box"><h2>Acceso de invitado</h2>
+            <p class="mut">Para alguien que se queda unos días (familia de visita, una niñera, quien cuida la casa): el acceso <b>se corta solo</b> cuando vence.</p>
+            <form class="gform" id="gform"><label><span>Dura</span><select id="ghours"><option value="24">1 día</option><option value="72">3 días</option><option value="168" selected>1 semana</option><option value="720">1 mes</option></select></label>
+              <label><span>Ve</span><select id="gprof"><option value="basic">Sólo luces y clima</option><option value="kids" selected>Todo menos la seguridad</option><option value="full">Todo</option></select></label>
+              <button class="b pri" type="submit"><ha-icon icon="mdi:account-clock-outline"></ha-icon>Crear link</button></form>
+            <div id="gout"></div></div>
+          <div class="box"><h2>Mensaje a la app</h2>
+            <p class="mut">Aparece en la pantalla de los equipos que tienen la app abierta (por ejemplo, «Mañana a las 10 paso a revisar el portón»).</p>
+            <form id="mform"><textarea id="mtext" maxlength="300" rows="3" placeholder="Escribí el mensaje…"></textarea>
+              <div class="row"><button class="b pri" type="submit"><ha-icon icon="mdi:message-text-outline"></ha-icon>Mandar a todos</button></div></form></div>
+        </div>
+        <div id="eqv"><div class="box"><h2>Qué ve cada equipo</h2><p class="mut">Cargando…</p></div></div>
         <div class="box" id="acc"><h2>Accesos a la casa</h2><p class="mut">Cargando…</p></div>
         <div class="box" id="devs"><h2>Celulares y tablets</h2><p class="mut">Cargando…</p></div>`);
       if (!main) return;
+      this._renderViews({ into: main.querySelector('#eqv') }).catch((e) => { main.querySelector('#eqv').innerHTML = `<div class="box"><h2>Qué ve cada equipo</h2><p class="mut">${esc(e.message || e)}</p></div>`; });
       this._renderDevs(main.querySelector('#devs'));
       this._renderAccess(main.querySelector('#acc'));
       const $ = (id) => main.querySelector(`#${id}`);
@@ -630,6 +689,30 @@
         w.document.close(); w.focus(); w.print();
       };
       $('regen').onclick = () => this._renderApp(true);
+      $('gform').onsubmit = async (e) => {
+        e.preventDefault();
+        const hours = Number($('ghours').value), out = $('gout');
+        try {
+          const g = await this._hass.callWS({ type: 'matterai/pairing', guest_hours: hours, profile: $('gprof').value });
+          const until = new Date(g.guest.until * 1000).toLocaleString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+          const gq = window.qrcode(0, 'L'); gq.addData(g.link); gq.make();
+          const gwa = `https://wa.me/?text=${encodeURIComponent(`¡Hola! Te dejo acceso a la casa hasta el ${until}. Bajá la app MatterAI y abrí este link desde el celular:\n${g.link}`)}`;
+          out.innerHTML = `<div class="gres"><div class="qr sm">${gq.createSvgTag({ cellSize: 4, margin: 0, scalable: true })}</div><div>
+            <p><b>Vale hasta el ${esc(until)}.</b> Sirve para un solo celular; si nadie lo usa, el link vence antes (${esc(String(g.hours || 24))} h).</p>
+            <div class="link">${esc(g.link)}</div>
+            <div class="row"><button class="b" id="gcopy">Copiar link</button><a class="b pri" href="${esc(gwa)}" target="_blank" rel="noopener">Mandar por WhatsApp</a></div></div></div>`;
+          out.querySelector('#gcopy').onclick = async () => { try { await navigator.clipboard.writeText(g.link); this._toast('Link copiado'); } catch (_) { this._toast('No se pudo copiar: seleccionalo a mano'); } };
+        } catch (err) { this._toast(`No se pudo: ${err.message || err}`); }
+      };
+      $('mform').onsubmit = async (e) => {
+        e.preventDefault();
+        const text = $('mtext').value.trim(); if (!text) { $('mtext').focus(); return; }
+        try {
+          const res = await this._hass.callWS({ type: 'matterai/app/message', text });
+          $('mtext').value = '';
+          this._toast(res.online ? `Mandado: lo ven ${res.online === 1 ? '1 equipo' : `${res.online} equipos`} con la app abierta` : 'Mandado, pero ahora no hay ningún equipo con la app abierta');
+        } catch (err) { this._toast(`No se pudo: ${err.message || err}`); }
+      };
     }
 
     /** Un acceso por equipo: cuándo se usó por última vez y cortar uno solo (celular perdido, empleado que ya no está). */
@@ -637,13 +720,13 @@
       let r;
       try { r = await this._hass.callWS({ type: 'matterai/app/access' }); } catch (e) { box.innerHTML = `<h2>Accesos a la casa</h2><p class="mut">${esc(e.message || e)}</p>`; return; }
       const when = (t) => (t ? new Date(t * 1000).toLocaleString('es-AR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : '—');
-      const VIA = { pair: 'QR del instalador', invite: 'Agregado desde la app', upgrade: 'Pasado del acceso compartido' };
+      const VIA = { pair: 'QR del instalador', invite: 'Agregado desde la app', upgrade: 'Pasado del acceso compartido', guest: 'Invitado' };
       const sh = r.shared || {};
       box.innerHTML = `<h2>Accesos a la casa</h2>
         <p class="mut">Cada celular o tablet tiene su propio acceso. Si se pierde un celular, desvinculalo acá: los demás siguen andando.</p>
         ${r.devices.length ? `<table class="tb"><thead><tr><th>Equipo</th><th>Vinculado</th><th>Último uso</th><th></th></tr></thead><tbody>
           ${r.devices.map((d) => `<tr><td><b>${esc(d.name)}</b>${d.apps.length ? `<br><small class="mut">${esc(d.apps.join(', '))}</small>` : ''}</td>
-            <td>${esc(when(d.created))}<br><small class="mut">${esc(VIA[d.via] || '')}</small></td><td>${esc(when(d.last_used))}</td>
+            <td>${esc(when(d.created))}<br><small class="mut">${esc(VIA[d.via] || '')}</small>${d.until ? `<br><small class="wn">Vence el ${esc(when(d.until))}</small>` : ''}</td><td>${esc(when(d.last_used))}</td>
             <td><button class="b warn" data-rev="${esc(d.user_id)}" data-n="${esc(d.name)}">Desvincular</button></td></tr>`).join('')}
         </tbody></table>` : '<p class="mut">Todavía no hay equipos con acceso propio.</p>'}
         ${sh.active ? `<h3>Acceso compartido (versión anterior)</h3>
@@ -657,6 +740,8 @@
           this._renderAccess(box);
           const devs = this.shadowRoot ? this.shadowRoot.querySelector('#devs') : null;
           if (devs) this._renderDevs(devs);
+          const eqv = this.shadowRoot ? this.shadowRoot.querySelector('#eqv') : null;
+          if (eqv) this._renderViews({ into: eqv }).catch(() => {});
         };
       });
       const off = box.querySelector('#shoff');
@@ -676,14 +761,30 @@
       try { r = await this._hass.callWS({ type: 'matterai/app/devices' }); } catch (e) { box.innerHTML = `<h2>Celulares y tablets</h2><p class="mut">${esc(e.message || e)}</p>`; return; }
       const P = r.profiles || {};
       const HELP = { full: 'Ve y maneja todo', kids: 'Sin alarma, cerraduras, portón ni cámaras', basic: 'Sólo luces, clima, persianas y música' };
+      // la versión más nueva entre los equipos: los que tienen una anterior, a actualizar
+      const num = (v) => String(v || '').split(/[.-]/).map((x) => parseInt(x, 10) || 0);
+      const cmp = (a, b) => { const A = num(a), B = num(b); for (let i = 0; i < Math.max(A.length, B.length); i++) { if ((A[i] || 0) !== (B[i] || 0)) return (A[i] || 0) - (B[i] || 0); } return 0; };
+      const newest = r.devices.map((d) => d.app_version).filter(Boolean).sort(cmp).pop() || '';
+      const since = (t) => { if (!t) return 'sin datos'; const m = Math.round((Date.now() / 1000 - t) / 60); return m < 2 ? 'hace un momento' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
       box.innerHTML = `<h2>Celulares y tablets</h2>
-        <p class="mut">Cada equipo con la app aparece acá solo, la primera vez que se conecta. El perfil decide qué ve (por ejemplo, el de los chicos sin la alarma ni las cámaras) y «Pedir huella» protege la alarma, las cerraduras y el portón en ese equipo.</p>
-        ${r.devices.length ? `<table class="tb"><thead><tr><th>Equipo</th><th>Perfil</th><th>Pedir huella</th><th>Avisos</th></tr></thead><tbody>
-          ${r.devices.map((d) => `<tr data-dev="${esc(d.device_id)}"><td><b>${esc(d.name)}</b><br><small class="mut">${esc(d.model)}${d.app_version ? ` · app ${esc(d.app_version)}` : ''}</small></td>
+        <p class="mut">Cada equipo con la app aparece acá solo, la primera vez que se conecta. El perfil decide qué ve (por ejemplo, el de los chicos sin la alarma ni las cámaras) y «Pedir huella» protege la alarma, las cerraduras y el portón en ese equipo. Con «Probar» le mandás una orden de prueba a ese equipo (tiene que tener la app abierta).</p>
+        ${r.devices.length ? `<table class="tb"><thead><tr><th>Equipo</th><th>Ahora</th><th>Perfil</th><th>Pedir huella</th><th>Avisos</th><th></th></tr></thead><tbody>
+          ${r.devices.map((d) => `<tr data-dev="${esc(d.device_id)}"><td><b>${esc(d.name)}</b><br><small class="mut">${esc(d.model)}${d.app_version ? ` · app ${esc(d.app_version)}` : ''}</small>${d.app_version && newest && cmp(d.app_version, newest) < 0 ? `<br><small class="wn">Hay una versión más nueva (${esc(newest)}): actualizá la app en este equipo</small>` : ''}</td>
+            <td>${d.online ? '<b class="ok">● Conectado</b>' : `<span class="mut">○ Cerrada<br><small>${esc(d.seen ? `vista ${since(d.seen)}` : 'sin datos desde que arrancó HA')}</small></span>`}</td>
             <td><select data-k="profile">${Object.keys(P).map((k) => `<option value="${k}" ${d.profile === k ? 'selected' : ''}>${esc(P[k])}</option>`).join('')}</select><br><small class="mut">${esc(HELP[d.profile] || '')}</small></td>
             <td><input type="checkbox" data-k="secure" ${d.secure ? 'checked' : ''}></td>
-            <td>${d.notify ? `<b class="ok">${esc(d.notify)}</b>` : d.push ? '<b class="wn">Reiniciar HA</b>' : '<span class="mut">Sin notificaciones</span>'}</td></tr>`).join('')}
+            <td>${d.notify ? `<b class="ok">${esc(d.notify)}</b>` : d.push ? '<b class="wn">Reiniciar HA</b>' : '<span class="mut">Sin notificaciones</span>'}</td>
+            <td><select class="tst" data-test="${esc(d.device_id)}" title="Probar este equipo a distancia"><option value="">Probar…</option><option value="hello">Mostrar un aviso</option><option value="screen_on">Prender la pantalla</option><option value="reload">Recargar la app</option></select></td></tr>`).join('')}
         </tbody></table>` : '<p class="mut">Todavía no hay equipos: aparecen cuando el cliente abre la app vinculada.</p>'}`;
+      box.querySelectorAll('[data-test]').forEach((sel) => {
+        sel.onchange = async () => {
+          const command = sel.value; sel.value = ''; if (!command) return;
+          try {
+            const res = await this._hass.callWS({ type: 'matterai/app/test', device_id: sel.dataset.test, command });
+            this._toast(res.online ? 'Mandado: tendría que verse en el equipo ahora' : 'La app de ese equipo está cerrada: no le llega. Abrila en el equipo y probá de nuevo');
+          } catch (e) { this._toast(`No se pudo: ${e.message || e}`); }
+        };
+      });
       box.querySelectorAll('[data-dev] [data-k]').forEach((el) => {
         el.onchange = async () => {
           const id = el.closest('[data-dev]').dataset.dev;
@@ -695,7 +796,7 @@
     }
 
     /* ---------- Dashboards por persona ---------- */
-    async _renderViews() {
+    async _renderViews(opts) {
       const r = await this._hass.callWS({ type: 'matterai/views/list' });
       const people = r.people || [];
       const views = r.views || [];
@@ -710,7 +811,7 @@
         const vid = p.view || r.default || null, x = views.find((y) => y.id === vid), k = kindOf(p);
         const kname = k === 'tablet' ? 'tablet' : 'celular';
         if (!x) return `Muestra el <b>inicio automático</b> (${kname})`;
-        return `Muestra <b>«${esc(x.name)}»</b>${p.view ? '' : ' (el general)'} · diseño de ${kname} ${lay(x, k) ? '<span class="dv-tag on">diseñado</span>' : '<span class="dv-tag">prearmado</span>'}${p.kind ? '' : ' <span class="mut">· todavía no abrió la app nueva</span>'}`;
+        return `Muestra <b>«${esc(x.name)}»</b>${p.view ? '' : ' (el por defecto)'} · diseño de ${kname} ${lay(x, k) ? '<span class="dv-tag on">diseñado</span>' : '<span class="dv-tag">prearmado</span>'}${p.kind ? '' : ' <span class="mut">· todavía no abrió la app nueva</span>'}`;
       };
       // el mismo equipo vinculado dos veces: mismo nombre y mismo tipo; el que se usó (o vinculó) más tarde es el bueno
       const isTab = (p) => /tab|sm-x|sm-t|ipad/i.test((p.model || '') + p.name);
@@ -722,30 +823,65 @@
       const lay = (x, k) => { const L = (x.layouts || {})[k]; return (L && L.blocks && L.blocks.length) || ((x.kind || 'phone') === k && x.blocks && x.blocks.length); };
       const state = (x, k) => (lay(x, k) ? '<span class="dv-tag on">diseñado</span>' : '<span class="dv-tag">prearmado</span>');
       const ago = (t) => { if (!t) return 'sin uso todavía'; const m = Math.round((Date.now() / 1000 - t) / 60); return m < 2 ? 'en uso ahora' : m < 60 ? `usado hace ${m} min` : m < 1440 ? `usado hace ${Math.round(m / 60)} h` : `usado hace ${Math.round(m / 1440)} días`; };
-      const viewOpts = (sel) => `<option value="">${r.default ? 'El general' : 'Inicio automático'}</option>${views.map((x) => `<option value="${esc(x.id)}" ${sel === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}`;
+      const viewOpts = (sel) => `<option value="">${r.default ? `El por defecto (${esc((views.find((y) => y.id === r.default) || {}).name || '')})` : 'Inicio automático'}</option>${views.map((x) => `<option value="${esc(x.id)}" ${sel === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}`;
+      /** Miniatura del diseño: una barrita por tarjeta (las grandes, como plano o cámaras, más altas). */
+      const blocksOf = (x, k) => { const L = (x.layouts || {})[k]; return (L && L.blocks && L.blocks.length) ? L.blocks : ((x.kind || 'phone') === k && x.blocks) || []; };
+      const mini = (x, k) => {
+        const bl = blocksOf(x, k), tall = (b) => /plan|cam|frigate|music|media|weather|clima/i.test((b && b.type) || '');
+        const bars = bl.slice(0, k === 'tablet' ? 10 : 7).map((b) => `<i class="${tall(b) ? 't' : ''}"></i>`).join('');
+        return `<button class="dv-mini ${k} ${bl.length ? '' : 'empty'}" data-ved="${esc(x.id)}" data-k="${k}" title="Editar el diseño de ${k === 'tablet' ? 'tablet' : 'celular'}">
+          <span class="scr">${bars || '<em>prearmado</em>'}</span><small><ha-icon icon="${k === 'tablet' ? 'mdi:tablet' : 'mdi:cellphone'}"></ha-icon>${k === 'tablet' ? 'Tablet' : 'Celular'}</small></button>`;
+      };
       const card = (x) => {
         const open = this._vopen.has(x.id), us = users(x.id), isDef = r.default === x.id;
+        const others = isDef ? people.filter((p) => !p.view && !stale(p)) : [];
         return `<article class="dv-card ${open ? 'open' : ''}">
           <div class="dv-top">
-            <button class="dv-hit" data-vtog="${esc(x.id)}" aria-expanded="${open}"><span class="dv-ic"><ha-icon icon="mdi:view-dashboard-outline"></ha-icon></span>
-              <span class="dv-t"><b>${esc(x.name)}</b>${isDef ? '<span class="dv-tag gen">general</span>' : ''}
-                <small>Diseño de celular ${state(x, 'phone')} · Diseño de tablet ${state(x, 'tablet')}</small>
-                <small class="dv-who">${us.length ? `Lo usa${us.length > 1 ? 'n' : ''}: ${us.map((p) => `<span class="dv-dev">${devIc(p)}${esc(p.name)}</span>`).join('')}` : isDef ? `Lo ven los equipos sin uno propio${people.filter((p) => !p.view && !stale(p)).length ? `: ${people.filter((p) => !p.view && !stale(p)).map((p) => `<span class="dv-dev">${devIc(p)}${esc(p.name)}</span>`).join('')}` : ''}` : '<span class="mut">Ningún equipo lo usa todavía</span>'}</small></span></button>
-            <button class="b pri" data-ved="${esc(x.id)}"><ha-icon icon="mdi:pencil-ruler"></ha-icon>Editar diseño</button>
-            <button class="dv-chev" data-vtog="${esc(x.id)}" aria-label="${open ? 'Achicar' : 'Opciones'}"><ha-icon icon="mdi:chevron-down"></ha-icon></button>
+            <div class="dv-minis">${mini(x, 'phone')}${mini(x, 'tablet')}</div>
+            <div class="dv-main">
+              <div class="dv-name"><b>${esc(x.name)}</b>
+                <button class="dv-star ${isDef ? 'on' : ''}" data-vstar="${esc(x.id)}" title="${isDef ? 'Es el dashboard por defecto (tocá para sacarlo)' : 'Usarlo por defecto: lo ven los equipos que no tienen uno elegido'}">${isDef ? '★ Por defecto' : '☆'}</button>
+                <span class="sp"></span>
+                <button class="dv-chev" data-vmenu="${esc(x.id)}" title="Más opciones" aria-label="Más opciones"><ha-icon icon="mdi:dots-vertical"></ha-icon></button>
+                <div class="dv-menu" data-menu="${esc(x.id)}" hidden>
+                  <button data-vtog="${esc(x.id)}"><ha-icon icon="mdi:form-textbox"></ha-icon>Nombre y equipos</button>
+                  <button data-vdup="${esc(x.id)}"><ha-icon icon="mdi:content-copy"></ha-icon>Duplicar</button>
+                  <button class="warn" data-vdel="${esc(x.id)}"><ha-icon icon="mdi:delete-outline"></ha-icon>Borrar</button>
+                </div></div>
+              <div class="dv-who">${us.map((p) => `<span class="dv-dev">${devIc(p)}${esc(p.name)}</span>`).join('')}${others.map((p) => `<span class="dv-dev dim" title="No tiene uno elegido: ve el por defecto">${devIc(p)}${esc(p.name)}</span>`).join('')}
+                ${!us.length && !others.length ? '<span class="mut">Nadie lo ve todavía</span>' : ''}<button class="dv-add" data-vtog="${esc(x.id)}"><ha-icon icon="mdi:plus"></ha-icon>equipo</button></div>
+              <div class="dv-btns"><button class="b pri" data-ved="${esc(x.id)}" data-k="phone"><ha-icon icon="mdi:cellphone"></ha-icon>Editar celular</button><button class="b" data-ved="${esc(x.id)}" data-k="tablet"><ha-icon icon="mdi:tablet"></ha-icon>Editar tablet</button></div>
+            </div>
           </div>
           ${open ? `<div class="dv-body">
             <label class="dv-f"><span>Nombre</span><input data-vname="${esc(x.id)}" value="${esc(x.name)}" maxlength="40"></label>
-            <div class="dv-f"><span>Equipos que lo usan</span>
+            <div class="dv-f"><span>Quién lo ve</span>
               ${people.length ? `<div class="dv-chips">${people.filter((p) => !stale(p)).map((p) => `<label class="dv-chip ${p.view === x.id ? 'on' : ''}"><input type="checkbox" data-vuse="${esc(p.user_id)}" data-v="${esc(x.id)}" ${p.view === x.id ? 'checked' : ''}>${devIc(p)}${esc(p.name)}${p.view && p.view !== x.id ? `<small>ahora: ${esc((views.find((y) => y.id === p.view) || {}).name || '—')}</small>` : ''}</label>`).join('')}</div>`
-                : '<p class="mut">Todavía no hay equipos vinculados (se vinculan desde «App del cliente»).</p>'}
+                : '<p class="mut">Todavía no hay equipos vinculados (se vinculan desde «Equipos»).</p>'}
               <p class="mut">Una persona con celular y tablet: marcá los dos. El celular usa el diseño de celular y la tablet el de tablet.</p></div>
-            <label class="dv-sw"><input type="checkbox" data-vdef="${esc(x.id)}" ${isDef ? 'checked' : ''}><span>Usarlo como dashboard general (lo ven los equipos que no tienen uno propio)</span></label>
-            <div class="dv-act"><button class="b" data-vdup="${esc(x.id)}"><ha-icon icon="mdi:content-copy"></ha-icon>Duplicar</button><span class="sp"></span><button class="b warn" data-vdel="${esc(x.id)}"><ha-icon icon="mdi:delete-outline"></ha-icon>Borrar</button></div>
+            <div class="dv-act"><span class="sp"></span><button class="b" data-vtog="${esc(x.id)}">Listo</button></div>
           </div>` : ''}
         </article>`;
       };
-      const main = this._page('views', `<style>
+      // into: la página Equipos muestra acá sólo «Qué ve cada equipo»; la de Dashboards, sólo los dashboards
+      const into = opts && opts.into, again = () => this._renderViews(opts);
+      const eqBox = into ? `        <div class="box dv-eq"><div class="bh"><h2>Qué ve cada equipo</h2></div>
+          ${people.map((p) => { const st = stale(p), dup = twinsOf(p).length > 0;
+            const linked = p.created ? `vinculado el ${new Date(p.created * 1000).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
+            return `<div class="dv-row ${st ? 'stale' : ''}"><span class="dv-ic">${devIc(p)}</span>
+            <span class="dv-t"><b>${esc(p.name)}</b>${st ? ' <span class="dv-tag warn">vínculo viejo (duplicado)</span>' : dup ? ' <span class="dv-tag on">el que se usa</span>' : ''}<small class="mut" style="display:block">${esc([kindOf(p) === 'tablet' ? 'Tablet' : 'Celular', p.model, linked, ago(p.last_used)].filter(Boolean).join(' · '))}</small>
+              ${st ? '' : `<small class="dv-shows">${shows(p)}</small>`}</span>
+            ${st ? `<button class="b warn" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" data-stale="1"><ha-icon icon="mdi:link-variant-off"></ha-icon>Quitar duplicado</button>`
+              : `<label class="dv-pick"><span>Dashboard</span><select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select></label>
+            <button class="dv-chev" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" title="Desvincular este equipo" aria-label="Desvincular"><ha-icon icon="mdi:link-variant-off"></ha-icon></button>`}</div>`; }).join('')}
+          ${people.some(stale) ? '<div class="dv-note warnn"><b>Hay equipos vinculados dos veces.</b> Pasa al volver a vincular el mismo celular o tablet (por ejemplo, al reinstalar la app). El marcado como «vínculo viejo» es el que no se usa hace más tiempo: «Quitar duplicado» lo borra y su dashboard pasa al que queda. Desde esta versión, si un equipo se vuelve a vincular, la casa reemplaza el vínculo viejo sola.</div>' : ''}
+          ${loose.map((d) => `<div class="dv-row"><span class="dv-ic"><ha-icon icon="mdi:cellphone-link"></ha-icon></span><span class="dv-t"><b>${esc(d.name)}</b><small class="mut" style="display:block">${esc(d.model || '')} · acceso compartido</small></span>
+            <select data-asg="${esc(d.device_id)}">${viewOpts(d.view)}</select></div>`).join('')}
+          ${people.length || loose.length ? '' : '<p class="mut">Todavía no hay equipos con la app.</p>'}
+          <div class="dv-note"><b>¿Cómo le doy un dashboard a una persona?</b> Cada celular o tablet aparece acá con su nombre apenas se vincula con su código (el QR de arriba, o desde la app: Opciones → Agregar otro celular). Elegí el dashboard al lado de cada uno de sus equipos, o marcalos dentro del dashboard. Si un celular no aparece, todavía no está vinculado con su propio código.</div>
+        </div>
+` : '';
+      const html = `<style>
         .dv{display:flex;flex-direction:column;gap:16px;max-width:1100px}
         .dv-new{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
         .dv input:not([type]),.dv select{padding:9px 12px;border-radius:10px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:var(--secondary-background-color,transparent);color:inherit;font:inherit;font-size:14px;min-width:0}
@@ -781,77 +917,109 @@
         .dv-who{display:flex!important;flex-wrap:wrap;align-items:center;gap:6px;white-space:normal!important}
         .dv-dev{display:inline-flex;align-items:center;gap:4px;padding:2px 9px 2px 6px;border-radius:999px;background:rgba(3,169,244,.1);color:var(--primary-color,#03a9f4);font-weight:600}
         .dv-dev ha-icon{--mdc-icon-size:15px}
+        .dv-top{align-items:stretch;gap:16px}
+        .dv-minis{display:flex;gap:8px;align-items:flex-end;flex:none}
+        .dv-mini{display:flex;flex-direction:column;align-items:center;gap:5px;background:none;border:0;padding:0;color:inherit;font:inherit;cursor:pointer}
+        .dv-mini .scr{display:flex;flex-wrap:wrap;align-content:flex-start;gap:3px;padding:6px 5px;box-sizing:border-box;border-radius:9px;border:2px solid var(--divider-color,rgba(127,127,127,.35));background:var(--secondary-background-color,rgba(127,127,127,.08));transition:border-color .15s,transform .15s;overflow:hidden}
+        .dv-mini.phone .scr{width:46px;height:82px}.dv-mini.tablet .scr{width:96px;height:68px}
+        .dv-mini i{display:block;width:100%;height:7px;border-radius:3px;background:rgba(3,169,244,.35)}.dv-mini i.t{height:16px;background:rgba(3,169,244,.55)}
+        .dv-mini.tablet i{width:calc(50% - 1.5px)}
+        .dv-mini em{margin:auto;font-size:9.5px;font-style:normal;opacity:.55;text-align:center;line-height:1.1}
+        .dv-mini.empty .scr{border-style:dashed}
+        .dv-mini small{display:flex;align-items:center;gap:3px;font-size:11px;opacity:.7}.dv-mini small ha-icon{--mdc-icon-size:13px}
+        .dv-mini:hover .scr{border-color:var(--primary-color,#03a9f4);transform:translateY(-2px)}
+        .dv-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:8px}
+        .dv-name{display:flex;align-items:center;gap:8px;position:relative}.dv-name b{font-size:16.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.dv-name .sp{flex:1}
+        .dv-star{border:0;background:none;color:inherit;font:inherit;font-size:13px;font-weight:600;padding:3px 8px;border-radius:999px;cursor:pointer;opacity:.55;white-space:nowrap}
+        .dv-star:hover{opacity:1;background:rgba(255,193,7,.12)}.dv-star.on{opacity:1;color:#e0a100;background:rgba(255,193,7,.15)}
+        .dv-card{overflow:visible}
+        .dv-menu{position:absolute;right:0;top:40px;z-index:4;min-width:200px;padding:6px;border-radius:12px;background:var(--card-background-color,#1c1c1e);border:1px solid var(--divider-color,rgba(127,127,127,.25));box-shadow:0 10px 30px rgba(0,0,0,.25);display:flex;flex-direction:column}
+        .dv-menu[hidden]{display:none}
+        .dv-menu button{display:flex;align-items:center;gap:10px;padding:9px 10px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;font-size:14px;cursor:pointer;text-align:left}
+        .dv-menu button:hover{background:rgba(127,127,127,.12)}.dv-menu button.warn{color:var(--error-color,#db4437)}.dv-menu ha-icon{--mdc-icon-size:19px;opacity:.8}
+        .dv-dev.dim{background:rgba(127,127,127,.12);color:inherit;font-weight:500;opacity:.8}
+        .dv-add{display:inline-flex;align-items:center;gap:2px;padding:2px 10px 2px 6px;border-radius:999px;border:1px dashed var(--divider-color,rgba(127,127,127,.45));background:none;color:inherit;font:inherit;font-size:12.5px;cursor:pointer;opacity:.75}
+        .dv-add:hover{opacity:1;border-color:var(--primary-color,#03a9f4);color:var(--primary-color,#03a9f4)}.dv-add ha-icon{--mdc-icon-size:15px}
+        .dv-btns{display:flex;gap:8px;flex-wrap:wrap;margin-top:auto}
+        .dv-card .dv-body{padding-left:16px}
+        .dv-steps{list-style:none;counter-reset:st;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:4px 0 14px;padding:0}
+        .dv-steps li{counter-increment:st;position:relative;padding:10px 12px 10px 44px;border-radius:12px;background:rgba(127,127,127,.08);font-size:13.5px}
+        .dv-steps li::before{content:counter(st);position:absolute;left:12px;top:10px;width:22px;height:22px;border-radius:50%;display:grid;place-items:center;background:var(--primary-color,#03a9f4);color:#fff;font-size:12px;font-weight:700}
+        .dv-steps small{display:block;opacity:.7;font-size:12.5px;margin-top:2px}
+        @media (max-width:800px){.dv-steps{grid-template-columns:1fr}.dv-top{flex-direction:column}}
         .dv-shows{display:block;margin-top:4px;font-size:13px;opacity:.95}
         .dv-pick{display:flex;flex-direction:column;gap:3px;font-size:11.5px;font-weight:600;opacity:.95}.dv-pick span{opacity:.7}
         .dv-row{align-items:flex-start}.dv-row .dv-pick,.dv-row .dv-chev{margin-top:4px}
       </style>
-      <div class="dv">
+      <div class="dv">${into ? '' : `
         <div class="box"><div class="bh"><h2>Dashboards de esta casa</h2></div>
-          <p class="mut" style="margin-top:0">Uno por persona, con su diseño para el celular y para la tablet. Lo que guardes les llega a sus equipos al instante, sin actualizar la app.</p>
+          <ol class="dv-steps"><li><b>Creá un dashboard</b><small>Uno por persona o uno para toda la familia.</small></li><li><b>Diseñalo</b><small>«Editar celular» y «Editar tablet»: cada equipo usa el suyo.</small></li><li><b>Elegí quién lo ve</b><small>Con «+ equipo», o desde Equipos. Lo toman al instante.</small></li></ol>
           <form class="dv-new" id="vnewf"><input id="vnewn" placeholder="Nombre del dashboard (por ejemplo, «Gianfranco»)" maxlength="40" autocomplete="off"><button class="b pri" type="submit"><ha-icon icon="mdi:plus"></ha-icon>Crear y diseñar</button></form>
         </div>
         <div class="dv-list">
           ${views.map(card).join('')}
-          <div class="dv-auto"><span class="dv-ic"><ha-icon icon="mdi:auto-fix"></ha-icon></span><span class="dv-t"><b>Inicio automático</b><small class="mut" style="display:block">${r.default ? 'No se usa: hay un dashboard general.' : 'Lo ven los equipos sin dashboard. Se arma solo con los ambientes, escenas y cámaras de la casa.'}</small></span>
+          <div class="dv-auto"><span class="dv-ic"><ha-icon icon="mdi:auto-fix"></ha-icon></span><span class="dv-t"><b>Inicio automático</b><small class="mut" style="display:block">${r.default ? 'No se usa: hay un dashboard por defecto (★).' : 'Lo ven los equipos que no tienen dashboard, porque no hay uno por defecto (★). Se arma solo con los ambientes, escenas y cámaras de la casa.'}</small></span>
             ${r.default ? '' : '<button class="b" id="vauto"><ha-icon icon="mdi:pencil-ruler"></ha-icon>Personalizarlo</button>'}</div>
         </div>
-        <div class="box dv-eq"><div class="bh"><h2>Qué ve cada equipo</h2></div>
-          ${people.map((p) => { const st = stale(p), dup = twinsOf(p).length > 0;
-            const linked = p.created ? `vinculado el ${new Date(p.created * 1000).toLocaleDateString('es-AR', { day: 'numeric', month: 'short', year: 'numeric' })}` : '';
-            return `<div class="dv-row ${st ? 'stale' : ''}"><span class="dv-ic">${devIc(p)}</span>
-            <span class="dv-t"><b>${esc(p.name)}</b>${st ? ' <span class="dv-tag warn">vínculo viejo (duplicado)</span>' : dup ? ' <span class="dv-tag on">el que se usa</span>' : ''}<small class="mut" style="display:block">${esc([kindOf(p) === 'tablet' ? 'Tablet' : 'Celular', p.model, linked, ago(p.last_used)].filter(Boolean).join(' · '))}</small>
-              ${st ? '' : `<small class="dv-shows">${shows(p)}</small>`}</span>
-            ${st ? `<button class="b warn" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" data-stale="1"><ha-icon icon="mdi:link-variant-off"></ha-icon>Quitar duplicado</button>`
-              : `<label class="dv-pick"><span>Dashboard</span><select data-asgu="${esc(p.user_id)}">${viewOpts(p.view)}</select></label>
-            <button class="dv-chev" data-unlink="${esc(p.user_id)}" data-n="${esc(p.name)}" title="Desvincular este equipo" aria-label="Desvincular"><ha-icon icon="mdi:link-variant-off"></ha-icon></button>`}</div>`; }).join('')}
-          ${people.some(stale) ? '<div class="dv-note warnn"><b>Hay equipos vinculados dos veces.</b> Pasa al volver a vincular el mismo celular o tablet (por ejemplo, al reinstalar la app). El marcado como «vínculo viejo» es el que no se usa hace más tiempo: «Quitar duplicado» lo borra y su dashboard pasa al que queda. Desde esta versión, si un equipo se vuelve a vincular, la casa reemplaza el vínculo viejo sola.</div>' : ''}
-          ${loose.map((d) => `<div class="dv-row"><span class="dv-ic"><ha-icon icon="mdi:cellphone-link"></ha-icon></span><span class="dv-t"><b>${esc(d.name)}</b><small class="mut" style="display:block">${esc(d.model || '')} · acceso compartido</small></span>
-            <select data-asg="${esc(d.device_id)}">${viewOpts(d.view)}</select></div>`).join('')}
-          ${people.length || loose.length ? '' : '<p class="mut">Todavía no hay equipos con la app.</p>'}
-          <div class="dv-note"><b>¿Cómo le doy un dashboard a una persona?</b> Cada celular o tablet aparece acá con su nombre apenas se vincula con su código (sección «App del cliente», o desde la app: Opciones → Agregar otro celular). Elegí el dashboard al lado de cada uno de sus equipos, o marcalos dentro del dashboard. Si un celular no aparece, todavía no está vinculado con su propio código.</div>
-        </div>
-      </div>`);
+        <div class="dv-note"><b>¿Quién ve cada dashboard?</b> Se elige en <button class="lnk" data-go="app">Equipos</button>, al lado de cada celular o tablet (o marcándolos adentro de cada dashboard).</div>`}
+${eqBox}
+      </div>`;
+      // en la página Equipos van sólo el estilo y el cuadro de equipos
+      const main = into ? ((into.innerHTML = html), into) : this._page('views', html);
       if (!main) return;
       const $ = (id) => main.querySelector(`#${id}`);
       const call = async (msg, ok) => { try { const res = await this._hass.callWS(msg); if (ok) this._toast(ok); return res; } catch (e) { this._toast(`No se pudo: ${e.message || e}`); return null; } };
-      const edit = async (id) => {
-        try { await loadScript(`${BASE}/matterai-editor.js?t=${Date.now()}`); await window.MaeEditor.open(this, id); } catch (e) { this._toast(`No se pudo abrir el editor: ${e.message || e}`); }
+      const edit = async (id, kind) => {
+        try { await loadScript(`${BASE}/matterai-editor.js?t=${Date.now()}`); await window.MaeEditor.open(this, id, kind); } catch (e) { this._toast(`No se pudo abrir el editor: ${e.message || e}`); }
       };
       const full = (x, patch) => Object.assign({}, x, patch); // el servidor descarta lo que no es del dashboard (updated, by)
-      $('vnewf').onsubmit = async (e) => {
+      if ($('vnewf')) $('vnewf').onsubmit = async (e) => {
         e.preventDefault();
         const name = $('vnewn').value.trim(); if (!name) { $('vnewn').focus(); return; }
         const nv = await call({ type: 'matterai/views/save', view: { name, kind: 'phone', pinned: [] } }, 'Dashboard creado');
-        if (nv) { this._vopen.add(nv.id); saveOpen(); await this._renderViews(); edit(nv.id); }
+        if (nv) { this._vopen.add(nv.id); saveOpen(); await again(); edit(nv.id); }
       };
       if ($('vauto')) $('vauto').onclick = async () => {
         const nv = await call({ type: 'matterai/views/save', view: { name: 'General', kind: 'phone', pinned: [] } });
         if (!nv) return;
         await call({ type: 'matterai/views/default', view_id: nv.id }, 'Listo: «General» es el dashboard de los equipos sin uno propio');
-        await this._renderViews(); edit(nv.id);
+        await again(); edit(nv.id);
       };
-      main.querySelectorAll('[data-vtog]').forEach((b) => { b.onclick = () => { const id = b.dataset.vtog; if (this._vopen.has(id)) this._vopen.delete(id); else this._vopen.add(id); saveOpen(); this._renderViews(); }; });
-      main.querySelectorAll('[data-ved]').forEach((b) => { b.onclick = () => edit(b.dataset.ved); });
+      main.querySelectorAll('[data-vtog]').forEach((b) => { b.onclick = () => { const id = b.dataset.vtog; if (this._vopen.has(id)) this._vopen.delete(id); else this._vopen.add(id); saveOpen(); again(); }; });
+      main.querySelectorAll('[data-ved]').forEach((b) => { b.onclick = () => edit(b.dataset.ved, b.dataset.k); });
+      main.querySelectorAll('[data-vstar]').forEach((b) => { b.onclick = async () => {
+        const on = r.default === b.dataset.vstar;
+        await call({ type: 'matterai/views/default', view_id: on ? null : b.dataset.vstar }, on ? 'Ya no hay dashboard por defecto: los equipos sin uno ven el inicio automático' : 'Listo: es el dashboard por defecto');
+        again();
+      }; });
+      // menú ⋮ de cada dashboard (se cierra al tocar afuera)
+      const closeMenus = () => main.querySelectorAll('.dv-menu').forEach((m) => { m.hidden = true; });
+      main.querySelectorAll('[data-vmenu]').forEach((b) => { b.onclick = (e) => {
+        e.stopPropagation();
+        const m = [...main.querySelectorAll('.dv-menu')].find((y) => y.dataset.menu === b.dataset.vmenu), was = m && !m.hidden;
+        closeMenus(); if (m && !was) m.hidden = false;
+      }; });
+      if (!into && !main._dvMenus) { main._dvMenus = true; main.addEventListener('click', (e) => { if (!e.target.closest('.dv-menu')) main.querySelectorAll('.dv-menu').forEach((m) => { m.hidden = true; }); }); }
       main.querySelectorAll('[data-vname]').forEach((inp) => { inp.onchange = async () => {
         const x = views.find((y) => y.id === inp.dataset.vname), name = inp.value.trim(); if (!x || !name || name === x.name) return;
-        if (await call({ type: 'matterai/views/save', view: full(x, { name }) }, 'Nombre cambiado')) this._renderViews();
+        if (await call({ type: 'matterai/views/save', view: full(x, { name }) }, 'Nombre cambiado')) again();
       }; });
       main.querySelectorAll('[data-vuse]').forEach((c) => { c.onchange = async () => {
         await call({ type: 'matterai/views/assign_user', user_id: c.dataset.vuse, view_id: c.checked ? c.dataset.v : null }, c.checked ? 'Asignado: el equipo lo toma al instante' : 'Sacado: ese equipo vuelve al general');
-        this._renderViews();
+        again();
       }; });
-      main.querySelectorAll('[data-vdef]').forEach((c) => { c.onchange = async () => { await call({ type: 'matterai/views/default', view_id: c.checked ? c.dataset.vdef : null }, 'Guardado'); this._renderViews(); }; });
+      main.querySelectorAll('[data-vdef]').forEach((c) => { c.onchange = async () => { await call({ type: 'matterai/views/default', view_id: c.checked ? c.dataset.vdef : null }, 'Guardado'); again(); }; });
       main.querySelectorAll('[data-vdup]').forEach((b) => { b.onclick = async () => {
         const x = views.find((y) => y.id === b.dataset.vdup); if (!x) return;
         const nv = await call({ type: 'matterai/views/save', view: full(x, { id: undefined, name: `${x.name} (copia)`.slice(0, 40) }) }, 'Duplicado');
-        if (nv) { this._vopen.add(nv.id); saveOpen(); this._renderViews(); }
+        if (nv) { this._vopen.add(nv.id); saveOpen(); again(); }
       }; });
       main.querySelectorAll('[data-vdel]').forEach((b) => { b.onclick = async () => {
         const x = views.find((y) => y.id === b.dataset.vdel); if (!x) return;
         if (!confirm(`¿Borrar «${x.name}»? Sus equipos pasan al dashboard general.`)) return;
-        if (await call({ type: 'matterai/views/delete', view_id: x.id }, 'Dashboard borrado')) { this._vopen.delete(x.id); saveOpen(); this._renderViews(); }
+        if (await call({ type: 'matterai/views/delete', view_id: x.id }, 'Dashboard borrado')) { this._vopen.delete(x.id); saveOpen(); again(); }
       }; });
-      main.querySelectorAll('[data-asgu]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign_user', user_id: sel.dataset.asgu, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
+      main.querySelectorAll('[data-asgu]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign_user', user_id: sel.dataset.asgu, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); again(); }; });
       main.querySelectorAll('[data-unlink]').forEach((b) => { b.onclick = async () => {
         const p = people.find((q) => q.user_id === b.dataset.unlink); if (!p) return;
         if (b.dataset.stale) {
@@ -859,13 +1027,13 @@
           // su dashboard pasa al vínculo que queda (si ese no tiene uno)
           const keep = twinsOf(p).sort((a, c) => fresh(c) - fresh(a))[0];
           if (keep && p.view && !keep.view) await call({ type: 'matterai/views/assign_user', user_id: keep.user_id, view_id: p.view });
-          if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Duplicado quitado')) this._renderViews();
+          if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Duplicado quitado')) again();
           return;
         }
         if (!confirm(`¿Desvincular «${p.name}»? Ese equipo deja de entrar a la casa (se vuelve a vincular con un código nuevo).`)) return;
-        if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Equipo desvinculado')) this._renderViews();
+        if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Equipo desvinculado')) again();
       }; });
-      main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); this._renderViews(); }; });
+      main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); again(); }; });
     }
 
     /* ---------- Seguridad: registro de auditoría y acceso del instalador ---------- */

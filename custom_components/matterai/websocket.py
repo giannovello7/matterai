@@ -74,7 +74,13 @@ async def ws_config_save(hass: HomeAssistant, connection: websocket_api.ActiveCo
     connection.send_result(msg["id"], {"ok": True})
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/pairing", vol.Optional("regenerate", default=False): bool})
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/pairing",
+    vol.Optional("regenerate", default=False): bool,
+    # invitado: el acceso vence solo (de 1 hora a 90 días) y entra con ese perfil
+    vol.Optional("guest_hours"): vol.All(vol.Coerce(int), vol.Range(min=1, max=24 * 90)),
+    vol.Optional("profile"): vol.In(["full", "kids", "basic"]),
+})
 @websocket_api.require_admin
 @websocket_api.async_response
 async def ws_pairing(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
@@ -82,7 +88,7 @@ async def ws_pairing(hass: HomeAssistant, connection: websocket_api.ActiveConnec
     from .pairing import async_pairing_link  # noqa: PLC0415
 
     try:
-        connection.send_result(msg["id"], await async_pairing_link(hass))
+        connection.send_result(msg["id"], await async_pairing_link(hass, guest_hours=msg.get("guest_hours"), profile=msg.get("profile")))
     except ValueError as err:
         connection.send_error(msg["id"], "no_url", str(err))
 
