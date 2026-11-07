@@ -15,6 +15,7 @@ from .watchdog_entities import async_setup_watchdog_platform
 
 
 class RuleSwitch(RuleEntity, SwitchEntity):
+    role = "routine"
     @property
     def is_on(self) -> bool:
         return bool(self.rule.get("enabled", True))
@@ -30,6 +31,7 @@ class SceneVoiceSwitch(RuleEntity, SwitchEntity):
     """Pulsador para Alexa / Google (Matter): al prenderlo ejecuta la escena y vuelve a apagarse."""
 
     suffix = "_voz"
+    role = "voice"
     _pulse = False
 
     @property
@@ -57,6 +59,7 @@ class CineSwitch(RuleEntity, SwitchEntity):
     """«Modo cine» de la Tele inteligente: prendido = modo cine activo."""
 
     suffix = "_cine"
+    role = "cine"
     _attr_icon = "mdi:movie-open"
 
     def _ctl(self):

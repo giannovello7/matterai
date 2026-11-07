@@ -22,7 +22,7 @@
 
   const ACTION_TYPES = [['none', 'Nada'], ['toggle', 'Prender / apagar / abrir'], ['more_info', 'Ver más (ventana del equipo)'], ['room', 'Abrir un ambiente'], ['screen', 'Abrir una pantalla'], ['service', 'Llamar a un servicio']];
   const KPI_KINDS = [['alarm', 'Alarma'], ['lights', 'Luces prendidas'], ['temp', 'Temperatura adentro'], ['acs', 'Aires'], ['curtains', 'Cortinas'], ['power', 'Consumo'], ['people', 'Quién está'], ['entity', 'Un equipo (portón, sensor…)']];
-  const DOM_NAME = { light: 'Luz', switch: 'Interruptor', cover: 'Cortina / portón', lock: 'Cerradura', camera: 'Cámara', climate: 'Aire', fan: 'Ventilador', media_player: 'Parlante / TV',
+  const DOM_NAME = { mae_scene: 'Escena MatterAI', mae_routine: 'Automatización MatterAI', light: 'Luz', switch: 'Interruptor', cover: 'Cortina / portón', lock: 'Cerradura', camera: 'Cámara', climate: 'Aire', fan: 'Ventilador', media_player: 'Parlante / TV',
     sensor: 'Sensor', binary_sensor: 'Sensor', scene: 'Escena', script: 'Script', automation: 'Automatización', input_boolean: 'Interruptor virtual', button: 'Botón', input_button: 'Botón',
     alarm_control_panel: 'Alarma', vacuum: 'Aspiradora', water_heater: 'Termotanque', person: 'Persona', weather: 'Clima', number: 'Número', select: 'Opción', siren: 'Sirena', valve: 'Válvula', humidifier: 'Humidificador' };
   // lo que puede ir adentro de un ambiente (como en la tarjeta)
@@ -654,8 +654,13 @@
     ent(label, key, val, domains, path) {
       return `<div class="fld"><span>${esc(label)}</span>${this.cbBtn(val, `data-cb="${esc(path || key)}" data-dom="${esc((domains || []).join(','))}"`)}</div>`;
     }
+    /** El tipo de un equipo para elegirlo: las escenas y automatizaciones de MatterAI son botones e interruptores con su marca. */
+    domOf(id) {
+      const role = ((this.states()[id] || {}).attributes || {}).matterai_role;
+      return role === 'scene' ? 'mae_scene' : role === 'routine' ? 'mae_routine' : String(id).split('.')[0];
+    }
     cbBtn(val, attrs) {
-      const d = val ? val.split('.')[0] : '';
+      const d = val ? this.domOf(val) : '';
       return `<button type="button" class="cbv" ${attrs}>${val ? `<span class="dtag">${esc(DOM_NAME[d] || d)}</span><b>${esc(this.fname(val))}</b><small>${esc(this.areaOf(val))}</small>` : '<span class="ph">Elegir un equipo…</span>'}<span class="hint">▾</span></button>`;
     }
     areaOf(id) {
@@ -671,8 +676,8 @@
     openCB(anchor, domains, onPick, allowNone = true) {
       this.closeCB();
       const S = this.states(), doms = domains && domains.length ? domains : null;
-      const all = Object.keys(S).filter((e) => !doms || doms.includes(e.split('.')[0])).map((e) => {
-        const d = e.split('.')[0], n = this.fname(e), a = this.areaOf(e);
+      const all = Object.keys(S).filter((e) => !doms || doms.includes(this.domOf(e))).map((e) => {
+        const d = this.domOf(e), n = this.fname(e), a = this.areaOf(e);
         return { e, d, n, a, k: `${n} ${a} ${DOM_NAME[d] || ''} ${e}`.toLowerCase() };
       });
       const box = document.createElement('div');
@@ -975,8 +980,8 @@
       switch (b.type) {
         case 'kpis': f = this.itemFields(b, i, { kpi: true }); break;
         case 'buttons': case 'camera': f = this.itemFields(b, i, { hold: true }); break;
-        case 'scenes': f = this.itemFields(b, i, { doms: ['scene', 'script'], tap: false }); break;
-        case 'routines': f = this.itemFields(b, i, { doms: ['automation', 'script'], tap: false, icon: false, mode: true }); break;
+        case 'scenes': f = this.itemFields(b, i, { doms: ['mae_scene', 'scene', 'script'], tap: false }); break;
+        case 'routines': f = this.itemFields(b, i, { doms: ['mae_routine', 'automation', 'script'], tap: false, icon: false, mode: true }); break;
         case 'covers': f = this.itemFields(b, i, { doms: ['cover'], tap: false, icon: false }); break;
         case 'lights': f = this.itemFields(b, i, { doms: ['light', 'switch'], tap: false, icon: false }); break;
         default: f = '';
@@ -1284,8 +1289,9 @@
         const shown = this.vista && this.vista._test && this.vista._test.X.kpiItems && this.vista._test.X.kpiItems[b.id];
         c.items = clone(shown && shown.length ? shown : [{ kind: 'lights' }, { kind: 'temp' }, { kind: 'alarm' }]);
       }
-      if (b.type === 'scenes' && !(c.entities && c.entities.length)) c.entities = ((m && m.scenes) || []).filter((id) => S[id]).slice(0, 12);
-      if (b.type === 'routines' && !(c.entities && c.entities.length)) c.entities = Object.keys(S).filter((x) => x.startsWith('automation.')).slice(0, 4);
+      const mae = (role) => Object.keys(S).filter((x) => ((S[x] || {}).attributes || {}).matterai_role === role);
+      if (b.type === 'scenes' && !(c.entities && c.entities.length)) c.entities = [...mae('scene'), ...((m && m.scenes) || [])].filter((id) => S[id]).slice(0, 12);
+      if (b.type === 'routines' && !(c.entities && c.entities.length)) c.entities = [...mae('routine'), ...Object.keys(S).filter((x) => x.startsWith('automation.'))].slice(0, 4);
     }
     move(id, d) {
       const B = this.blocks(), i = B.findIndex((b) => b.id === id), col = B[i].col || 0;

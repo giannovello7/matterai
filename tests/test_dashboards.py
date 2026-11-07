@@ -416,3 +416,21 @@ async def test_style_and_background_reach_the_device(hass, hass_ws_client, hass_
                              {"bg": {"kind": "image", "image": "https://malo.example/x.jpg"}}, {"bg": {"kind": "image", "image": "/api/matterai/media/0123456789abcdef.jpg", "dim": 3}}]):
         await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE, **bad}}}})
         assert not (await ws.receive_json())["success"], bad
+
+
+async def test_matterai_rules_say_what_they_are(hass) -> None:
+    """Las escenas y automatizaciones de MatterAI llevan «matterai_role»: con eso la app las pone en Escenas y Rutinas."""
+    from homeassistant.helpers.dispatcher import async_dispatcher_send
+
+    from custom_components.matterai.escenas.const import SIGNAL_CHANGED
+
+    await _setup(hass)
+    manager = hass.data.get("matterai_escenas")
+    manager.rules["sc1"] = {"id": "sc1", "kind": "scene", "name": "Cena", "enabled": True, "ui": {"voice": True}}
+    manager.rules["au1"] = {"id": "au1", "kind": "watch", "name": "Aviso del portón", "enabled": True}
+    async_dispatcher_send(hass, SIGNAL_CHANGED)
+    await hass.async_block_till_done()
+    roles = {s.attributes.get("rule_id") + ":" + s.domain: s.attributes.get("matterai_role") for s in hass.states.async_all() if s.attributes.get("rule_id")}
+    assert roles.get("sc1:button") == "scene"
+    assert roles.get("sc1:switch") == "voice", "el pulsador de voz no es una rutina"
+    assert roles.get("au1:switch") == "routine"

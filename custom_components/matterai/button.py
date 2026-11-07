@@ -12,6 +12,7 @@ from .watchdog_entities import async_setup_watchdog_platform
 
 
 class RuleButton(RuleEntity, ButtonEntity):
+    role = "scene"
     async def async_press(self) -> None:
         await self.manager.async_run(self.rule_id)
 
