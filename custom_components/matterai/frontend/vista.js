@@ -398,7 +398,9 @@
           return `${t}<div class="v-kpis n${Math.min(items.length, K === 'tablet' ? 6 : 3)}">${items.map((it, i) => kpi(m, it, i)).join('')}</div>${elAdd('Agregar un dato')}`;
         }
         case 'featured': case 'camera': case 'frigate': {
-          const list = [c.entity].concat(c.entities || [], m.cams || []).filter((id, i, a) => id && st(id) && a.indexOf(id) === i);
+          // las cámaras elegidas en el editor (sólo esas); si no se eligió ninguna, todas las de la casa
+          const picked = Array.isArray(c.entities) && c.entities.length;
+          const list = [c.entity].concat(picked ? c.entities : (m.cams || [])).filter((id, i, a) => id && st(id) && a.indexOf(id) === i);
           X.camIdx = X.camIdx || {}; const ci = (X.camIdx[b.id] || 0) % Math.max(list.length, 1); X.camList = X.camList || {}; X.camList[b.id] = list;
           const cam = list[ci] || null, gate = c.gate && st(c.gate) ? c.gate : null;
           const g = gate ? gateState(gate) : null;
@@ -410,7 +412,8 @@
           const photo = !cam ? '<div class="v-feed none"></div>' : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
           const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}">${photo}</div>` : photo;
-          const badge = !cam ? '' : video ? (live ? '' : '<span class="v-live"><i></i>EN VIVO</span>') : '<span class="v-live photo">FOTO · cada 10 s</span>';
+          // en video no va ningún cartel encima (como el visor de Frigate original); en modo foto se avisa que es foto
+          const badge = !cam || video ? '' : '<span class="v-live photo">FOTO · cada 10 s</span>';
           const gateBtn = g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : '';
           if (video) {
             // en video, nada encima de la imagen (como la tarjeta de Frigate original): el visor trae sus flechas y su menú.
