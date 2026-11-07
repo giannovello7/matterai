@@ -171,6 +171,8 @@ def resolve(view: dict[str, Any] | None, kind: str | None) -> dict[str, Any] | N
     out["header"] = (lay or {}).get("header") or None  # qué se ve arriba (hora, clima, avisos, menú)
     out["dock"] = (lay or {}).get("dock") or None      # botones de la barra de abajo, en orden
     out["theme"] = (lay or {}).get("theme") or None    # oscuro, claro o automático (según el equipo)
+    out["style"] = (lay or {}).get("style") or None    # estilo prearmado (MatterAI, tipo Apple, cristal)
+    out["bg"] = (lay or {}).get("bg") or None          # fondo propio (color, degradé o imagen de la casa)
     return out
 
 

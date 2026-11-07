@@ -164,6 +164,19 @@ HEADER = vol.Schema({
 }, extra=vol.REMOVE_EXTRA)
 
 
+# estilos prearmados y degradés de fondo (las mismas claves que app/vista.js)
+STYLES = ("matterai", "apple", "cristal")
+GRADIENTS = ("aurora", "atardecer", "oceano", "bosque", "noche", "arena", "nube")
+
+BG = vol.Schema({
+    vol.Required("kind"): vol.In(["none", "color", "gradient", "image"]),
+    vol.Optional("color"): vol.Any(None, vol.Match(r"^#[0-9a-fA-F]{6}$")),
+    vol.Optional("gradient"): vol.Any(None, vol.In(GRADIENTS)),
+    vol.Optional("image"): vol.Any(None, _media),
+    vol.Optional("dim"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=0.8))),  # cuánto se oscurece la imagen
+}, extra=vol.REMOVE_EXTRA)
+
+
 def layout_schema(max_blocks: int) -> vol.Schema:
     """Un diseño (el del celular o el de la tablet) de un dashboard."""
     return vol.Schema({
@@ -172,6 +185,8 @@ def layout_schema(max_blocks: int) -> vol.Schema:
         vol.Optional("header"): vol.Any(None, HEADER),                                       # desde la 2.20
         vol.Optional("dock"): vol.Any(None, vol.All([vol.In(DOCK_KEYS)], vol.Length(max=10))),
         vol.Optional("theme"): vol.Any(None, vol.In(["dark", "light", "auto"])),          # desde la 2.21: oscuro, claro o según el equipo
+        vol.Optional("style"): vol.Any(None, vol.In(STYLES)),                             # desde la 2.23: estilo prearmado
+        vol.Optional("bg"): vol.Any(None, BG),                                            # desde la 2.23: fondo propio
     }, extra=vol.REMOVE_EXTRA)
 
 

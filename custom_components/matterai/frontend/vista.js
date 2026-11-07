@@ -134,6 +134,24 @@
   }
 
   /* ───────── una instancia por pantalla ───────── */
+  /* estilos prearmados del diseño y degradés de fondo (el editor los ofrece; el servidor valida las mismas claves) */
+  const STYLE_LIST = [
+    ['matterai', 'MatterAI', 'Grafito y acento cálido, letra Red Hat'],
+    ['apple', 'Tipo Apple', 'Tarjetas redondeadas sin bordes, letra del sistema, títulos grandes'],
+    ['cristal', 'Cristal', 'Burbujas translúcidas sobre un fondo de color'],
+  ];
+  const STYLES = STYLE_LIST.map((x) => x[0]);
+  const GRAD_LIST = [
+    ['aurora', 'Aurora', 'radial-gradient(90% 70% at 15% 10%,#2b5876 0,transparent 60%),radial-gradient(80% 70% at 90% 30%,#4e4376 0,transparent 60%),radial-gradient(90% 80% at 50% 100%,#1d6b5f 0,transparent 60%),#0f1419'],
+    ['atardecer', 'Atardecer', 'linear-gradient(160deg,#3a1c4a 0%,#9c3d54 45%,#e2703a 80%,#eeb86d 100%)'],
+    ['oceano', 'Océano', 'linear-gradient(170deg,#0b1a33 0%,#123f6b 50%,#1f7a8c 100%)'],
+    ['bosque', 'Bosque', 'linear-gradient(165deg,#0f2017 0%,#1f4d36 55%,#5b8c5a 100%)'],
+    ['noche', 'Noche', 'radial-gradient(120% 80% at 50% 0%,#232b3b 0,#0b0e14 70%)'],
+    ['arena', 'Arena (claro)', 'linear-gradient(170deg,#f6efe6 0%,#ead9c4 60%,#d9c2a5 100%)'],
+    ['nube', 'Nube (claro)', 'linear-gradient(170deg,#eef3fa 0%,#dbe6f4 55%,#c9d8ee 100%)'],
+  ];
+  const GRADS = Object.fromEntries(GRAD_LIST.map((g) => [g[0], g[2]]));
+
   function create(el, ctx) {
     const X = { el, ctx, view: null, layout: null, sheet: null, menuFor: null, hidePlayer: false, cache: {}, signed: {}, held: false, camT: null, hist: {}, simOver: null, shown: {}, curB: null, live: {}, colSig: {}, partCache: {},
       dismissed: new Set(load('matterai.vista.dismissed', [])) };
@@ -174,14 +192,28 @@
       return c ? c.url : '';
     }
 
+    /** El fondo del diseño en CSS: un color, un degradé prearmado o una imagen de la casa (oscurecida para que se lea). */
+    function bgCSS(bg, light) {
+      if (!bg || !bg.kind || bg.kind === 'none') return '';
+      if (bg.kind === 'color' && /^#[0-9a-f]{6}$/i.test(bg.color || '')) return bg.color;
+      if (bg.kind === 'gradient' && GRADS[bg.gradient]) return GRADS[bg.gradient];
+      if (bg.kind === 'image' && bg.image) {
+        const u = img(bg.image); if (!u) return '';
+        const d = Math.max(0, Math.min(0.8, Number(bg.dim == null ? 0.35 : bg.dim)));
+        const tint = light ? `rgba(255,255,255,${d})` : `rgba(8,10,14,${d})`;
+        return `linear-gradient(${tint},${tint}),url("${String(u).replace(/["\\\n]/g, '')}") center/cover no-repeat`;
+      }
+      return '';
+    }
+
     /* layout: lo del editor, o el prearmado */
     function layout(m) {
       const v = X.view || {};
-      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null };
+      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null, style: v.style || null, bg: v.bg || null };
       const cfg = card() && card()._config;
       const d = defaults(kind(), m, v, (hass() || {}).states, cfg && cfg.floorplan);
       if (v.plan) d.plan = v.plan;
-      d.header = v.header || null; d.dock = v.dock || null; d.theme = v.theme || null;
+      d.header = v.header || null; d.dock = v.dock || null; d.theme = v.theme || null; d.style = v.style || null; d.bg = v.bg || null;
       return d;
     }
     const roomByName = (m, n) => m.rooms.find((r) => r.name.toLowerCase() === String(n).toLowerCase() || String(r.id).toLowerCase() === String(n).toLowerCase());
@@ -756,10 +788,13 @@
       const th = mine || L.theme || 'dark';
       const light = th === 'light' || (th === 'auto' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
       if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList) document.documentElement.classList.toggle('mae-light', light);
-      const sig = `${K}|${vertical}|${editing()}|${light}`;
+      // estilo prearmado (MatterAI, tipo Apple, cristal) y fondo propio del diseño
+      const st = STYLES.includes(L.style) ? L.style : 'matterai', bgx = bgCSS(L.bg, light);
+      const sig = `${K}|${vertical}|${editing()}|${light}|${st}|${bgx ? 1 : 0}`;
+      if (X.el.style && X.el.style.setProperty) { if (bgx) X.el.style.setProperty('--v-bgx', bgx); else X.el.style.removeProperty('--v-bgx'); }
       if (X.shell !== sig) {
         X.shell = sig; X.cache = {}; X.colSig = {}; X.partCache = {};
-        X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}${light ? ' light' : ''}`;
+        X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}${light ? ' light' : ''} st-${st}${bgx ? ' has-bg' : ''}`;
         X.el.innerHTML = K === 'tablet'
           ? `<div class="v-tab"><div class="v-c0" id="v-c0"></div><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top"></div><div class="v-cols"><div class="v-c1" id="v-c1"></div><div class="v-c2" id="v-c2"></div></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>${shared()}`
           : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`;
@@ -1207,5 +1242,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid };
+  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
 })(typeof window !== 'undefined' ? window : globalThis);

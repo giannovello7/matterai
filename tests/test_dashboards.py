@@ -391,3 +391,28 @@ async def test_header_and_dock_reach_the_device(hass, hass_ws_client, hass_clien
     # NEGATIVO: botón de barra desconocido
     await ws.send_json({"id": 4, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE, "dock": ["hackear"]}}}})
     assert not (await ws.receive_json())["success"]
+
+
+async def test_style_and_background_reach_the_device(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """Estilo prearmado y fondo: viajan al equipo, también en un diseño prearmado (sin tarjetas propias)."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    gian = await _phone(hass, hass_ws_client, client, "Celu Gianfranco", "dev-g")
+    lays = {"phone": {"blocks": None, "style": "cristal", "bg": {"kind": "gradient", "gradient": "aurora"}},
+            "tablet": {"blocks": PHONE, "style": "apple", "bg": {"kind": "image", "image": "/api/matterai/media/0123456789abcdef.jpg", "dim": 0.4}}}
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "G", "layouts": lays}})
+    res = await ws.receive_json()
+    assert res["success"], res
+    v = res["result"]
+    await ws.send_json({"id": 2, "type": "matterai/views/assign_user", "user_id": gian["user_id"], "view_id": v["id"]})
+    await ws.receive_json()
+    got = (await _ws(hass_ws_client, hass, gian["token"], 3, {"type": "matterai/app/view", "device_id": "dev-g", "kind": "phone"}))["result"]["view"]
+    assert got["style"] == "cristal" and got["bg"]["gradient"] == "aurora" and not got["blocks"]
+    got = (await _ws(hass_ws_client, hass, gian["token"], 4, {"type": "matterai/app/view", "device_id": "dev-g", "kind": "tablet"}))["result"]["view"]
+    assert got["style"] == "apple" and got["bg"]["image"] == "/api/matterai/media/0123456789abcdef.jpg"
+    # NEGATIVO: estilos, colores, degradés e imágenes que no son de la casa
+    for i, bad in enumerate([{"style": "hacker"}, {"bg": {"kind": "color", "color": "red;}body{x"}}, {"bg": {"kind": "gradient", "gradient": "url(x)"}},
+                             {"bg": {"kind": "image", "image": "https://malo.example/x.jpg"}}, {"bg": {"kind": "image", "image": "/api/matterai/media/0123456789abcdef.jpg", "dim": 3}}]):
+        await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE, **bad}}}})
+        assert not (await ws.receive_json())["success"], bad

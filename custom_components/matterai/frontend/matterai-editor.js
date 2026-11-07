@@ -160,6 +160,21 @@
   .catg button{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;background:#1e242e;border:1px solid rgba(160,175,200,.15);text-align:left}
   .catg button:hover{border-color:#f2b766}.catg b{display:block;font-weight:600}.catg small{color:#8f99ab;font-size:12px}
   .cic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#262e3a}.cic svg{width:20px;height:20px;fill:none;stroke:#f2b766;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+  .stl{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:6px}
+  .stc{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:14px;border:1px solid rgba(160,175,200,.18);background:#1e242e;color:inherit;cursor:pointer}
+  .stc:hover{border-color:rgba(242,183,102,.6)}.stc.on{border-color:#f2b766;box-shadow:0 0 0 1px #f2b766 inset}
+  .stc .sw{grid-row:1/3;width:54px;height:40px;border-radius:10px;display:flex;flex-direction:column;gap:3px;padding:5px;box-sizing:border-box}
+  .stc .sw i{display:block;height:8px;border-radius:3px}
+  .stc b{font-size:14px}.stc small{font-size:11.5px;color:#8f99ab;line-height:1.3}
+  .stp-matterai .sw{background:#161b21}.stp-matterai .sw i{background:#1e242e;border:1px solid rgba(160,175,200,.2)}.stp-matterai .sw i:first-child{background:#f2b766}
+  .stp-apple .sw{background:#000}.stp-apple .sw i{background:#1c1c1e;border-radius:6px}.stp-apple .sw i:first-child{background:#0a84ff}
+  .stp-cristal .sw{background:linear-gradient(135deg,#2b5876,#4e4376 60%,#1d6b5f)}.stp-cristal .sw i{background:rgba(255,255,255,.28);border-radius:8px;border:1px solid rgba(255,255,255,.4)}
+  .bgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px;margin-bottom:6px}
+  .bgs>button,.bgs>label{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:0;background:none;color:inherit;cursor:pointer;font:inherit}
+  .bgs .bsw{position:relative;width:100%;aspect-ratio:3/4;border-radius:10px;border:2px solid rgba(160,175,200,.2);display:grid;place-items:center;font-size:18px;color:#8f99ab;overflow:hidden;box-sizing:border-box}
+  .bgs .bsw.none{background:repeating-linear-gradient(45deg,#1e242e 0 6px,#262e3a 6px 12px)}.bgs .bsw.img{background:#1e242e}
+  .bgs .on .bsw{border-color:#f2b766}.bgs small{font-size:10.5px;color:#8f99ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+  .bgs input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
   @media (max-width:1100px){.ed{grid-template-columns:230px minmax(0,1fr) 310px}.ed.nolist{grid-template-columns:0 minmax(0,1fr) 330px}}`;
 
   function open(panel, viewId, kind) { return new Editor(panel, viewId, kind).start(); }
@@ -337,8 +352,22 @@
     get K() { return this._k || (this.v && this.v.kind) || 'phone'; }
     set K(k) { this._k = k; }
     lay() { const L = this.v.layouts || (this.v.layouts = {}); return L[this.K] || (L[this.K] = { blocks: [] }); }
+    /** Estilo prearmado y fondo del diseño: se elige tocando, como en una galería. */
+    lookEditor() {
+      const V = window.MaeVista || {}, L = this.lay(), st = L.style || 'matterai', bg = L.bg || { kind: 'none' };
+      const SL = V.STYLE_LIST || [], GL = V.GRAD_LIST || [];
+      return `<h4>Estilo</h4><div class="stl">${SL.map(([k, n, d]) => `<button class="stc stp-${k} ${st === k ? 'on' : ''}" data-stl="${k}"><span class="sw"><i></i><i></i><i></i></span><b>${esc(n)}</b><small>${esc(d)}</small></button>`).join('')}</div>
+        <h4>Fondo</h4><div class="bgs">
+          <button data-bgk="none" class="${bg.kind === 'none' ? 'on' : ''}" title="El del estilo"><span class="bsw none"></span><small>Del estilo</small></button>
+          ${GL.map(([k, n, css]) => `<button data-bgg="${k}" class="${bg.kind === 'gradient' && bg.gradient === k ? 'on' : ''}" title="${esc(n)}"><span class="bsw" style="background:${esc(css)}"></span><small>${esc(n)}</small></button>`).join('')}
+          <label class="bgc ${bg.kind === 'color' ? 'on' : ''}" title="Un color liso"><span class="bsw" style="background:${esc(bg.kind === 'color' && bg.color ? bg.color : '#1e242e')}"><input type="color" data-bgc value="${esc(bg.color || '#1e242e')}"></span><small>Color</small></label>
+          <button data-bgi class="${bg.kind === 'image' ? 'on' : ''}" title="Una foto de la casa"><span class="bsw img">${bg.kind === 'image' ? '✓' : '+'}</span><small>Imagen</small></button>
+          <input type="file" accept="image/*" data-bgf hidden></div>
+        ${bg.kind === 'image' ? `<label class="fld"><span>Oscurecer la imagen (para que se lea bien)</span><input type="range" min="0" max="0.8" step="0.05" data-bgd value="${esc(String(bg.dim == null ? 0.35 : bg.dim))}"></label>` : ''}
+        <p class="hint">«Del estilo» usa el fondo propio de cada estilo. Los fondos «(claro)» quedan mejor con el modo Claro.</p>`;
+    }
     /** Lo que ve el motor: el dashboard con las tarjetas del tipo que se está editando. */
-    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, theme: l.theme || null, layouts: undefined }); }
+    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, theme: l.theme || null, style: l.style || null, bg: l.bg || null, layouts: undefined }); }
     model() { return this.card && this.card.model ? this.card.model() : null; }
     states() { return this.hass.states; }
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
@@ -393,7 +422,7 @@
       this.$('#ed').classList.toggle('dlgon', open);
       if (!open) { this.$('#dlgh').innerHTML = ''; this.$('#dlgf').innerHTML = ''; return; }
       const b = this.selBlock(), CAT = window.MaeVista.CATALOG;
-      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Opciones del dashboard' : this.zone === 'allb' ? 'Botón «Toda la casa»'
+      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Estilo y fondo' : this.zone === 'allb' ? 'Botón «Toda la casa»'
         : b ? `${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : '';
       const sub = this.roomEd != null || this.el != null || this.pz != null;
       const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Configuración'], ['vis', 'Visibilidad'], ['lay', 'Diseño']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
@@ -409,7 +438,7 @@
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
           <span class="eseg" title="Modo de día o de noche de este diseño (el cliente también lo puede cambiar en Opciones)">${[['dark', '☾ Oscuro'], ['light', '☀ Claro'], ['auto', 'Auto']].map(([k, l]) => `<button data-theme="${k}" class="${(this.lay().theme || 'dark') === k ? 'on' : ''}">${l}</button>`).join('')}</span>
-          <button class="eb ico" data-e="dash" title="Opciones del dashboard (nombre, tema)">⚙</button>
+          <button class="eb" data-e="dash" title="Estilo, fondo, modo y nombre de este diseño">🎨 Estilo</button>
           <button class="eb ${this.playing ? 'pri' : ''}" data-e="play" title="${this.playing ? 'Volver a editar' : 'Usar la pantalla como en el celular (prender luces, cambiar de cámara, entrar a un ambiente)'}">${this.playing ? '✎ Editar' : '▶ Probar'}</button>
           <button class="eb pri2" data-e="add" title="Agregar una tarjeta" ${this.playing ? 'disabled' : ''}>+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
           <span class="emenu"><button class="eb ${Object.values(this.sim || {}).some(Boolean) ? 'pri2' : ''}" data-e="simm" title="Ver cómo queda en otras situaciones (no toca la casa)">Simular${Object.values(this.sim || {}).filter(Boolean).length ? ` (${Object.values(this.sim || {}).filter(Boolean).length})` : ''} ▾</button>${this.simOpen ? `<span class="emenu-l" style="left:0;right:auto">
@@ -728,10 +757,10 @@
         return;
       }
       if (!b && this.zone === 'dash') {
-        r.innerHTML = `<h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}" maxlength="40"></label>
-          <label class="fld"><span>Modo de ${this.K === 'tablet' ? 'la tablet' : 'el celular'}</span><select data-lt="theme">${[['', 'Oscuro (grafito)'], ['light', 'Claro'], ['auto', 'Automático (como el modo claro u oscuro del equipo)']]
+        r.innerHTML = `${this.lookEditor()}<h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}" maxlength="40"></label>
+          <label class="fld"><span>Modo de ${this.K === 'tablet' ? 'la tablet' : 'el celular'}</span><select data-lt="theme">${[['', 'Oscuro'], ['light', 'Claro'], ['auto', 'Automático (como el modo claro u oscuro del equipo)']]
             .map(([k, l]) => `<option value="${k}" ${(this.lay().theme || '') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-          <p class="hint">Cada diseño (celular y tablet) tiene su modo. El cliente lo puede cambiar en la app: Opciones → Pantalla → Modo de día o de noche.</p>
+          <p class="hint">Cada diseño (celular y tablet) tiene su estilo, su fondo y su modo. El cliente lo puede cambiar en la app: Opciones → Pantalla → Modo de día o de noche.</p>
           <p class="hint">«Simular → De noche» (arriba) es otra cosa: muestra cómo se ve el plano y las tarjetas que dependen de la hora, sin cambiar el modo.</p>`;
         return;
       }
@@ -1189,6 +1218,18 @@
       });
       W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
       W.querySelectorAll('#edr [data-lt]').forEach((x) => { x.onchange = () => this.change(() => { this.lay()[x.dataset.lt] = x.value || null; }); });
+      // estilo y fondo
+      W.querySelectorAll('#edr [data-stl]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().style = x.dataset.stl === 'matterai' ? null : x.dataset.stl; }); });
+      W.querySelectorAll('#edr [data-bgk]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().bg = null; }); });
+      W.querySelectorAll('#edr [data-bgg]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().bg = { kind: 'gradient', gradient: x.dataset.bgg }; }); });
+      W.querySelectorAll('#edr [data-bgc]').forEach((x) => { x.onchange = () => this.change(() => { this.lay().bg = { kind: 'color', color: x.value }; }); });
+      W.querySelectorAll('#edr [data-bgd]').forEach((x) => { x.onchange = () => this.change(() => { const g = this.lay().bg; if (g) g.dim = Number(x.value); }); });
+      const bgf = W.querySelector('#edr [data-bgf]');
+      W.querySelectorAll('#edr [data-bgi]').forEach((x) => { x.onclick = () => { if (bgf) bgf.click(); }; });
+      if (bgf) bgf.onchange = async () => {
+        const f = bgf.files && bgf.files[0]; if (!f) return;
+        try { const pth = await this.upload(f); this.change(() => { this.lay().bg = { kind: 'image', image: pth, dim: 0.35 }; }); this.toast('Fondo subido'); } catch (e) { this.toast(`No se pudo subir: ${e.message || e}`); }
+      };
       const back = () => { this.zone = null; this.pz = null; this.drawProps(); this.syncPreview(); this.bind(); };
       W.querySelectorAll('#edr [data-zback],#edr [data-pzback]').forEach((x) => { x.onclick = back; });
       W.querySelectorAll('#edr [data-hd]').forEach((x) => { x.onchange = () => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); if (x.checked) delete H[x.dataset.hd]; else H[x.dataset.hd] = false; l.header = Object.keys(H).length ? H : null; }); });
@@ -1315,7 +1356,9 @@
     /** Lo que se guarda (o se prueba): los dos diseños, el plano y lo demás del dashboard. */
     payload() {
       const v = this.v, L = v.layouts || {};
-      const lay = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null } : null);
+      // un diseño sin tarjetas propias (prearmado) igual guarda su estilo, fondo, modo, arriba y barra
+      const has = (x) => x && ((x.blocks && x.blocks.length) || x.style || x.bg || x.theme || x.header || x.dock);
+      const lay = (k) => (has(L[k]) ? { blocks: L[k].blocks && L[k].blocks.length ? L[k].blocks : null, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null, style: L[k].style || null, bg: L[k].bg || null } : null);
       return { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
         plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
     }
