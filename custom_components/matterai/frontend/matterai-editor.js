@@ -286,7 +286,7 @@
     addBlock(type, col) {
       const K = this.K, CAT = window.MaeVista.CATALOG;
       const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
-      const titled = ['frigate', 'rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text'];
+      const titled = ['frigate', 'rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text', 'agenda', 'irrigation'];
       const b = { id: this.newId(type), type, col: K === 'tablet' ? (col != null ? col : type === 'plan' ? 0 : 1) : 0, cfg };
       if (titled.includes(type)) b.title = type === 'frigate' ? 'Cámaras' : CAT[type].name;
       this.change(() => { this.blocks().push(b); this.sel = b.id; this.roomEd = null; this.rdraft = null; });
@@ -295,7 +295,7 @@
     openCatalog(col) {
       this.closeCatalog();
       const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
-        weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list', frigate: 'cam' };
+        weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list', frigate: 'cam', openings: 'door', agenda: 'cal', irrigation: 'water', batteries: 'battery' };
       const box = document.createElement('div');
       box.className = 'catp';
       box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' && col != null ? ` · ${col === 0 ? 'columna del plano' : `columna ${col}`}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
@@ -815,7 +815,29 @@
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
         case 'plan': h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>'; break;
         case 'weather': h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
-        case 'climate': h += this.ent('Aire o termostato', 'cl', c.entity, ['climate'], 'cfg.entity'); break;
+        case 'climate':
+          h += this.ent('Aire o termostato', 'cl', c.entity, ['climate'], 'cfg.entity');
+          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="">Compacto (una fila con − y +)</option><option value="big" ${c.style === 'big' ? 'selected' : ''}>Termostato grande (dial)</option></select></label>`;
+          break;
+        case 'openings':
+          h += `<label class="fld"><span>Qué muestra</span><select data-f="cfg.style"><option value="">Sólo lo que quedó abierto</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Todas las puertas y ventanas</option></select></label>
+            <p class="hint">Toma solos los sensores de puertas, ventanas y portones de la casa. Tocar la tarjeta abre «Puertas y ventanas».</p>`;
+          break;
+        case 'agenda': {
+          const cals = Object.keys(this.states()).filter((x) => x.startsWith('calendar.'));
+          const sel = c.entities && c.entities.length ? c.entities : null;
+          h += cals.length ? `<div class="fld"><span>Calendarios (ninguno marcado: todos)</span>${cals.map((id) => `<label class="chk"><input type="checkbox" data-cal="${esc(id)}" ${sel && sel.includes(id) ? 'checked' : ''}> ${esc(this.fname(id))}</label>`).join('')}</div>`
+            : '<p class="hint">La casa no tiene calendarios todavía (Google Calendar, Local Calendar…).</p>';
+          h += '<p class="hint">Muestra lo que viene hoy y mañana. Tocar la tarjeta abre la Agenda completa.</p>';
+          break;
+        }
+        case 'irrigation':
+          h += '<p class="hint">Toma solos los programas de riego de MatterAI (Automatizaciones → Riego), las válvulas y los interruptores con «riego» o «aspersor» en el nombre.</p>';
+          break;
+        case 'batteries':
+          h += `<label class="fld"><span>Avisar desde (%)</span><input type="number" min="5" max="90" data-f="cfg.max" value="${esc(c.max != null ? c.max : '')}" placeholder="25"></label>
+            <p class="hint">Lista los sensores con la pila por debajo de ese número. Con todas bien, dice «Todas las pilas bien».</p>`;
+          break;
         case 'covers': case 'lights': h += this.elemSection(b); break;
         case 'energy': h += this.ent('Sensor de consumo (vacío: el de la casa)', 'en', c.entity, ['sensor'], 'cfg.entity'); break;
         case 'sensor':
@@ -1222,6 +1244,12 @@
         row.ondrop = (e) => { e.preventDefault(); const d = this.srDrag; this.srDrag = null; if (d && d.g === row.dataset.sr) this.reorder(d.g, d.i, +row.dataset.i); };
       });
       W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
+      W.querySelectorAll('#edr [data-cal]').forEach((x) => { x.onchange = () => this.change(() => {
+        const bb = this.blocks().find((y) => y.id === this.sel); if (!bb) return;
+        const cc = bb.cfg = bb.cfg || {}, set = new Set(cc.entities || []);
+        if (x.checked) set.add(x.dataset.cal); else set.delete(x.dataset.cal);
+        if (set.size) cc.entities = [...set]; else delete cc.entities;
+      }); });
       W.querySelectorAll('#edr [data-lt]').forEach((x) => { x.onchange = () => this.change(() => { this.lay()[x.dataset.lt] = x.value || null; }); });
       // estilo y fondo
       W.querySelectorAll('#edr [data-stl]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().style = x.dataset.stl === 'matterai' ? null : x.dataset.stl; }); });

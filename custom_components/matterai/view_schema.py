@@ -42,6 +42,11 @@ BLOCK_TYPES = (
     "image",      # una imagen (con acción al tocar)
     "activity",   # acceso a la Actividad (toda la casa o un ambiente), desde la 2.21
     "frigate",    # cámaras en vivo con el visor de Frigate (Advanced Camera Card), desde la 2.22.2
+    # desde la 2.23
+    "openings",   # puertas y ventanas: qué quedó abierto
+    "agenda",     # lo que viene hoy y mañana en los calendarios
+    "irrigation", # riego: válvulas, interruptores de riego y programas de MatterAI
+    "batteries",  # pilas bajas (cfg.max: el límite en %)
 )
 SIZES = ("full", "half")
 COND_TYPES = ("state", "not_state", "night", "day", "music", "alarm_armed", "alarm_off", "someone_home", "nobody_home")

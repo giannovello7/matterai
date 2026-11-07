@@ -434,3 +434,16 @@ async def test_matterai_rules_say_what_they_are(hass) -> None:
     assert roles.get("sc1:button") == "scene"
     assert roles.get("sc1:switch") == "voice", "el pulsador de voz no es una rutina"
     assert roles.get("au1:switch") == "routine"
+
+
+async def test_new_cards_223_are_valid(hass, hass_ws_client) -> None:
+    """Las tarjetas de la 2.23 se guardan (y el termostato grande es un estilo)."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    blocks = [{"id": "op", "type": "openings", "cfg": {"style": "list"}}, {"id": "ag", "type": "agenda", "cfg": {"entities": ["calendar.familia"]}},
+              {"id": "ir", "type": "irrigation"}, {"id": "ba", "type": "batteries", "cfg": {"max": 30}},
+              {"id": "cl", "type": "climate", "cfg": {"entity": "climate.living", "style": "big"}}]
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Nuevas", "layouts": {"phone": {"blocks": blocks}}}})
+    res = await ws.receive_json()
+    assert res["success"], res
+    assert [b["type"] for b in res["result"]["layouts"]["phone"]["blocks"]] == ["openings", "agenda", "irrigation", "batteries", "climate"]

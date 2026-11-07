@@ -78,6 +78,10 @@
     text: { name: 'Texto', desc: 'Un título, un separador o una nota', kinds: ['phone', 'tablet'] },
     image: { name: 'Imagen', desc: 'Una foto o logo, con acción al tocar', kinds: ['phone', 'tablet'] },
     activity: { name: 'Actividad', desc: 'Qué pasó en la casa: por equipo, día, tipo y ambiente', kinds: ['phone', 'tablet'] },
+    openings: { name: 'Puertas y ventanas', desc: 'Qué quedó abierto (o «todo cerrado»)', kinds: ['phone', 'tablet'] },
+    agenda: { name: 'Agenda del día', desc: 'Lo que viene hoy y mañana en los calendarios', kinds: ['phone', 'tablet'] },
+    irrigation: { name: 'Riego', desc: 'Zonas de riego y programas, con su interruptor', kinds: ['phone', 'tablet'] },
+    batteries: { name: 'Pilas', desc: 'Sensores con la pila baja, para cambiarlas a tiempo', kinds: ['phone', 'tablet'] },
   };
   /* Condiciones para mostrar una tarjeta (como la tarjeta condicional de Home Assistant) */
   const CONDITIONS = { state: 'Un equipo está en un estado', not_state: 'Un equipo NO está en un estado', night: 'Es de noche (20 a 7 h)', day: 'Es de día (7 a 20 h)',
@@ -548,9 +552,67 @@
           const id = c.entity && st(c.entity) ? c.entity : Object.keys(S).find((x) => x.startsWith('climate.'));
           if (!id) return editing() ? `${t}<p class="v-empty">Elegí el aire en las propiedades.</p>` : '';
           const s = st(id), a = s.attributes, on = s.state !== 'off';
+          if (c.style === 'big') {
+            // termostato grande: el anillo marca la temperatura elegida entre la mínima y la máxima del aire
+            const lo = Number(a.min_temp != null ? a.min_temp : 16), hi = Number(a.max_temp != null ? a.max_temp : 30), tg = Number(a.temperature);
+            const pct = Number.isFinite(tg) && hi > lo ? Math.max(0, Math.min(1, (tg - lo) / (hi - lo))) : 0;
+            return `<div class="v-card v-clim v-dial ${on ? 'on' : ''} m-${esc(s.state)}">${t}<div class="v-dring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" class="d0" pathLength="100"/><circle cx="60" cy="60" r="50" class="d1" pathLength="100" style="stroke-dasharray:${(pct * 75).toFixed(1)} 100"/></svg>
+              <div class="v-dmid" data-more="${esc(id)}"><small>${esc(on ? MODE_TXT[s.state] || s.state : 'Apagado')}</small><b>${Number.isFinite(tg) ? dec(tg) : '—'}<i>°</i></b><span>${a.current_temperature != null ? `Adentro ${dec(a.current_temperature)}°` : esc(fname(id))}</span></div></div>
+              <div class="v-dbar"><button class="v-cb" data-ctemp="${esc(id)}" data-d="-1" aria-label="Bajar">−</button><button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button><button class="v-cb" data-ctemp="${esc(id)}" data-d="1" aria-label="Subir">+</button></div></div>`;
+          }
           return `<div class="v-card v-clim ${on ? 'on' : ''}">${t}<div class="v-row"><span class="v-bic">${ic('snow')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(fname(id))}</b>
             <span>${esc(on ? MODE_TXT[s.state] || s.state : 'Apagado')}${a.current_temperature != null ? ` · adentro ${dec(a.current_temperature)}°` : ''}</span></span><button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
             <div class="v-cset"><button class="v-cb" data-ctemp="${esc(id)}" data-d="-1" aria-label="Bajar">−</button><b>${a.temperature != null ? `${dec(a.temperature)}°` : '—'}</b><button class="v-cb" data-ctemp="${esc(id)}" data-d="1" aria-label="Subir">+</button></div></div>`;
+        }
+        case 'openings': {
+          // puertas, ventanas y portones: los elegidos, o todos los sensores de apertura de la casa
+          const S = (hass() || {}).states || {};
+          const isOpening = (id) => { const s = S[id]; if (!s) return false; const dc = s.attributes.device_class;
+            return (id.startsWith('binary_sensor.') && ['door', 'window', 'garage_door', 'opening'].includes(dc)) || (id.startsWith('cover.') && ['garage', 'gate', 'door'].includes(dc)); };
+          const ids = (c.entities && c.entities.length ? c.entities.filter((id) => S[id]) : Object.keys(S).filter(isOpening)).slice(0, 40);
+          X.shown[b.id] = ids.map((id) => ({ entity: id, name: nameIn(c, id) }));
+          const open = ids.filter((id) => ['on', 'open', 'opening'].includes(S[id].state));
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">La casa no tiene sensores de puertas o ventanas.</p>` : '';
+          const since = (id) => { const ms = Date.now() - new Date(S[id].last_changed).getTime(), mn = Math.round(ms / 60000); return mn < 1 ? 'recién' : mn < 60 ? `hace ${mn} min` : mn < 1440 ? `hace ${Math.round(mn / 60)} h` : `hace ${Math.round(mn / 1440)} días`; };
+          const shown = c.style === 'list' ? ids : open;
+          return `<div class="v-card v-open ${open.length ? 'warn' : 'ok'}">${t}<div class="v-row" data-scr="aberturas"><span class="v-bic">${ic('door')}</span><span class="v-tx"><b>${open.length ? `${open.length} abierta${open.length > 1 ? 's' : ''}` : 'Todo cerrado'}</b><span>${ids.length} puerta${ids.length > 1 ? 's' : ''} y ventana${ids.length > 1 ? 's' : ''}</span></span><span class="v-chev">${ic('chev')}</span></div>
+            ${shown.length ? `<div class="v-list2">${shown.map((id, i) => { const o = ['on', 'open', 'opening'].includes(S[id].state);
+              return `<div class="v-orow ${o ? 'o' : ''}" data-more="${esc(id)}"${EL(i)}><i></i><span class="v-tx"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${o ? 'Abierta' : 'Cerrada'} · ${esc(since(id))}</span></span></div>`; }).join('')}</div>` : ''}</div>`;
+        }
+        case 'agenda': {
+          // lo próximo de cada calendario (el estado del calendario trae su próximo evento); tocar abre la Agenda
+          const S = (hass() || {}).states || {};
+          const cals = (c.entities && c.entities.length ? c.entities : Object.keys(S).filter((x) => x.startsWith('calendar.'))).filter((id) => S[id]);
+          if (!cals.length) return editing() ? `${t}<p class="v-empty">La casa no tiene calendarios.</p>` : '';
+          const day0 = new Date(); day0.setHours(0, 0, 0, 0);
+          const evs = cals.map((id) => ({ id, a: S[id].attributes })).filter((x) => x.a.message && x.a.start_time)
+            .map((x) => ({ id: x.id, msg: x.a.message, start: new Date(String(x.a.start_time).replace(' ', 'T')), allDay: !!x.a.all_day, now: S[x.id].state === 'on' }))
+            .filter((x) => !Number.isNaN(x.start.getTime()) && x.start - day0 < 2 * 864e5).sort((p, q) => p.start - q.start).slice(0, 6);
+          const when = (x) => { const tom = x.start - day0 >= 864e5; const h = x.allDay ? 'Todo el día' : x.start.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }); return x.now ? `Ahora · ${h}` : `${tom ? 'Mañana · ' : ''}${h}`; };
+          return `<div class="v-card v-agd" data-scr="agenda">${t || `<h3>${esc(b.title || 'Hoy')}</h3>`}${evs.length ? `<div class="v-list2">${evs.map((x) => `<div class="v-arow ${x.now ? 'now' : ''}"><span class="v-bic">${ic('cal')}</span><span class="v-tx"><b>${esc(x.msg)}</b><span>${esc(when(x))}</span></span></div>`).join('')}</div>` : '<p class="v-empty">Nada para hoy ni mañana.</p>'}</div>`;
+        }
+        case 'irrigation': {
+          // riego: los programas de MatterAI (riego por zonas) y las válvulas o interruptores de riego
+          const S = (hass() || {}).states || {};
+          const auto = Object.keys(S).filter((id) => { const a = S[id].attributes || {}; return (a.matterai_role === 'routine' && a.kind === 'irrigation') || id.startsWith('valve.') || (/^switch\./.test(id) && /riego|aspersor|valvula|válvula|irrig|sprinkl/i.test(id + ' ' + (a.friendly_name || '')) && !a.matterai_role); });
+          const ids = (c.entities && c.entities.length ? c.entities : auto).filter((id) => S[id]).slice(0, 16);
+          X.shown[b.id] = ids.map((id) => ({ entity: id, name: nameIn(c, id) }));
+          if (!ids.length) return editing() ? `${t}<p class="v-empty">La casa no tiene riego (válvulas, interruptores de riego o programas de MatterAI).</p>` : '';
+          const on = (id) => ['on', 'open', 'opening'].includes(S[id].state);
+          const n = ids.filter((id) => on(id) && !(S[id].attributes || {}).matterai_role).length;
+          return `<div class="v-card v-irr">${t || `<h3>${esc(b.title || 'Riego')}</h3>`}<p class="v-isub">${ic('water')}${n ? `Regando ${n} zona${n > 1 ? 's' : ''}` : 'Sin regar ahora'}</p><div class="v-list2">${ids.map((id, i) => { const prog = (S[id].attributes || {}).matterai_role === 'routine';
+            return `<div class="v-rti"${EL(i)}><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${prog ? (on(id) ? 'Programa activo' : 'Programa pausado') : on(id) ? 'Regando' : 'Cerrada'}</span></span><button class="v-pw ${on(id) ? 'on' : ''}" ${prog ? `data-auto="${esc(id)}"` : `data-ent="${esc(id)}"`} aria-label="Prender o apagar"></button></div>`; }).join('')}</div></div>`;
+        }
+        case 'batteries': {
+          // pilas: los sensores de batería por debajo del límite (25 % si no se elige otro)
+          const S = (hass() || {}).states || {}, lim = c.max != null ? Number(c.max) : 25;
+          const all = Object.keys(S).filter((id) => { const a = S[id].attributes || {}; return a.device_class === 'battery' && (id.startsWith('sensor.') || id.startsWith('binary_sensor.')); });
+          const lvl = (id) => (id.startsWith('binary_sensor.') ? (S[id].state === 'on' ? 0 : 100) : Number(S[id].state));
+          const low = all.filter((id) => Number.isFinite(lvl(id)) && lvl(id) <= lim).sort((p, q) => lvl(p) - lvl(q));
+          if (!all.length) return editing() ? `${t}<p class="v-empty">La casa no tiene sensores con batería.</p>` : '';
+          const nm = (id) => fname(id).replace(/\s*(bater[ií]a|battery|pila)s?\s*$/i, '') || fname(id);
+          return `<div class="v-card v-bat ${low.length ? 'warn' : 'ok'}">${t}<div class="v-row"><span class="v-bic">${ic(low.length ? 'alert' : 'battery')}</span><span class="v-tx"><b>${low.length ? `${low.length} pila${low.length > 1 ? 's' : ''} para cambiar` : 'Todas las pilas bien'}</b><span>${all.length} equipo${all.length > 1 ? 's' : ''} con pila</span></span></div>
+            ${low.length ? `<div class="v-list2">${low.slice(0, 12).map((id) => `<div class="v-orow o" data-more="${esc(id)}"><i></i><span class="v-tx"><b>${esc(nm(id))}</b><span>${id.startsWith('binary_sensor.') ? 'Pila baja' : `${Math.round(lvl(id))} %`}</span></span></div>`).join('')}</div>` : ''}</div>`;
         }
         case 'covers': {
           const ids = entsOf(c, m, 'cover', 'covers').filter((id) => (c.entities && c.entities.length) || !['gate', 'garage', 'door'].includes((st(id) || { attributes: {} }).attributes.device_class));
