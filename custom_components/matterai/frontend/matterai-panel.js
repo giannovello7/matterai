@@ -137,6 +137,26 @@
   .qr svg,.qr img{width:100%;height:100%}
   .link{word-break:break-all;font-size:12px;opacity:.8;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);margin:8px 0}
   .row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 2px}
+  .wz-ov{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px}
+  .wz{width:min(620px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;border-radius:20px;background:var(--card-background-color,#1c1c1e);color:var(--primary-text-color,#eee);box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden}
+  .wz-h{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--divider-color,rgba(127,127,127,.2))}.wz-h ha-icon{color:var(--primary-color,#03a9f4)}
+  .wz-h .sp,.wz-ft .sp{flex:1}.wz-n{font-size:12.5px;opacity:.6}
+  .wz-b{padding:16px 18px;overflow:auto;display:flex;flex-direction:column;gap:10px}.wz-b h3{margin:0 0 4px;font-size:16px}
+  .wz-o{display:flex;gap:12px;align-items:flex-start;text-align:left;padding:12px 14px;border-radius:14px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:none;color:inherit;font:inherit;cursor:pointer}
+  .wz-o.on{border-color:var(--primary-color,#03a9f4);background:rgba(3,169,244,.08)}.wz-o ha-icon{color:var(--primary-color,#03a9f4);margin-top:2px}
+  .wz-o b{display:block;font-size:14.5px}.wz-o small{display:block;opacity:.72;font-size:12.5px;margin-top:3px;line-height:1.4}.wz-o select{margin-top:6px}
+  .wz-f{display:flex;flex-direction:column;gap:6px}.wz-f>span{font-size:12.5px;font-weight:600;opacity:.75}
+  .wz-f input,.wz-o select{padding:9px 12px;border-radius:10px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:var(--secondary-background-color,transparent);color:inherit;font:inherit;font-size:14px}
+  .wz-st{display:flex;gap:8px;flex-wrap:wrap}.wz-st button{padding:8px 14px;border-radius:999px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:none;color:inherit;font:inherit;cursor:pointer}
+  .wz-st button.on{border-color:var(--primary-color,#03a9f4);color:var(--primary-color,#03a9f4);background:rgba(3,169,244,.1)}
+  .wz-rv{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
+  .wz-rv li{display:flex;align-items:center;gap:10px;padding:9px 12px;border-radius:12px;background:rgba(127,127,127,.08);font-size:13.5px}.wz-rv li span{flex:1}
+  .wz-rv li.ok ha-icon{color:#3ecf8e}.wz-rv li.wn ha-icon{color:#ffb547}
+  .wz-ft{display:flex;gap:8px;align-items:center;padding:12px 16px;border-top:1px solid var(--divider-color,rgba(127,127,127,.2));flex-wrap:wrap}
+  .wz .dv-chips{display:flex;flex-wrap:wrap;gap:8px}.wz .dv-chip{display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;border:1px solid var(--divider-color,rgba(127,127,127,.3));cursor:pointer;font-size:13.5px}
+  .wz .dv-chip input{display:none}.wz .dv-chip.on{border-color:var(--primary-color,#03a9f4);background:rgba(3,169,244,.1);color:var(--primary-color,#03a9f4)}
+  .wz .dv-sw{display:flex;align-items:center;gap:10px;font-size:14px;cursor:pointer}
+  .wz .dv-chev{width:36px;height:36px;border-radius:10px;border:0;background:none;color:inherit;cursor:pointer;display:grid;place-items:center}
   .eq2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;margin:18px 0}
   @media (max-width:1000px){.eq2{grid-template-columns:minmax(0,1fr)}}
   .gform{display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap;margin-top:10px}
@@ -884,6 +904,7 @@
       const html = `<style>
         .dv{display:flex;flex-direction:column;gap:16px;max-width:1100px}
         .dv-new{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+        .dv-start{display:flex;gap:14px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.dv-start .mut{flex:1;min-width:220px}
         .dv input:not([type]),.dv select{padding:9px 12px;border-radius:10px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:var(--secondary-background-color,transparent);color:inherit;font:inherit;font-size:14px;min-width:0}
         .dv-new input{flex:1;min-width:220px}
         .dv-list{display:flex;flex-direction:column;gap:10px}
@@ -954,7 +975,8 @@
       <div class="dv">${into ? '' : `
         <div class="box"><div class="bh"><h2>Dashboards de esta casa</h2></div>
           <ol class="dv-steps"><li><b>Creá un dashboard</b><small>Uno por persona o uno para toda la familia.</small></li><li><b>Diseñalo</b><small>«Editar celular» y «Editar tablet»: cada equipo usa el suyo.</small></li><li><b>Elegí quién lo ve</b><small>Con «+ equipo», o desde Equipos. Lo toman al instante.</small></li></ol>
-          <form class="dv-new" id="vnewf"><input id="vnewn" placeholder="Nombre del dashboard (por ejemplo, «Gianfranco»)" maxlength="40" autocomplete="off"><button class="b pri" type="submit"><ha-icon icon="mdi:plus"></ha-icon>Crear y diseñar</button></form>
+          <div class="dv-start"><button class="b pri" id="vwiz"><ha-icon icon="mdi:auto-fix"></ha-icon>Armar con el asistente</button><span class="mut">Desde la estructura MatterAI, una plantilla o un dashboard de esta casa: se adapta solo y te dice qué revisar.</span></div>
+          <form class="dv-new" id="vnewf"><input id="vnewn" placeholder="…o uno vacío: nombre (por ejemplo, «Gianfranco»)" maxlength="40" autocomplete="off"><button class="b" type="submit"><ha-icon icon="mdi:plus"></ha-icon>Crear y diseñar</button></form>
         </div>
         <div class="dv-list">
           ${views.map(card).join('')}
@@ -973,6 +995,7 @@ ${eqBox}
         try { await loadScript(`${BASE}/matterai-editor.js?t=${Date.now()}`); await window.MaeEditor.open(this, id, kind); } catch (e) { this._toast(`No se pudo abrir el editor: ${e.message || e}`); }
       };
       const full = (x, patch) => Object.assign({}, x, patch); // el servidor descarta lo que no es del dashboard (updated, by)
+      if ($('vwiz')) $('vwiz').onclick = () => this._wizard(r, people.filter((p) => !stale(p)), devIc, edit, again);
       if ($('vnewf')) $('vnewf').onsubmit = async (e) => {
         e.preventDefault();
         const name = $('vnewn').value.trim(); if (!name) { $('vnewn').focus(); return; }
@@ -1034,6 +1057,106 @@ ${eqBox}
         if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Equipo desvinculado')) again();
       }; });
       main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); again(); }; });
+    }
+
+    /* ---------- Asistente: un dashboard para un cliente nuevo, adaptado a esta casa ---------- */
+    async _wizard(r, people, devIc, edit, again) {
+      try {
+        await loadScript(`${BASE}/vista.js?t=${Date.now()}`);
+        await loadScript(`${BASE}/matterai-editor.js?t=${Date.now()}`);
+      } catch (e) { this._toast(`No se pudo abrir el asistente: ${e.message || e}`); return; }
+      const E = window.MaeEditor, V = window.MaeVista, views = r.views || [];
+      // el modelo de la casa (ambientes, cámaras, escenas…) lo da la tarjeta MatterAI sin dibujarse
+      const Card = customElements.get('matterai-home-card'), hc = Card ? document.createElement('matterai-home-card') : null;
+      if (hc) { hc.setAttribute('headless', ''); hc.setConfig(Object.assign({}, this._draft || {})); hc.hass = this._hass; }
+      const model = () => (hc && hc.model ? hc.model() : null);
+      const W = { step: 1, src: 'auto', tpl: null, copy: views[0] ? views[0].id : '', name: '', who: new Set(), def: !r.default, style: 'matterai', res: null };
+      const ov = document.createElement('div');
+      ov.className = 'wz-ov';
+      this.shadowRoot.appendChild(ov);
+      const close = () => { ov.remove(); };
+      const STY = (V.STYLE_LIST || []);
+      const draw = () => {
+        let body = '';
+        if (W.step === 1) {
+          const opt = (k, ic, t, d, extra = '') => `<button class="wz-o ${W.src === k ? 'on' : ''}" data-src="${k}"><ha-icon icon="${ic}"></ha-icon><span><b>${t}</b><small>${d}</small>${extra}</span></button>`;
+          body = `<h3>1 · ¿De dónde sale el diseño?</h3>
+            ${opt('auto', 'mdi:auto-fix', 'Estructura MatterAI', 'Se arma sola con los ambientes, escenas, cámaras y plano de esta casa, y se sigue adaptando cuando agregás equipos.')}
+            ${opt('file', 'mdi:file-upload-outline', 'Una plantilla tuya (archivo)', 'Exportada desde el editor de otra casa («⋯ → Exportar como plantilla»). Lo que no existe acá se adapta solo.', W.tpl ? `<small class="ok">✓ «${esc(W.tpl.name || 'plantilla')}» cargada</small>` : '')}
+            ${views.length ? opt('copy', 'mdi:content-copy', 'Copiar un dashboard de esta casa', `<select data-copy>${views.map((x) => `<option value="${esc(x.id)}" ${W.copy === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`) : ''}
+            <input type="file" accept="application/json,.json" data-tplf hidden>`;
+        } else if (W.step === 2) {
+          body = `<h3>2 · ¿Para quién es?</h3>
+            <label class="wz-f"><span>Nombre del dashboard</span><input data-name value="${esc(W.name)}" maxlength="40" placeholder="Por ejemplo, «Familia Pérez» o «Tablet del living»"></label>
+            <div class="wz-f"><span>Quién lo ve</span>${people.length ? `<div class="dv-chips">${people.map((p) => `<label class="dv-chip ${W.who.has(p.user_id) ? 'on' : ''}"><input type="checkbox" data-who="${esc(p.user_id)}" ${W.who.has(p.user_id) ? 'checked' : ''}>${devIc(p)}${esc(p.name)}</label>`).join('')}</div>` : '<p class="mut">Todavía no hay equipos vinculados: lo asignás después desde Equipos.</p>'}</div>
+            <label class="dv-sw"><input type="checkbox" data-def ${W.def ? 'checked' : ''}><span>★ Usarlo por defecto (lo ven los equipos que no tienen uno elegido)</span></label>
+            <div class="wz-f"><span>Estilo</span><div class="wz-st">${STY.map(([k, n]) => `<button class="${W.style === k ? 'on' : ''}" data-sty="${k}">${esc(n)}</button>`).join('')}</div></div>`;
+        } else {
+          const R = W.res || { list: [] }, bad = R.list.filter((x) => !x.ok).length;
+          body = `<h3>Listo: «${esc(W.name)}» quedó creado</h3>
+            <p class="mut">${bad ? `Hay ${bad} cosa${bad > 1 ? 's' : ''} para revisar en esta casa:` : 'Todo en orden. Ya lo pueden ver los equipos elegidos.'}</p>
+            <ul class="wz-rv">${R.list.map((x) => `<li class="${x.ok ? 'ok' : 'wn'}"><ha-icon icon="${x.ok ? 'mdi:check-circle' : 'mdi:alert-circle-outline'}"></ha-icon><span>${esc(x.text)}</span>${!x.ok && x.k === 'casa' ? '<button class="lnk" data-gocasa>Ir a La casa</button>' : !x.ok && x.k === 'auto' ? '<button class="lnk" data-goauto>Ir a Automatizaciones</button>' : ''}</li>`).join('')}</ul>`;
+        }
+        const foot = W.step === 1 ? '<button class="b" data-x>Cancelar</button><span class="sp"></span><button class="b pri" data-next>Siguiente</button>'
+          : W.step === 2 ? '<button class="b" data-back>Atrás</button><span class="sp"></span><button class="b pri" data-make><ha-icon icon="mdi:check"></ha-icon>Crear</button>'
+            : '<button class="b" data-x>Listo</button><span class="sp"></span><button class="b" data-ed="phone"><ha-icon icon="mdi:cellphone"></ha-icon>Editar celular</button><button class="b pri" data-ed="tablet"><ha-icon icon="mdi:tablet"></ha-icon>Editar tablet</button>';
+        ov.innerHTML = `<div class="wz"><div class="wz-h"><ha-icon icon="mdi:auto-fix"></ha-icon><b>Asistente: dashboard para un cliente nuevo</b><span class="sp"></span><span class="wz-n">${W.step < 3 ? `Paso ${W.step} de 2` : ''}</span><button class="dv-chev" data-x aria-label="Cerrar"><ha-icon icon="mdi:close"></ha-icon></button></div><div class="wz-b">${body}</div><div class="wz-ft">${foot}</div></div>`;
+        bind();
+      };
+      const make = async () => {
+        if (!W.name.trim()) { this._toast('Ponele un nombre'); return; }
+        const S = this._hass.states, m = model();
+        let layouts = { phone: null, tablet: null }, missing = [], plan = null;
+        if (W.src === 'file' && W.tpl) {
+          layouts = JSON.parse(JSON.stringify(W.tpl.layouts));
+          missing = E.entitiesIn(layouts).filter((id) => !S[id]);
+          Object.values(layouts).forEach((l) => l && E.adapt(l.blocks, S, m));
+        } else if (W.src === 'copy') {
+          const x = views.find((y) => y.id === W.copy);
+          if (x) { layouts = JSON.parse(JSON.stringify(x.layouts || {})); plan = x.plan || null; }
+        }
+        // estilo elegido: en los dos diseños (aunque sean el prearmado)
+        ['phone', 'tablet'].forEach((k) => { if (W.style !== 'matterai' || (layouts[k] && layouts[k].style)) { layouts[k] = layouts[k] || { blocks: null }; layouts[k].style = W.style === 'matterai' ? null : W.style; } });
+        let nv;
+        try { nv = await this._hass.callWS({ type: 'matterai/views/save', view: { name: W.name.trim().slice(0, 40), kind: 'phone', pinned: [], layouts, plan } }); }
+        catch (e) { this._toast(`No se pudo crear: ${e.message || e}`); return; }
+        try {
+          for (const uid of W.who) await this._hass.callWS({ type: 'matterai/views/assign_user', user_id: uid, view_id: nv.id });
+          if (W.def) await this._hass.callWS({ type: 'matterai/views/default', view_id: nv.id });
+        } catch (e) { this._toast(`Se creó, pero no se pudo asignar: ${e.message || e}`); }
+        // para revisar: el prearmado cuenta como sus tarjetas
+        const look = {};
+        ['phone', 'tablet'].forEach((k) => { look[k] = layouts[k] && layouts[k].blocks && layouts[k].blocks.length ? layouts[k] : { blocks: V.defaults(k, m || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, {}, S, (this._draft || {}).floorplan).blocks }; });
+        const fp = (this._draft || {}).floorplan;
+        W.res = { id: nv.id, list: E.review(look, plan || (fp && fp.image ? { image: fp.image, zones: fp.zones || [] } : null), S, m, missing) };
+        W.step = 3; draw();
+        again();
+      };
+      const bind = () => {
+        const q = (sel) => ov.querySelectorAll(sel);
+        q('[data-x]').forEach((b) => { b.onclick = close; });
+        q('[data-src]').forEach((b) => { b.onclick = (e) => { if (e.target.closest('select')) return; W.src = b.dataset.src; if (W.src === 'file') ov.querySelector('[data-tplf]').click(); draw(); }; });
+        q('[data-copy]').forEach((sel) => { sel.onchange = () => { W.copy = sel.value; W.src = 'copy'; draw(); }; });
+        q('[data-tplf]').forEach((inp) => { inp.onchange = async () => {
+          const f = inp.files && inp.files[0]; if (!f) return;
+          let d = null; try { d = JSON.parse(await f.text()); } catch (_) { d = null; }
+          const t = E.readTemplate(d);
+          if (!t) { this._toast('Ese archivo no es una plantilla de MatterAI'); W.src = 'auto'; } else { W.tpl = t; W.src = 'file'; if (!W.name) W.name = t.name || ''; }
+          draw();
+        }; });
+        q('[data-next]').forEach((b) => { b.onclick = () => { if (W.src === 'file' && !W.tpl) { this._toast('Elegí el archivo de la plantilla'); return; } W.step = 2; draw(); const n = ov.querySelector('[data-name]'); if (n) n.focus(); }; });
+        q('[data-back]').forEach((b) => { b.onclick = () => { W.step = 1; draw(); }; });
+        q('[data-name]').forEach((i) => { i.oninput = () => { W.name = i.value; }; });
+        q('[data-who]').forEach((c) => { c.onchange = () => { if (c.checked) W.who.add(c.dataset.who); else W.who.delete(c.dataset.who); c.closest('.dv-chip').classList.toggle('on', c.checked); }; });
+        q('[data-def]').forEach((c) => { c.onchange = () => { W.def = c.checked; }; });
+        q('[data-sty]').forEach((b) => { b.onclick = () => { W.style = b.dataset.sty; draw(); }; });
+        q('[data-make]').forEach((b) => { b.onclick = async () => { b.disabled = true; await make(); b.disabled = false; }; });
+        q('[data-ed]').forEach((b) => { b.onclick = () => { close(); edit(W.res.id, b.dataset.ed); }; });
+        q('[data-gocasa]').forEach((b) => { b.onclick = () => { close(); this._go('casa'); }; });
+        q('[data-goauto]').forEach((b) => { b.onclick = () => { close(); this._go('auto'); }; });
+      };
+      ov.onclick = (e) => { if (e.target === ov) close(); };
+      draw();
     }
 
     /* ---------- Seguridad: registro de auditoría y acceso del instalador ---------- */

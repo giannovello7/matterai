@@ -1417,8 +1417,9 @@
     }
     /** Una plantilla de otra casa se adapta a esta: lo que no existe se saca, y la tarjeta que queda vacía vuelve a
      *  automático (se arma sola con los equipos, ambientes, escenas y rutinas de ESTA casa). */
-    adaptBlocks(blocks) {
-      const S = this.states(), has = (id) => !!(id && S[id]), m = this.model() || { rooms: [] };
+    adaptBlocks(blocks) { return Editor.adapt(blocks, this.states(), this.model()); }
+    static adapt(blocks, states, model) {
+      const S = states || {}, has = (id) => !!(id && S[id]), m = model || { rooms: [] };
       const rooms = new Set(m.rooms.map((r) => r.name));
       (blocks || []).forEach((b) => {
         const c = b.cfg = b.cfg || {};
@@ -1433,9 +1434,41 @@
       });
       return blocks;
     }
+    /** Una plantilla leída de un archivo: sus diseños con tarjetas conocidas e ids nuevos (o null si no sirve). */
+    static readTemplate(d) {
+      if (!d || d.format !== 'matterai-dashboard' || !d.layouts) return null;
+      const CAT = window.MaeVista.CATALOG, L = {}, nid = (t) => `${t}-${window.MaeVista.uid()}`.slice(0, 24);
+      ['phone', 'tablet'].forEach((k) => {
+        const l = d.layouts[k];
+        if (l && Array.isArray(l.blocks)) {
+          L[k] = { blocks: l.blocks.filter((b) => b && CAT[b.type]).slice(0, 30).map((b) => Object.assign(clone(b), { id: nid(b.type) })), orientation: l.orientation || null };
+          ['header', 'dock', 'theme', 'style', 'bg'].forEach((x) => { if (l[x] && !(x === 'bg' && l.bg.kind === 'image')) L[k][x] = clone(l[x]); }); // la foto de fondo es de la otra casa
+        }
+      });
+      return L.phone || L.tablet ? { name: d.name || '', layouts: L } : null;
+    }
+    /** Lo que conviene revisar en esta casa después de armar un dashboard: [{ ok, text, k }]. */
+    static review(layouts, plan, states, model, missing) {
+      const S = states || {}, m = model || { rooms: [], cams: [], scenes: [], access: [], roomOf: {} }, out = [];
+      const blocks = Object.values(layouts || {}).flatMap((l) => (l && l.blocks) || []), has = (t) => blocks.some((b) => b.type === t);
+      const add = (ok, text, k) => out.push({ ok, text, k: k || null });
+      const rooms = m.rooms || [];
+      add(rooms.length > 0, rooms.length ? `${rooms.length} ambiente${rooms.length > 1 ? 's' : ''} encontrados` : 'La casa no tiene ambientes: asigná los equipos a Áreas de Home Assistant (o cargalos en «La casa → Ambientes»)', 'casa');
+      const dark = rooms.filter((r) => !(r.lights || []).length).map((r) => r.name);
+      if (rooms.length) add(!dark.length, dark.length ? `Ambientes sin luces: ${dark.slice(0, 6).join(', ')}${dark.length > 6 ? '…' : ''}` : 'Todos los ambientes tienen luces', 'casa');
+      const loose = Object.keys(S).filter((id) => /^(light|cover|climate|lock)\./.test(id) && !(m.roomOf || {})[id] && !/_group$|grupo/i.test(id));
+      add(!loose.length, loose.length ? `${loose.length} equipo${loose.length > 1 ? 's' : ''} sin ambiente (no aparecen en «Ambientes»)` : 'Todos los equipos están en un ambiente', 'casa');
+      if (missing && missing.length) add(false, `${missing.length} equipo${missing.length > 1 ? 's' : ''} de la plantilla no existe${missing.length > 1 ? 'n' : ''} acá: esas tarjetas quedaron en automático o para elegir`, 'edit');
+      if (has('plan')) add(!!(plan && plan.image), plan && plan.image ? `El plano tiene ${(plan.zones || []).length} ambiente${(plan.zones || []).length === 1 ? '' : 's'} marcados` : 'Falta el plano de la tablet: subilo en «Editar tablet → Plano e imágenes»', 'tablet');
+      if (has('camera') || has('featured') || has('frigate')) add((m.cams || []).length > 0, (m.cams || []).length ? `${m.cams.length} cámara${m.cams.length > 1 ? 's' : ''}` : 'Hay una tarjeta de cámara pero la casa no tiene cámaras: sacala', 'edit');
+      if (has('scenes')) add((m.scenes || []).length > 0 || Object.values(S).some((x) => (x.attributes || {}).matterai_role === 'scene'), 'Escenas', 'auto');
+      if (has('lock') || has('away')) add((m.access || []).length > 0, (m.access || []).length ? 'Portón y cerraduras encontrados' : 'No hay portón ni cerraduras: revisá las tarjetas de acceso', 'edit');
+      if (out.find((x) => x.text === 'Escenas')) { const e = out.find((x) => x.text === 'Escenas'); e.text = e.ok ? 'La casa tiene escenas' : 'La casa no tiene escenas todavía: armalas en Automatizaciones'; }
+      return out;
+    }
     /** Plantilla: el diseño (celular y tablet) en un archivo, para usarlo en otra casa. El plano no va (es de esta casa). */
     exportDesign() {
-      const L = this.v.layouts || {}, keep = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: L[k].orientation || null } : null);
+      const L = this.v.layouts || {}, keep = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: L[k].orientation || null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null, style: L[k].style || null, bg: L[k].bg && L[k].bg.kind !== 'image' ? L[k].bg : null } : null);
       const data = { format: 'matterai-dashboard', version: 1, name: this.v.name, exported: new Date().toISOString(), layouts: { phone: keep('phone'), tablet: keep('tablet') } };
       const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
       const a = document.createElement('a');
@@ -1690,5 +1723,5 @@
     }
   }
 
-  window.MaeEditor = { open, _Editor: Editor };
+  window.MaeEditor = { open, _Editor: Editor, adapt: Editor.adapt, readTemplate: Editor.readTemplate, review: Editor.review, entitiesIn: Editor.entitiesIn };
 })();
