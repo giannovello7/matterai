@@ -434,3 +434,37 @@ async def test_app_learns_local_address(hass, hass_ws_client, hass_client_no_aut
     # NEGATIVO: un usuario que no es un equipo de la casa no la puede pedir
     msg = await _ws(hass_ws_client, hass, hass_read_only_access_token, 3, {"type": "matterai/app/net"})
     assert not msg["success"]
+
+
+# ---------------------------------------------------------------- puesta en marcha
+async def test_setup_checklist(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """El paso a paso se tilda solo con lo que tiene la casa; lo de la entrega lo marca el instalador."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "matterai/setup"})
+    r = (await ws.receive_json())["result"]
+    st = {s["key"]: s for s in r["steps"]}
+    assert st["name"]["ok"] and st["url"]["ok"] and st["support"]["ok"], "los datos del alta ya están"
+    assert not st["local"]["ok"] and not st["phones"]["ok"] and not st["dashboard"]["ok"]
+    assert not st["central"]["ok"], "sin la clave de la casa no está conectada al panel central"
+    assert r["done"] < r["total"] and {g["key"] for g in r["groups"]} == {"casa", "central", "app", "auto", "entrega"}
+    # vincular un celular lo tilda solo
+    client = await hass_client_no_auth()
+    _, ana = await _pair(client, decode((await _link(ws, 2))["code"])["c"], "Ana")
+    await ws.send_json({"id": 3, "type": "matterai/setup"})
+    assert {s["key"]: s for s in (await ws.receive_json())["result"]["steps"]}["phones"]["ok"]
+    # lo de la entrega se marca y se desmarca
+    await ws.send_json({"id": 4, "type": "matterai/setup/mark", "key": "m_explain", "done": True})
+    res = await ws.receive_json()
+    m = {s["key"]: s for s in res["result"]["steps"]}["m_explain"]
+    assert m["ok"] and m["at"] and m["manual"]
+    await ws.send_json({"id": 5, "type": "matterai/setup/mark", "key": "m_explain", "done": False})
+    assert not {s["key"]: s for s in (await ws.receive_json())["result"]["steps"]}["m_explain"]["ok"]
+    # NEGATIVO: no se marcan pasos automáticos ni inventados
+    await ws.send_json({"id": 6, "type": "matterai/setup/mark", "key": "central", "done": True})
+    assert not (await ws.receive_json())["success"]
+    # NEGATIVO: un celular de la casa no ve ni marca la puesta en marcha
+    msg = await _ws(hass_ws_client, hass, ana["token"], 1, {"type": "matterai/setup"})
+    assert not msg["success"]
+    msg = await _ws(hass_ws_client, hass, ana["token"], 1, {"type": "matterai/setup/mark", "key": "m_push", "done": True})
+    assert not msg["success"]

@@ -39,6 +39,8 @@
   /* Menú: k = página; g = título de grupo. scope: client = lo ve el cliente, system = interno. */
   const NAV = [
     { k: 'home', l: 'Resumen', i: 'mdi:view-dashboard-outline' },
+    { k: 'setup', l: 'Puesta en marcha', i: 'mdi:clipboard-check-outline' },
+    { k: 'manual', l: 'Manual', i: 'mdi:book-open-variant' },
     { g: 'App del cliente', d: 'Lo que configurás para la app MatterAI' },
     { k: 'views', l: 'Dashboards', i: 'mdi:view-dashboard-edit-outline' },
     { k: 'casa', l: 'La casa', i: 'mdi:home-edit-outline' },
@@ -56,6 +58,8 @@
   ];
   const PAGES = {
     home: ['Resumen', 'Cómo está esta casa de un vistazo.', null],
+    setup: ['Puesta en marcha', 'El paso a paso para dejar la casa lista, igual en todos los clientes. Se va tildando solo a medida que configurás; lo de la entrega lo marcás vos.', 'system'],
+    manual: ['Manual', 'Todo lo que tiene MatterAI (la app, la integración y el panel central) y cómo se usa.', 'system'],
     casa: ['La casa', 'Los datos de la casa que usan todos los dashboards: tu marca y soporte, personas, ambientes con sus equipos, alarma, portones y cámaras, y qué secciones tiene la app.', 'client'],
     dash: ['Inicio clásico', 'La pantalla anterior a los dashboards (con el plano viejo). Sólo para equipos que todavía la usan (Opciones de la app → Diseño del inicio → Clásico).', 'client'],
     auto: ['Automatizaciones', 'Las del cliente y los equipos del instalador (portón inteligente, sensor de ocupación), que el cliente no ve.', 'client'],
@@ -137,6 +141,22 @@
   .qr svg,.qr img{width:100%;height:100%}
   .link{word-break:break-all;font-size:12px;opacity:.8;padding:10px;border-radius:10px;background:rgba(127,127,127,.12);margin:8px 0}
   .row{display:flex;gap:10px;flex-wrap:wrap;margin:12px 0 2px}
+  .mn{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;align-items:start;max-width:1200px}
+  @media (max-width:900px){.mn{grid-template-columns:minmax(0,1fr)}.mn-toc{position:static!important}}
+  .mn-toc{position:sticky;top:76px;display:flex;flex-direction:column;gap:2px}
+  .mn-toc input{padding:9px 12px;border-radius:10px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:var(--secondary-background-color,transparent);color:inherit;font:inherit;font-size:14px;margin-bottom:8px}
+  .mn-toc button{text-align:left;padding:8px 10px;border:0;border-radius:8px;background:none;color:inherit;font:inherit;font-size:13.5px;cursor:pointer;opacity:.8}.mn-toc button:hover{background:rgba(127,127,127,.12);opacity:1}
+  .mn-body{display:flex;flex-direction:column;gap:16px}.mn-sec{line-height:1.55;font-size:14.5px}.mn-sec h2{font-size:19px;margin-bottom:10px}.mn-sec h3{margin:18px 0 6px;font-size:15.5px}
+  .mn-sec ul,.mn-sec ol{margin:6px 0;padding-left:22px}.mn-sec li{margin:5px 0}.mn-sec code{font-size:12.5px;padding:1px 6px;border-radius:6px;background:rgba(127,127,127,.15)}
+  .mn-note{padding:10px 14px;border-radius:12px;background:rgba(3,169,244,.1);border-left:3px solid var(--primary-color,#03a9f4);margin:10px 0}
+  .su-top{display:flex;flex-direction:column;gap:12px;margin-bottom:18px}.su-top b{display:block;font-size:18px}.su-top .mut{display:block;margin-top:4px}
+  .su-bar{height:10px;border-radius:999px;background:rgba(127,127,127,.18);overflow:hidden}.su-bar i{display:block;height:100%;border-radius:999px;background:var(--primary-color,#03a9f4);transition:width .4s}
+  .su-g{margin-bottom:16px}.su-g .bh .ok{font-weight:600;font-size:13px}
+  .su-s{display:flex;align-items:flex-start;gap:12px;padding:12px 2px;border-top:1px solid var(--divider-color,rgba(127,127,127,.15))}
+  .su-s>ha-icon{flex:none;margin-top:1px;opacity:.5}.su-s.ok>ha-icon{color:#3ecf8e;opacity:1}.su-s.todo>ha-icon{color:#ffb547;opacity:1}
+  .su-t{flex:1;min-width:0}.su-t b{display:block;font-size:14.5px;font-weight:600}.su-s.ok .su-t b{opacity:.75}
+  .su-t span{display:block;opacity:.7;font-size:13px;margin-top:2px;line-height:1.45}.su-t small{display:block;font-size:12.5px;margin-top:4px;color:var(--primary-color,#03a9f4)}
+  .su-chk{display:inline-flex;align-items:center;gap:8px;font-size:13px;cursor:pointer;white-space:nowrap;padding-top:2px}.su-chk input{width:18px;height:18px}
   .wz-ov{position:fixed;inset:0;z-index:30;background:rgba(0,0,0,.5);display:grid;place-items:center;padding:16px}
   .wz{width:min(620px,100%);max-height:calc(100vh - 32px);display:flex;flex-direction:column;border-radius:20px;background:var(--card-background-color,#1c1c1e);color:var(--primary-text-color,#eee);box-shadow:0 20px 60px rgba(0,0,0,.4);overflow:hidden}
   .wz-h{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--divider-color,rgba(127,127,127,.2))}.wz-h ha-icon{color:var(--primary-color,#03a9f4)}
@@ -288,7 +308,7 @@
       this._timer = setInterval(() => { if (!document.hidden && AUTO_REFRESH.has(this._tab)) this._render(this._tab, true); }, 30000);
     }
     _render(tab, quiet = false) {
-      const R = { home: this._renderHome, dash: this._renderDash, casa: this._renderCasa, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
+      const R = { home: this._renderHome, setup: this._renderSetup, manual: this._renderManual, dash: this._renderDash, casa: this._renderCasa, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
         backup: () => this._renderCopias('backup'), tpl: () => this._renderCopias('tpl'), conn: this._renderConn, voice: this._renderVoice, house: this._renderHouse, sec: this._renderSec, views: this._renderViews };
       const main = this.shadowRoot.getElementById('main');
       if (!quiet) main.innerHTML = `${this._head(tab)}<div class="box"><p class="mut">Cargando…</p></div>`;
@@ -357,7 +377,9 @@
       const outdated = c.latest && c.latest !== s.version;
       const tile = (go, icon, label, value, cls, sub) => `<button class="tile" data-go="${go}"><small><ha-icon icon="${icon}"></ha-icon>${esc(label)}</small><b class="${cls}">${value}</b><span>${sub}</span></button>`;
       const alertsN = al.filter((a) => a.level !== 'info').length;
-      this._page('home', `<div class="tiles">
+      let su = null; try { su = await this._hass.callWS({ type: 'matterai/setup' }); } catch (_) { su = null; }
+      const setupTile = su && su.done < su.total ? tile('setup', 'mdi:clipboard-check-outline', 'Puesta en marcha', `${su.done} de ${su.total}`, 'wn', 'Ver lo que falta para dejarla lista') : '';
+      this._page('home', `<div class="tiles">${setupTile}
           ${tile('health', 'mdi:heart-pulse', 'Estado de la casa', alertsN ? plural(alertsN, 'aviso', 'avisos') : 'Todo en orden', alertsN ? (crit ? 'bad' : 'wn') : 'ok', alertsN ? 'Ver qué hay que atender' : 'Sin nada pendiente')}
           ${tile('wd', 'mdi:shield-sync-outline', 'Servicios vigilados', wd ? (svcs.length ? `${okSvc} de ${svcs.length}` : '—') : '…', wd && okSvc < svcs.length ? 'wn' : 'ok', wd && wd.maintenance_until ? `En mantenimiento hasta ${esc(when(wd.maintenance_until))}` : 'funcionando')}
           ${tile('health', 'mdi:lan-disconnect', 'Equipos sin responder', st.unavailable, st.unavailable ? 'wn' : 'ok', `de ${st.entities} entidades`)}
@@ -1057,6 +1079,64 @@ ${eqBox}
         if (await call({ type: 'matterai/app/revoke', user_id: p.user_id }, 'Equipo desvinculado')) again();
       }; });
       main.querySelectorAll('[data-asg]').forEach((sel) => { sel.onchange = async () => { await call({ type: 'matterai/views/assign', device_id: sel.dataset.asg, view_id: sel.value || null }, 'Asignado: el equipo lo toma al instante'); again(); }; });
+    }
+
+    /* ---------- Manual: frontend/manual.md (viaja con cada versión de la integración) ---------- */
+    async _renderManual() {
+      let md = '';
+      try { const res = await fetch(`${BASE}/manual.md?v=${Date.now()}`); md = res.ok ? await res.text() : ''; } catch (_) { md = ''; }
+      if (!md) { this._page('manual', '<div class="box"><p class="mut">No se pudo cargar el manual.</p></div>'); return; }
+      const inl = (t) => esc(t).replace(/`([^`]+)`/g, '<code>$1</code>').replace(/\*\*([^*]+)\*\*/g, '<b>$1</b>');
+      const secs = []; let cur = null, list = null;
+      const close = () => { if (list) { cur.html += `</${list}>`; list = null; } };
+      md.replace(/\r/g, '').split('\n').forEach((ln) => {
+        let mm;
+        if ((mm = ln.match(/^# (.+)/))) { if (cur) close(); cur = { t: mm[1], id: `m${secs.length}`, html: '' }; secs.push(cur); return; }
+        if (!cur) return;
+        if ((mm = ln.match(/^## (.+)/))) { close(); cur.html += `<h3>${inl(mm[1])}</h3>`; return; }
+        if ((mm = ln.match(/^(\d+)\. (.+)/))) { if (list !== 'ol') { close(); cur.html += '<ol>'; list = 'ol'; } cur.html += `<li>${inl(mm[2])}</li>`; return; }
+        if ((mm = ln.match(/^- (.+)/))) { if (list !== 'ul') { close(); cur.html += '<ul>'; list = 'ul'; } cur.html += `<li>${inl(mm[1])}</li>`; return; }
+        if ((mm = ln.match(/^> (.+)/))) { close(); cur.html += `<div class="mn-note">${inl(mm[1])}</div>`; return; }
+        if (!ln.trim()) { close(); return; }
+        close(); cur.html += `<p>${inl(ln)}</p>`;
+      });
+      if (cur) close();
+      const main = this._page('manual', `<div class="mn"><nav class="mn-toc"><input id="mnq" placeholder="Buscar en el manual…" autocomplete="off">${secs.map((x) => `<button data-mn="${x.id}">${esc(x.t)}</button>`).join('')}</nav>
+        <div class="mn-body">${secs.map((x) => `<section class="box mn-sec" id="${x.id}"><h2>${esc(x.t)}</h2>${x.html}</section>`).join('')}<p class="mut" id="mnnone" hidden>No encontré nada con esa palabra.</p></div></div>`);
+      if (!main) return;
+      main.querySelectorAll('[data-mn]').forEach((b) => { b.onclick = () => { const el = main.querySelector(`#${b.dataset.mn}`); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); }; });
+      const q = main.querySelector('#mnq');
+      q.oninput = () => {
+        const w = q.value.trim().toLowerCase(); let any = false;
+        main.querySelectorAll('.mn-sec').forEach((sec) => { const hit = !w || sec.textContent.toLowerCase().includes(w); sec.hidden = !hit; any = any || hit; });
+        main.querySelector('#mnnone').hidden = any;
+      };
+    }
+
+    /* ---------- Puesta en marcha: el paso a paso de cada instalación ---------- */
+    async _renderSetup() {
+      const r = await this._hass.callWS({ type: 'matterai/setup' });
+      const pct = r.total ? Math.round((r.done / r.total) * 100) : 0;
+      const when = (t) => new Date(t * 1000).toLocaleDateString('es-AR', { day: 'numeric', month: 'short' });
+      const step = (x) => {
+        const st = x.ok === true ? 'ok' : x.ok === null ? 'wait' : x.optional ? 'opt' : 'todo';
+        const icon = { ok: 'mdi:check-circle', wait: 'mdi:clock-outline', opt: 'mdi:circle-outline', todo: 'mdi:circle-outline' }[st];
+        const act = x.manual ? `<label class="su-chk"><input type="checkbox" data-mark="${esc(x.key)}" ${x.ok ? 'checked' : ''}><span>${x.ok ? `Hecho${x.at ? ` · ${esc(when(x.at))}` : ''}` : 'Marcar hecho'}</span></label>`
+          : x.ok || !x.go ? '' : `<button class="b" data-go="${esc(x.go)}">Ir</button>`;
+        return `<div class="su-s ${st}"><ha-icon icon="${icon}"></ha-icon><div class="su-t"><b>${esc(x.title)}${x.optional ? ' <small class="mut">(si corresponde)</small>' : ''}</b>
+          <span>${esc(x.help)}</span>${x.detail ? `<small>${esc(x.detail)}</small>` : ''}</div>${act}</div>`;
+      };
+      const main = this._page('setup', `<div class="box su-top"><div><b>${r.done === r.total ? '¡La casa está lista!' : `Van ${r.done} de ${r.total} pasos`}</b>
+          <span class="mut">${r.done === r.total ? 'Todo lo necesario está hecho. Lo que dice «si corresponde» depende de cada cliente.' : 'Los pasos se tildan solos cuando la casa ya los tiene. Tocá «Ir» para hacer el que falta.'}</span></div>
+          <div class="su-bar"><i style="width:${pct}%"></i></div></div>
+        ${r.groups.map((g) => { const ss = r.steps.filter((x) => x.group === g.key); const ok = ss.filter((x) => x.ok || x.optional).length === ss.length;
+          return `<div class="box su-g"><div class="bh"><h2>${esc(g.title)}</h2>${ok ? '<span class="ok">✓ Listo</span>' : ''}</div><p class="mut" style="margin-top:0">${esc(g.desc)}</p>${ss.map(step).join('')}</div>`; }).join('')}
+        <p class="mut">¿No sabés cómo se hace un paso? Está explicado en el <button class="lnk" data-go="manual">Manual</button>.</p>`);
+      if (!main) return;
+      main.querySelectorAll('[data-mark]').forEach((c) => { c.onchange = async () => {
+        try { await this._hass.callWS({ type: 'matterai/setup/mark', key: c.dataset.mark, done: c.checked }); } catch (e) { this._toast(`No se pudo: ${e.message || e}`); }
+        this._renderSetup();
+      }; });
     }
 
     /* ---------- Asistente: un dashboard para un cliente nuevo, adaptado a esta casa ---------- */
