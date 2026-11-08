@@ -173,6 +173,9 @@ def resolve(view: dict[str, Any] | None, kind: str | None) -> dict[str, Any] | N
     out["theme"] = (lay or {}).get("theme") or None    # oscuro, claro o automático (según el equipo)
     out["style"] = (lay or {}).get("style") or None    # estilo prearmado (MatterAI, tipo Apple, cristal)
     out["bg"] = (lay or {}).get("bg") or None          # fondo propio (color, degradé o imagen de la casa)
+    for k in ("v", "cols", "side"):                    # diseño v2: columnas de la tablet con su ancho
+        if (lay or {}).get(k) is not None:
+            out[k] = lay[k]
     return out
 
 

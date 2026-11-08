@@ -181,6 +181,11 @@
   .tsw.tk-control4{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.tsw.tk-control4 i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}
   .tsw.tk-savant{background:#050505}.tsw.tk-savant i{background:#161616;border-radius:2px}.tsw.tk-savant i:first-child{background:#c9a96e}
   .eseg.wrap{flex-wrap:wrap;height:auto}
+  .cpk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+  .cpk button{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:10px;border-radius:12px;border:1px solid rgba(160,175,200,.18);background:#1e242e;color:inherit;cursor:pointer;text-align:left}
+  .cpk button.on{border-color:#f2b766;box-shadow:0 0 0 1px #f2b766 inset}.cpk b{font-size:13px}
+  .ctn{display:flex;gap:4px;width:100%;height:54px;padding:5px;box-sizing:border-box;border-radius:8px;background:#0d1116}
+  .ctn .sd{display:block;width:30%;border-radius:4px;background:#f2b766;opacity:.8}.ctn .cg{flex:1;display:flex;gap:4px}.ctn .cg i{display:block;border-radius:4px;background:#2f3a49}
   .bgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px;margin-bottom:6px}
   .bgs>button,.bgs>label{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:0;background:none;color:inherit;cursor:pointer;font:inherit}
   .bgs .bsw{position:relative;width:100%;aspect-ratio:3/4;border-radius:10px;border:2px solid rgba(160,175,200,.2);display:grid;place-items:center;font-size:18px;color:#8f99ab;overflow:hidden;box-sizing:border-box}
@@ -204,7 +209,7 @@
       const v = lst.views.find((x) => x.id === this.viewId);
       if (!v) { this.p._toast('Ese dashboard no existe'); return; }
       this.cfg = cfg.config || {};
-      this.v = Editor.normalize(clone(v));
+      this.v = Editor.v2(Editor.normalize(clone(v)));
       this.K = this.k0 || v.kind || 'phone';
       this.saved = clone(this.v);
       // la tarjeta MatterAI sin dibujarse: da el modelo de la casa (ambientes, luces, cámaras…)
@@ -270,7 +275,7 @@
     blockAct(id, act) {
       const B = this.blocks(), i = B.findIndex((b) => b.id === id); if (i < 0) return;
       if (act === 'up' || act === 'down') return this.change(() => this.move(id, act === 'up' ? -1 : 1));
-      if (act === 'left' || act === 'right') return this.change(() => { B[i].col = Math.max(0, Math.min(2, (B[i].col || 0) + (act === 'left' ? -1 : 1))); });
+      if (act === 'left' || act === 'right') return this.change(() => { delete B[i].zone; B[i].col = Math.max(0, Math.min(this.colsInfo().n - 1, (B[i].col || 0) + (act === 'left' ? -1 : 1))); });
       if (act === 'dup') return this.change(() => { const nb = clone(B[i]); nb.id = this.newId(nb.type); B.splice(i + 1, 0, nb); this.sel = nb.id; });
       if (act === 'del') {
         const name = (window.MaeVista.CATALOG[B[i].type] || {}).name || B[i].type;
@@ -289,28 +294,33 @@
           const j = B.findIndex((x) => x.id === where.target);
           if (j < 0) { B.splice(i, 0, b); return; }
           b.col = B[j].col || 0;
+          if (B[j].zone) b.zone = B[j].zone; else delete b.zone;
           B.splice(j + (where.after ? 1 : 0), 0, b);
-        } else { b.col = this.K === 'tablet' ? where.col || 0 : 0; B.push(b); }
+        } else if (where.zone && this.K === 'tablet') { b.zone = where.zone; b.fill = false; B.push(b); }
+        else { b.col = this.K === 'tablet' ? where.col || 0 : 0; delete b.zone; B.push(b); }
         this.sel = b.id;
       });
     }
     /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
-    addBlock(type, col) {
+    addBlock(type, col, zone) {
       const K = this.K, CAT = window.MaeVista.CATALOG;
       const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
       const titled = ['frigate', 'rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text', 'agenda', 'irrigation'];
       const b = { id: this.newId(type), type, col: K === 'tablet' ? (col != null ? col : type === 'plan' ? 0 : 1) : 0, cfg };
+      if (K === 'tablet' && zone) b.zone = zone;
+      // el plano llena el alto que sobra en su columna (y deja lugar a las demás tarjetas)
+      if (type === 'plan' && K === 'tablet' && !zone) b.fill = true;
       if (titled.includes(type)) b.title = type === 'frigate' ? 'Cámaras' : CAT[type].name;
       this.change(() => { this.blocks().push(b); this.sel = b.id; this.roomEd = null; this.rdraft = null; });
     }
     /** Catálogo de tarjetas (como «Agregar tarjeta» de Home Assistant), con buscador. */
-    openCatalog(col) {
+    openCatalog(col, zone) {
       this.closeCatalog();
       const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
         weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list', frigate: 'cam', openings: 'door', agenda: 'cal', irrigation: 'water', batteries: 'battery' };
       const box = document.createElement('div');
       box.className = 'catp';
-      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' && col != null ? ` · ${col === 0 ? 'columna del plano' : `columna ${col}`}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
+      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' ? (zone ? ` · banda de ${zone === 'top' ? 'arriba' : 'abajo'}` : col != null ? ` · ${this.colName(col).toLowerCase()}` : '') : ''}</b><button class="eb sm" data-cx>✕</button></div>
         <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div></div>`;
       this.wrap.appendChild(box);
       this.catBox = box;
@@ -325,7 +335,7 @@
       box.onclick = (e) => {
         if (e.target === box || e.target.closest('[data-cx]')) return this.closeCatalog();
         const ck = e.target.closest('[data-ck]'); if (!ck) return undefined;
-        this.closeCatalog(); this.addBlock(ck.dataset.ck, col);
+        this.closeCatalog(); this.addBlock(ck.dataset.ck, col, zone);
         return undefined;
       };
       paint(); inp.focus();
@@ -361,9 +371,35 @@
       delete v.blocks; delete v.orientation; delete v.updated; delete v.by;
       return v;
     }
+    /** Formato v2 (columnas con ancho, bandas, ancho en cuartos) para los dos diseños: se ve igual que antes. */
+    static v2(v) {
+      const M = window.MaeVista;
+      ['phone', 'tablet'].forEach((k) => { const L = v.layouts && v.layouts[k]; if (L && L.blocks && L.blocks.length && M && M.migrateLayout) v.layouts[k] = M.migrateLayout(L, k); });
+      return v;
+    }
+    /** Columnas de la tablet de este diseño (anchos) y si la primera va al costado. */
+    colsInfo() { const L = this.lay(); const cols = Array.isArray(L.cols) && L.cols.length ? L.cols : [0, 1, 1]; return { cols, side: L.side !== false, n: cols.length }; }
+    colName(i) { const { side } = this.colsInfo(); return side && i === 0 ? 'Columna del costado' : `Columna ${side ? i : i + 1}`; }
     get K() { return this._k || (this.v && this.v.kind) || 'phone'; }
     set K(k) { this._k = k; }
     lay() { const L = this.v.layouts || (this.v.layouts = {}); return L[this.K] || (L[this.K] = { blocks: [] }); }
+    /** Lugares de la tablet: cada columna y las bandas de arriba y de abajo. */
+    placeOpts() { const { n } = this.colsInfo(); return [['top', 'Banda de arriba'], ...Array.from({ length: n }, (_, i) => [`c${i}`, this.colName(i)]), ['bottom', 'Banda de abajo']]; }
+    placeOf(b) { return b.zone ? b.zone : `c${Math.min(this.colsInfo().n - 1, +b.col || 0)}`; }
+    setPlace(b, k) { if (k === 'top' || k === 'bottom') { b.zone = k; b.fill = false; } else { delete b.zone; b.col = +String(k).replace('c', ''); } }
+    /** Elegir las columnas de la tablet (y si la primera va al costado). */
+    chooseCols() {
+      const P = window.MaeVista.TABLET_PRESETS || [], cur = this.colsInfo();
+      const thumb = (o) => `<span class="ctn">${o.side ? '<i class="sd"></i>' : ''}<span class="cg">${(o.side ? o.cols.slice(1) : o.cols).map((w) => `<i style="flex:${w || 1}"></i>`).join('')}</span></span>`;
+      this.modal('Columnas de la tablet', `<div class="cpk">${P.map(([k, l, o]) => `<button data-cp="${k}" class="${o.side === cur.side && o.cols.join() === cur.cols.join() ? 'on' : ''}">${thumb(o)}<b>${esc(l)}</b></button>`).join('')}</div>
+        <p class="hint">Las tarjetas de una columna que deja de existir pasan a la última. Arriba y abajo hay además una banda de lado a lado.</p>`, (e) => {
+        const x = e.target.closest('[data-cp]'); if (!x) return;
+        const o = (P.find((y) => y[0] === x.dataset.cp) || [])[2]; if (!o) return;
+        this.closeCatalog();
+        this.change(() => { const L = this.lay(); L.v = 2; L.side = o.side; L.cols = o.cols.slice(); (L.blocks || []).forEach((b) => { if (!b.zone && (b.col || 0) > o.cols.length - 1) b.col = o.cols.length - 1; }); });
+        this.toast('Columnas cambiadas');
+      });
+    }
     /** «Cómo se ve» de una tarjeta: botones para tocar (no una lista desplegable). */
     styleSeg(c, opts, def) {
       const cur = c.style || def;
@@ -384,7 +420,7 @@
         <p class="hint">«Del estilo» usa el fondo propio de cada estilo. Los fondos «(claro)» quedan mejor con el modo Claro.</p>`;
     }
     /** Lo que ve el motor: el dashboard con las tarjetas del tipo que se está editando. */
-    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, theme: l.theme || null, style: l.style || null, bg: l.bg || null, layouts: undefined }); }
+    viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, theme: l.theme || null, style: l.style || null, bg: l.bg || null, v: l.v, cols: l.cols, side: l.side, layouts: undefined }); }
     model() { return this.card && this.card.model ? this.card.model() : null; }
     states() { return this.hass.states; }
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
@@ -400,10 +436,11 @@
 
     prearmado(silent) {
       const m = this.model();
-      const d = window.MaeVista.defaults(this.K, m || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, this.v, this.states(), this.cfg.floorplan);
+      const d0 = window.MaeVista.defaults(this.K, m || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, this.v, this.states(), this.cfg.floorplan);
+      const d = window.MaeVista.migrateLayout(d0, this.K);
       if (!silent) this.push();
       const l = this.lay();
-      l.blocks = d.blocks;
+      l.blocks = d.blocks; l.v = 2; if (this.K === 'tablet') { l.side = d.side; l.cols = d.cols; }
       if (!this.v.plan && d.plan) this.v.plan = d.plan;
       if (this.K === 'tablet' && !l.orientation) l.orientation = d.orientation || 'landscape';
       if (silent) this.baseline();
@@ -442,7 +479,7 @@
       const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Estilo y fondo' : this.zone === 'allb' ? 'Botón «Toda la casa»'
         : b ? `${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : '';
       const sub = this.roomEd != null || this.el != null || this.pz != null;
-      const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Configuración'], ['vis', 'Visibilidad'], ['lay', 'Diseño']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
+      const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Contenido'], ['lay', 'Aspecto'], ['vis', 'Cuándo se ve']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
       this.$('#dlgh').innerHTML = `<div class="dlg-t"><b>${b ? 'Editar tarjeta' : 'Editar'}</b><small>${esc(title)}</small></div><button class="eb ico" data-dx="cancel" title="Cerrar sin guardar (Esc)">✕</button>${tabs}`;
       this.$('#dlgf').innerHTML = `${b ? '<button class="eb warn" data-dx="del">Borrar</button>' : ''}<span class="sp"></span><button class="eb" data-dx="cancel">Cancelar</button><button class="eb pri" data-dx="ok">Guardar</button>`;
     }
@@ -453,7 +490,7 @@
       const other = K === 'tablet' ? 'phone' : 'tablet', hasOther = !!(((v.layouts || {})[other] || {}).blocks || []).length;
       this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver">← Volver</button><h2>${esc(v.name)}</h2>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
-          ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span>` : ''}
+          ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span><button class="eb" data-e="cols" title="Cuántas columnas y de qué ancho">▦ Columnas</button>` : ''}
           <span class="eseg" title="Modo de día o de noche de este diseño (el cliente también lo puede cambiar en Opciones)">${[['dark', '☾ Oscuro'], ['light', '☀ Claro'], ['auto', 'Auto']].map(([k, l]) => `<button data-theme="${k}" class="${(this.lay().theme || 'dark') === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           <button class="eb" data-e="dash" title="Estilo, fondo, modo y nombre de este diseño">🎨 Estilo</button>
           <button class="eb ${this.playing ? 'pri' : ''}" data-e="play" title="${this.playing ? 'Volver a editar' : 'Usar la pantalla como en el celular (prender luces, cambiar de cámara, entrar a un ambiente)'}">${this.playing ? '✎ Editar' : '▶ Probar'}</button>
@@ -562,7 +599,7 @@
       return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
         onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
-        onMove: (from, where) => this.moveTo(from, where), onAdd: (col) => this.openCatalog(col), onRoom: (a, i) => this.roomAct(a, i),
+        onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone) => this.openCatalog(col, zone), onRoom: (a, i) => this.roomAct(a, i),
         room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
     }
     /** Tocar algo en la pantalla del medio: la tarjeta, y si fue un ambiente, se abre por dentro para editarlo. */
@@ -593,14 +630,14 @@
       const K = this.K, CAT = window.MaeVista.CATALOG;
       this.modal(`${(CAT[b.type] || {}).name || b.type}${b.title ? ` · ${b.title}` : ''}`, `<div class="mlist">
         <button data-cm="edit">✎ Editar</button><button data-cm="dup">⧉ Duplicar</button><button data-cm="copy">↗ Copiar a otro dashboard…</button>
-        ${K === 'tablet' ? [[0, 'columna del plano'], [1, 'columna 1'], [2, 'columna 2']].filter(([c]) => c !== (b.col || 0)).map(([c, l]) => `<button data-cm="col" data-c="${c}">⇄ Pasar a la ${l}</button>`).join('') : ''}
+        ${K === 'tablet' ? this.placeOpts().filter(([k]) => k !== this.placeOf(b)).map(([k, l]) => `<button data-cm="col" data-c="${k}">⇄ Pasar a: ${esc(l)}</button>`).join('') : ''}
         <button data-cm="del" class="warn">✕ Borrar la tarjeta</button></div>`, (e) => {
         const x = e.target.closest('[data-cm]'); if (!x) return;
         this.closeCatalog();
         const k = x.dataset.cm;
         if (k === 'edit') this.pick(id);
         else if (k === 'copy') this.copyTo(b);
-        else if (k === 'col') this.change(() => { b.col = +x.dataset.c; });
+        else if (k === 'col') this.change(() => this.setPlace(b, x.dataset.c));
         else this.blockAct(id, k);
       });
     }
@@ -840,6 +877,7 @@
       const S = this.states(), opts = (doms) => Object.keys(S).filter((e) => doms.includes(e.split('.')[0])).sort().map((e) => [e, this.fname(e)]);
       if (this.el != null && b.type !== 'rooms') { r.innerHTML = this.elemEditor(b, this.el, opts); return; }
       let h = `<h4>${esc((CAT[b.type] || {}).name || b.type)}</h4><label class="fld"><span>Título (vacío: sin título)</span><input data-f="title" value="${esc(b.title || '')}"></label>`;
+      let hs = ''; // el aspecto propio de la tarjeta (va en la pestaña Aspecto)
       const autoChk = (txt) => `<label class="chk"><input type="checkbox" data-fb="cfg.auto" ${c.auto ? 'checked' : ''}> ${txt}</label>`;
       switch (b.type) {
         case 'kpis': h += this.elemSection(b); break;
@@ -848,33 +886,34 @@
           if (b.type === 'camera') h += this.elemSection(b);
           break;
         case 'rooms':
-          h += this.styleSeg(c, [['list', 'Lista'], ['grid', 'Grilla'], ['photo', 'Tarjetas grandes']], 'list');
+          hs += this.styleSeg(c, [['list', 'Lista'], ['grid', 'Grilla'], ['photo', 'Tarjetas grandes']], 'list');
           if (this.roomEd != null) { r.innerHTML = this.roomEditor(); return; }
           h += this.elemSection(b);
           h += '<p class="hint">Cada persona también puede fijar o sacar ambientes desde su celular (mantener apretado).</p>';
           break;
-        case 'scenes': h += this.styleSeg(c, [['', 'Botones'], ['covers', 'Portadas de colores']], ''); h += this.elemSection(b); break;
+        case 'scenes': hs += this.styleSeg(c, [['', 'Botones'], ['covers', 'Portadas de colores']], ''); h += this.elemSection(b); break;
         case 'routines':
-          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="">Un botón que abre todas las rutinas</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Lista en la pantalla (las primeras 4)</option></select></label>`;
+          hs += this.styleSeg(c, [['', 'Un botón que abre todas'], ['list', 'Lista (las primeras 4)']], '');
           h += this.elemSection(b); break;
         case 'buttons':
-          h += this.styleSeg(c, [['grid', 'Grilla'], ['list', 'Lista'], ['tiles', 'Mosaicos'], ['chips', 'Fila de accesos']], 'grid');
+          hs += this.styleSeg(c, [['grid', 'Grilla'], ['list', 'Lista'], ['tiles', 'Mosaicos'], ['chips', 'Fila de accesos']], 'grid');
+          hs += `<div class="fld"><span>Botones por fila</span><span class="eseg">${[['', 'Auto'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']].map(([k, l]) => `<button data-ccols="${k}" class="${String(c.cols || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           h += this.elemSection(b); break;
         case 'alarm': h += this.ent('Alarma (vacío: la de la casa)', 'al', c.entity, PICK.alarm, 'cfg.entity'); break;
         case 'away': h += this.ent('Interruptor, escena o script', 'aw', c.entity, PICK.away, 'cfg.entity'); break;
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
         case 'plan':
-          h += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
+          hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
         case 'weather': h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
         case 'climate':
           h += this.ent('Aire o termostato', 'cl', c.entity, ['climate'], 'cfg.entity');
-          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="">Compacto (una fila con − y +)</option><option value="big" ${c.style === 'big' ? 'selected' : ''}>Termostato grande (dial)</option></select></label>`;
+          hs += this.styleSeg(c, [['', 'Compacto (− y +)'], ['big', 'Termostato grande']], '');
           break;
         case 'openings':
-          h += `<label class="fld"><span>Qué muestra</span><select data-f="cfg.style"><option value="">Sólo lo que quedó abierto</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Todas las puertas y ventanas</option></select></label>
-            <p class="hint">Toma solos los sensores de puertas, ventanas y portones de la casa. Tocar la tarjeta abre «Puertas y ventanas».</p>`;
+          hs += this.styleSeg(c, [['', 'Sólo lo abierto'], ['list', 'Todas']], '');
+          h += `<p class="hint">Toma solos los sensores de puertas, ventanas y portones de la casa. Tocar la tarjeta abre «Puertas y ventanas».</p>`;
           break;
         case 'agenda': {
           const cals = Object.keys(this.states()).filter((x) => x.startsWith('calendar.'));
@@ -904,7 +943,7 @@
             <p class="hint">Abre la Actividad con filtros por día, tipo, ambiente y un buscador de equipos. Tocar un evento muestra el historial de ese equipo (como en Home Assistant).</p>`;
           break;
         case 'text':
-          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="separator" ${c.style === 'separator' ? 'selected' : ''}>Separador (sólo el título)</option><option value="" ${c.style !== 'separator' ? 'selected' : ''}>Nota con texto</option></select></label>`;
+          hs += this.styleSeg(c, [['separator', 'Separador (sólo el título)'], ['', 'Nota con texto']], '');
           if (c.style !== 'separator') h += `<label class="fld"><span>Texto</span><textarea data-f="cfg.text" maxlength="600" style="font-family:inherit;font-size:13px;min-height:90px">${esc(c.text || '')}</textarea></label>`;
           break;
         case 'image':
@@ -915,11 +954,15 @@
           break;
         default: h += '<p class="hint">Esta tarjeta no tiene opciones.</p>';
       }
-      if (b.type === 'buttons') h += `<label class="fld"><span>Botones por fila</span><select data-f="cfg.cols"><option value="">Automático</option>${[1, 2, 3, 4].map((n) => `<option value="${n}" ${c.cols === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>`;
-      let lay = '<h4>Diseño</h4>';
-      if (this.K === 'tablet') lay += `<label class="fld"><span>Columna</span><select data-f="col">${[[0, 'Del plano'], [1, 'Columna 1'], [2, 'Columna 2']].map(([k, l]) => `<option value="${k}" ${(b.col || 0) === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>`;
-      lay += `<label class="fld"><span>Ancho</span><select data-f="size"><option value="">Completo</option><option value="half" ${b.size === 'half' ? 'selected' : ''}>Media columna (van de a dos)</option></select></label>
-        <p class="hint">Para moverla, arrastrala en la pantalla. Con ⋮ (en la tarjeta) se duplica, se copia a otro dashboard o se borra.</p>`;
+      // Aspecto: lo propio de la tarjeta y dónde va (todo con botones, sin listas)
+      const span = +b.span || (b.size === 'half' ? 2 : 4);
+      let lay = hs ? `<h4>Cómo se ve</h4>${hs}` : '';
+      lay += `<h4>Tamaño y lugar</h4><div class="fld"><span>Ancho</span><span class="eseg">${[[1, '¼'], [2, '½'], [3, '¾'], [4, 'Completo']].map(([k, l]) => `<button data-span="${k}" class="${span === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
+      if (this.K === 'tablet') {
+        lay += `<div class="fld"><span>Dónde va</span><span class="eseg wrap">${this.placeOpts().map(([k, l]) => `<button data-place="${k}" class="${this.placeOf(b) === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</span></div>`;
+        if (!b.zone) lay += `<label class="chk"><input type="checkbox" data-fill ${b.fill ? 'checked' : ''}> Llenar el alto que sobra en su columna (ideal para el plano)</label>`;
+      }
+      lay += '<p class="hint">Para moverla, también podés arrastrarla en la pantalla. Con ⋮ (en la tarjeta) se duplica, se copia a otro dashboard o se borra.</p>';
       const tab = this.$('#edl') ? 'all' : (this.tab || 'cfg');
       r.innerHTML = tab === 'vis' ? this.condEditor(b) : tab === 'lay' ? lay : tab === 'all' ? h + lay + this.condEditor(b) : h;
       const ip = r.querySelector('[data-imgprev]'); if (ip) this.signed(ip.dataset.imgprev).then((u) => { ip.src = u; }).catch(() => {});
@@ -1179,7 +1222,7 @@
       if (ed) ed.onclick = (e) => { if ((this.moreOpen || this.simOpen) && !e.composedPath().some((x) => x.classList && x.classList.contains('emenu'))) { this.moreOpen = false; this.simOpen = false; this.draw(); } };
       W.querySelectorAll('[data-kind]').forEach((x) => { x.onclick = () => {
         if (x.dataset.kind === this.K) return;
-        this.K = x.dataset.kind; this.sel = null; this.roomEd = null; this.rdraft = null;
+        this.K = x.dataset.kind; this.sel = null; this.roomEd = null; this.rdraft = null; this.dlgSnap = null; this.zone = null;
         if (!this.blocks().length) this.prearmado(true); // todavía no tiene diseño para este tipo: arranca del prearmado
         this.draw();
       }; });
@@ -1297,6 +1340,11 @@
         row.ondrop = (e) => { e.preventDefault(); const d = this.srDrag; this.srDrag = null; if (d && d.g === row.dataset.sr) this.reorder(d.g, d.i, +row.dataset.i); };
       });
       W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
+      const selB = () => this.blocks().find((y) => y.id === this.sel);
+      W.querySelectorAll('#edr [data-span]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; const n = +x.dataset.span; if (n >= 4) { delete bb.span; delete bb.size; } else { bb.span = n; if (n === 2) bb.size = 'half'; else delete bb.size; } }); });
+      W.querySelectorAll('#edr [data-place]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (bb) this.setPlace(bb, x.dataset.place); }); });
+      W.querySelectorAll('#edr [data-fill]').forEach((x) => { x.onchange = () => this.change(() => { const bb = selB(); if (bb) { if (x.checked) bb.fill = true; else delete bb.fill; } }); });
+      W.querySelectorAll('#edr [data-ccols]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; bb.cfg = bb.cfg || {}; if (x.dataset.ccols) bb.cfg.cols = +x.dataset.ccols; else delete bb.cfg.cols; }); });
       W.querySelectorAll('#edr [data-cst]').forEach((x) => { x.onclick = () => this.change(() => {
         const bb = this.blocks().find((y) => y.id === this.sel); if (!bb) return;
         bb.cfg = bb.cfg || {}; if (x.dataset.cst) bb.cfg.style = x.dataset.cst; else delete bb.cfg.style;
@@ -1419,6 +1467,7 @@
       if (k === 'plan') return this.planEditor();
       if (k === 'history') return this.historyDlg();
       if (k === 'tpl') return this.chooseTemplate();
+      if (k === 'cols') return this.chooseCols();
       if (k === 'export') return this.exportDesign();
       if (k === 'import') return this.importDesign();
       if (k === 'try') {
@@ -1454,7 +1503,7 @@
       const v = this.v, L = v.layouts || {};
       // un diseño sin tarjetas propias (prearmado) igual guarda su estilo, fondo, modo, arriba y barra
       const has = (x) => x && ((x.blocks && x.blocks.length) || x.style || x.bg || x.theme || x.header || x.dock);
-      const lay = (k) => (has(L[k]) ? { blocks: L[k].blocks && L[k].blocks.length ? L[k].blocks : null, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null, style: L[k].style || null, bg: L[k].bg || null } : null);
+      const lay = (k) => (has(L[k]) ? { blocks: L[k].blocks && L[k].blocks.length ? L[k].blocks : null, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null, style: L[k].style || null, bg: L[k].bg || null, v: L[k].v || null, cols: k === 'tablet' ? L[k].cols || null : null, side: k === 'tablet' && L[k].side != null ? L[k].side : null } : null);
       return { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
         plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
     }
@@ -1532,7 +1581,7 @@
         const l = d.layouts[k];
         if (l && Array.isArray(l.blocks)) {
           L[k] = { blocks: l.blocks.filter((b) => b && CAT[b.type]).slice(0, 30).map((b) => Object.assign(clone(b), { id: nid(b.type) })), orientation: l.orientation || null };
-          ['header', 'dock', 'theme', 'style', 'bg'].forEach((x) => { if (l[x] && !(x === 'bg' && l.bg.kind === 'image')) L[k][x] = clone(l[x]); }); // la foto de fondo es de la otra casa
+          ['header', 'dock', 'theme', 'style', 'bg', 'v', 'cols', 'side'].forEach((x) => { if (l[x] && !(x === 'bg' && l.bg.kind === 'image')) L[k][x] = clone(l[x]); }); // la foto de fondo es de la otra casa
         }
       });
       return L.phone || L.tablet ? { name: d.name || '', layouts: L } : null;
@@ -1558,7 +1607,7 @@
     }
     /** Plantilla: el diseño (celular y tablet) en un archivo, para usarlo en otra casa. El plano no va (es de esta casa). */
     exportDesign() {
-      const L = this.v.layouts || {}, keep = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: L[k].orientation || null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null, style: L[k].style || null, bg: L[k].bg && L[k].bg.kind !== 'image' ? L[k].bg : null } : null);
+      const L = this.v.layouts || {}, keep = (k) => (L[k] && L[k].blocks && L[k].blocks.length ? { blocks: L[k].blocks, orientation: L[k].orientation || null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null, style: L[k].style || null, bg: L[k].bg && L[k].bg.kind !== 'image' ? L[k].bg : null, v: L[k].v || null, cols: L[k].cols || null, side: L[k].side != null ? L[k].side : null } : null);
       const data = { format: 'matterai-dashboard', version: 1, name: this.v.name, exported: new Date().toISOString(), layouts: { phone: keep('phone'), tablet: keep('tablet') } };
       const blob = new Blob([JSON.stringify(data, null, 1)], { type: 'application/json' });
       const a = document.createElement('a');
@@ -1585,6 +1634,7 @@
         if (!confirm(`¿Reemplazar el diseño por la plantilla «${d.name || 'sin nombre'}»? (Se puede deshacer)`)) return;
         const miss = Editor.entitiesIn(L).filter((id) => !this.states()[id]);
         Object.values(L).forEach((l) => this.adaptBlocks(l.blocks));
+        Object.keys(L).forEach((k) => { L[k] = window.MaeVista.migrateLayout(L[k], k); }); // plantillas viejas: al formato v2
         this.change(() => { this.v.layouts = Object.assign({}, this.v.layouts, L); this.sel = null; this.el = null; });
         this.toast(miss.length ? `Plantilla adaptada a esta casa: ${miss.length} equipo${miss.length > 1 ? 's' : ''} de la otra casa no estaba${miss.length > 1 ? 'n' : ''}; esas tarjetas quedaron en automático o para elegir` : 'Plantilla cargada: revisala y guardá');
       };
@@ -1605,9 +1655,10 @@
       const V = window.MaeVista, m = this.model() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, name = ((V.TEMPLATE_LIST || []).find((x) => x[0] === k) || [, k])[1];
       this.change(() => {
         kinds.forEach((kk) => {
-          const t = V.template(k, kk, m, this.v, this.states(), this.cfg.floorplan);
+          const t = V.migrateLayout(V.template(k, kk, m, this.v, this.states(), this.cfg.floorplan), kk);
           const L = (this.v.layouts = this.v.layouts || {})[kk] = this.v.layouts[kk] || {};
           L.blocks = clone(t.blocks).map((b) => Object.assign(b, { id: this.newId(b.type) }));
+          L.v = 2; if (kk === 'tablet') { L.side = t.side; L.cols = t.cols; }
           L.style = k === 'matterai' ? null : k;
           if (kk === 'tablet' && !L.orientation) L.orientation = 'landscape';
         });

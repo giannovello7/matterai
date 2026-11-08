@@ -70,8 +70,10 @@ Escenas y automatizaciones MatterAI, pensadas para que las entienda cualquiera: 
 
 Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**.
 
-- **Tocá cualquier cosa** en la pantalla del medio (una tarjeta, un ambiente, un dato del resumen, la parte de arriba o la barra de abajo) y se abre su ventana con pestañas: **Configuración**, **Visibilidad** (mostrarla sólo si…) y **Diseño** (ancho, columna).
-- **Arrastrá** las tarjetas para moverlas, y lo de adentro de cada tarjeta (escenas, ambientes, botones) para ordenarlo. Nunca hay flechas.
+- **Tocá cualquier cosa** en la pantalla del medio (una tarjeta, un ambiente, un dato del resumen, la parte de arriba o la barra de abajo) y se abre su ventana con 3 pestañas: **Contenido** (qué muestra), **Aspecto** (cómo se ve, su ancho y dónde va) y **Cuándo se ve** (mostrarla sólo si…).
+- **Ancho de cada tarjeta**: ¼, ½, ¾ o completo; las angostas se acomodan una al lado de la otra.
+- **Tablet: ▦ Columnas** (arriba): plano al costado + 1 o 2 columnas, 2, 3 o 4 columnas, o una grande + 2 chicas. Además hay una **banda de arriba** (debajo de la hora) y una **banda de abajo** (arriba de la música), de lado a lado. En «Aspecto → Dónde va» elegís la columna o la banda, y «Llenar el alto que sobra» hace que el plano ocupe el resto de su columna sin tapar a las demás.
+- **Arrastrá** las tarjetas para moverlas (una línea dorada marca dónde van a caer: arriba, abajo o al costado de otra, o en una columna o banda vacía), y lo de adentro de cada tarjeta (escenas, ambientes, botones) para ordenarlo. Nunca hay flechas.
 - **⋮** en cada tarjeta: duplicar, copiar a otro dashboard, borrar.
 - **+ Tarjeta**: el catálogo con buscador. **+ Agregar tarjeta** al final de cada columna.
 - **Celular / Tablet** y, en la tablet, **Horizontal / Vertical**.

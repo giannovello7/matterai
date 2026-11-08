@@ -136,7 +136,8 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .vista.k-tablet{height:100vh;padding:16px;overflow:hidden;box-sizing:border-box}
 .v-tab{display:flex;gap:16px;height:100%}
 .v-c0{height:100%;flex:none;display:flex;flex-direction:column;gap:12px;max-width:46%}
-.v-c0 .v-b{height:100%}.v-c0 .v-plan{height:100%;width:auto;max-width:100%}
+/* sólo la tarjeta que «llena el alto» (el plano) ocupa lo que sobra; las demás, su alto justo */
+.v-b.fill{flex:1 1 0;min-height:0}.v-b.fill>.v-plan{height:100%;width:auto;max-width:100%;margin:0 auto}
 .v-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .k-tablet .v-head{gap:12px}.k-tablet .v-head .v-when b{font-size:50px;line-height:.95}.k-tablet .v-head .v-when span{font-size:13.5px}
 .k-tablet .v-chip{padding:10px 14px!important;border-radius:18px;font-size:22px;font-weight:400}.k-tablet .v-chip svg.i{width:26px;height:26px}
@@ -167,17 +168,17 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 /* tablet en vertical (como el diseño): el plano a la izquierda; arriba a la derecha la hora, el resumen y la
    primera columna; abajo, de lado a lado, la segunda columna, la música y la barra */
 .vista.k-tablet.vert{height:100vh;overflow:hidden}
-.vert .v-tab{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto auto auto;gap:12px;height:100%}
+.vert .v-tab{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto auto auto auto;gap:12px;height:100%}
 .vert .v-main,.vert .v-cols{display:contents}
 .vert .v-c0{grid-row:1/4;grid-column:1;height:100%;max-width:52vw;min-height:0}
-.vert .v-c0 .v-b{height:100%}.vert .v-c0 .v-plan{height:100%;width:auto;max-width:100%}
+.vert .v-b.fill>.v-plan{height:100%;width:auto;max-width:100%}
 .vert .v-head{grid-row:1;grid-column:2;flex-wrap:wrap;gap:10px}.vert .v-head .v-when b{font-size:40px}
 .vert .v-top{grid-row:2;grid-column:2;min-width:0}.vert .v-top .v-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}
 .vert .v-c1{grid-row:3;grid-column:2;min-height:0}
 .vert .v-c2{grid-row:4;grid-column:1/3;flex-direction:row;overflow-x:auto;overflow-y:hidden;align-items:stretch;max-height:34vh}
 .vert .v-c2>.v-b,.vert .v-c2>.v-halfs{flex:1 0 260px;min-width:0;overflow:auto}
 .vert .v-c2>.v-eadd{flex:0 0 160px;margin:0}
-.vert .v-player{grid-row:5;grid-column:1/3}.vert .v-dock{grid-row:6;grid-column:1/3}
+.vert .v-bot{grid-row:5;grid-column:1/3}.vert .v-player{grid-row:6;grid-column:1/3}.vert .v-dock{grid-row:7;grid-column:1/3}
 .vert .v-top:empty{display:none}
 /* ───── tema claro (se elige en el editor: oscuro, claro o según el equipo) ───── */
 .vista.light{--bg:#f2f3f5;--card:#ffffff;--card2:#eceef2;--line:rgba(22,27,33,.10);--fg:#161b21;--muted:#6a7383;--off:#d3d8e0;
@@ -539,3 +540,34 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.st-savant .v-dock button,.vista.st-savant .v-nav button{text-transform:uppercase;letter-spacing:.18em;font-size:9.5px!important}
 .vista.st-savant .v-dock button.on{background:transparent!important;color:var(--warm)}
 .vista.st-savant.k-tablet .v-c0{max-width:52%}
+
+/* ═════════ diseño v2 (editor 2026-11): columnas con ancho, bandas de lado a lado y tarjetas por cuartos ═════════ */
+.v-row4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}
+.k-phone .v-row4{margin:14px 0}
+.v-row4>.v-b>h3:first-child{margin-top:0}
+.v-row4>.sp-1{grid-column:span 1}.v-row4>.sp-2{grid-column:span 2}.v-row4>.sp-3{grid-column:span 3}.v-row4>.sp-4{grid-column:span 4}
+.k-tablet .v-row4{gap:12px;flex:none}
+/* columnas de la tablet (las del medio; la del costado, si hay, va aparte como siempre) */
+.v-cols>.v-col{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0;overflow:auto;scrollbar-width:none}
+.v-cols>.v-col::-webkit-scrollbar{display:none}
+.v-cols>.v-col>.v-b{flex:none}.v-cols>.v-col>.v-b.fill{flex:1 1 0}
+.k-tablet .v-cols>.v-col>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis),
+.k-tablet :is(.v-cols>.v-col,.v-top,.v-bot,.v-side)>.v-row4>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px}
+.k-tablet .v-cols>.v-col>.v-b>h3{margin:0 0 10px}
+.noside .v-c0{height:auto;max-width:none;flex:initial}
+/* bandas de lado a lado (arriba, debajo de la hora; y abajo, arriba de la música) */
+.v-top,.v-bot{display:flex;flex-direction:column;gap:12px;min-width:0}
+.v-bot:empty{display:none}
+.vista.editing :is(.v-top,.v-bot)>.v-eadd{margin:0;padding:8px;font-size:12px;opacity:.7}
+.vista.editing .v-top:not(:has(.v-b))>.v-eadd::after{content:" · banda de arriba"}.vista.editing .v-bot:not(:has(.v-b))>.v-eadd::after{content:" · banda de abajo"}
+/* tablet vertical sin columna al costado: las columnas una al lado de la otra, debajo de la hora */
+.vert.noside .v-tab{display:flex;flex-direction:column}
+.vert.noside .v-main{display:flex;flex:1;min-height:0}
+.vert.noside .v-cols{display:grid;flex:1;min-height:0}
+.vert.noside .v-cols>.v-col{grid-row:auto;grid-column:auto;flex-direction:column;max-height:none;overflow:auto}
+.vert.noside :is(.v-head,.v-top,.v-bot,.v-player,.v-dock){grid-row:auto;grid-column:auto}
+/* arrastrar y soltar en el editor: la copia que sigue al puntero y la línea donde va a caer */
+.v-ghost{opacity:.9;transform:rotate(1.2deg) scale(.97);box-shadow:0 22px 50px rgba(0,0,0,.45);border-radius:18px;transition:none}
+.vista.editing .dragging{opacity:.28}
+.v-dropline{position:absolute;z-index:61;display:none;border-radius:3px;background:var(--warm);box-shadow:0 0 10px var(--warm);pointer-events:none}
+.vista.editing [data-el],.vista.editing [data-ri]{cursor:grab}

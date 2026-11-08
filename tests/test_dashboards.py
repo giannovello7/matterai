@@ -462,3 +462,26 @@ async def test_templates_and_plan_size(hass, hass_ws_client) -> None:
     for i, bad in enumerate([{"style": "lutron"}, {"blocks": [{"id": "p", "type": "plan", "cfg": {"zoom": "gigante"}}]}]):
         await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE, **bad}}}})
         assert not (await ws.receive_json())["success"], bad  # NEGATIVO
+
+
+async def test_layout_v2_columns_bands_spans(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """Diseño v2: columnas con ancho, columna al costado, bandas, ancho en cuartos y «llenar el alto»; llegan al equipo."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    gian = await _phone(hass, hass_ws_client, client, "Tablet living", "dev-t")
+    tab = {"v": 2, "side": False, "cols": [2, 1, 1], "blocks": [
+        {"id": "p", "type": "plan", "col": 0, "fill": True}, {"id": "k", "type": "kpis", "zone": "top"},
+        {"id": "s", "type": "scenes", "col": 3, "span": 2}, {"id": "m", "type": "music", "zone": "bottom", "span": 4}]}
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "V2", "layouts": {"tablet": tab}}})
+    res = await ws.receive_json()
+    assert res["success"], res
+    await ws.send_json({"id": 2, "type": "matterai/views/assign_user", "user_id": gian["user_id"], "view_id": res["result"]["id"]})
+    await ws.receive_json()
+    got = (await _ws(hass_ws_client, hass, gian["token"], 3, {"type": "matterai/app/view", "device_id": "dev-t", "kind": "tablet"}))["result"]["view"]
+    assert got["v"] == 2 and got["cols"] == [2, 1, 1] and got["side"] is False
+    assert {b["id"]: (b.get("zone"), b.get("span"), b.get("fill")) for b in got["blocks"]}["k"][0] == "top"
+    # NEGATIVO: columnas o anchos fuera de rango
+    for i, bad in enumerate([{"cols": [1, 1, 1, 1, 1]}, {"cols": [9]}, {"blocks": [{"id": "x", "type": "kpis", "span": 5}]}, {"blocks": [{"id": "x", "type": "kpis", "zone": "left"}]}, {"blocks": [{"id": "x", "type": "kpis", "col": 4}]}]):
+        await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"tablet": {"blocks": PHONE, **bad}}}})
+        assert not (await ws.receive_json())["success"], bad

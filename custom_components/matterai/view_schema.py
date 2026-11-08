@@ -117,8 +117,12 @@ BLOCK = vol.Schema({
     vol.Required("id"): vol.All(str, vol.Match(r"^[\w-]{1,24}$")),
     vol.Required("type"): vol.In(BLOCK_TYPES),
     vol.Optional("title"): vol.Any(None, vol.All(str, vol.Length(max=40))),
-    vol.Optional("col", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=2)),
-    vol.Optional("size"): vol.Any(None, vol.In(SIZES)),                 # ancho completo o media columna
+    vol.Optional("col", default=0): vol.All(vol.Coerce(int), vol.Range(min=0, max=3)),
+    vol.Optional("size"): vol.Any(None, vol.In(SIZES)),                 # ancho completo o media columna (diseños viejos)
+    # diseño v2 (2.24): banda de lado a lado, ancho en cuartos y llenar el alto que sobra
+    vol.Optional("zone"): vol.Any(None, vol.In(["top", "bottom"])),
+    vol.Optional("span"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=4))),
+    vol.Optional("fill"): vol.Any(None, bool),
     vol.Optional("show"): vol.Any(None, vol.All([COND], vol.Length(max=6))),  # se ve sólo si se cumple todo
     vol.Optional("cfg", default=dict): CFG,
 }, extra=vol.REMOVE_EXTRA)
@@ -193,6 +197,10 @@ def layout_schema(max_blocks: int) -> vol.Schema:
         vol.Optional("theme"): vol.Any(None, vol.In(["dark", "light", "auto"])),          # desde la 2.21: oscuro, claro o según el equipo
         vol.Optional("style"): vol.Any(None, vol.In(STYLES)),                             # desde la 2.23: estilo prearmado
         vol.Optional("bg"): vol.Any(None, BG),                                            # desde la 2.23: fondo propio
+        # diseño v2 (2.24): columnas de la tablet con su ancho y la columna al costado
+        vol.Optional("v"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=2))),
+        vol.Optional("cols"): vol.Any(None, vol.All([vol.All(vol.Coerce(int), vol.Range(min=0, max=6))], vol.Length(min=1, max=4))),
+        vol.Optional("side"): vol.Any(None, bool),
     }, extra=vol.REMOVE_EXTRA)
 
 
