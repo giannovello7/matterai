@@ -1028,20 +1028,43 @@
       const msg = document.createElement('span'); msg.className = 'v-hmsg'; msg.textContent = 'Conectando…'; box.appendChild(msg);
       const Hh = { el: box, video: v, key, dead: false, pc: null, unsub: null, sid: null, queue: [], stream: null };
       const h = hass(), conn = h && h.connection;
-      const done = (how) => { if (Hh.dead) return; msg.textContent = ''; box.classList.add('ok'); diag(`video ${how}: ${fname(key)}`); };
-      const nothing = (why) => {
-        if (Hh.dead) return;
-        X.camNo[key] = true;
-        msg.textContent = pic ? '' : 'Esta cámara no tiene video en vivo';
-        diag(`sin video en vivo para ${fname(key)} (${why}) → foto`);
+      // cómo se acomoda: lo que diga la config de esa cámara (como en Android: dimensions.layout.fit); si no dice,
+      // las imágenes «comprimidas a lo ancho» (1080P Lite, 960x1080) se estiran a 16:9 y las normales llenan el recuadro
+      const camCfg = (((card() || {})._config || {}).camera_card || {}).cameras || [];
+      const cc = camCfg.find((x) => x && x.camera_entity === key) || {};
+      const fitCfg = ((cc.dimensions || {}).layout || {}).fit;
+      const applyFit = () => {
+        const w = v.videoWidth, hh = v.videoHeight;
+        const fill = fitCfg ? fitCfg === 'fill' : !!(w && hh && w / hh < 1.3);
+        box.classList.toggle('stretch', fill);
       };
+      if (fitCfg) applyFit();
+      v.addEventListener('loadedmetadata', applyFit);
+      v.addEventListener('resize', applyFit);
+      const done = (how) => { if (Hh.dead || Hh.ok) return; Hh.ok = true; clearTimeout(Hh.t); msg.textContent = ''; box.classList.add('ok'); applyFit(); diag(`video ${how}: ${fname(key)} ${v.videoWidth}x${v.videoHeight}`); };
+      const nothing = (why) => {
+        if (Hh.dead || Hh.ok) return;
+        clearTimeout(Hh.t);
+        X.camNo[key] = true;
+        msg.textContent = 'No se pudo conectar con esta cámara';
+        box.classList.add('fail');
+        diag(`sin video en vivo para ${fname(key)} (${why})`);
+      };
+      // como Home Assistant: si una forma no da imagen, la otra. WebRTC 10 s → HLS 15 s → aviso (nunca «Conectando…» para siempre)
+      const watch = (secs, next) => { clearTimeout(Hh.t); Hh.t = setTimeout(() => { if (!Hh.dead && !Hh.ok) next(); }, secs * 1000); };
       v.addEventListener('loadeddata', () => done(Hh.pc ? 'WebRTC' : 'HLS'));
-      const hls = () => Promise.resolve(h.callWS({ type: 'camera/stream', entity_id: key, format: 'hls' })).then((r) => {
-        if (Hh.dead || !r || !r.url) return;
-        v.src = url(r.url); const p = v.play(); if (p && p.catch) p.catch(() => {});
-      });
+      const hls = () => {
+        if (Hh.dead || Hh.triedHls) return Promise.reject(new Error('ya probado'));
+        Hh.triedHls = true;
+        watch(15, () => nothing('HLS sin imagen en 15 s'));
+        return Promise.resolve(h.callWS({ type: 'camera/stream', entity_id: key, format: 'hls' })).then((r) => {
+          if (Hh.dead || !r || !r.url) { if (!Hh.dead) nothing('sin dirección HLS'); return; }
+          v.src = url(r.url); const p = v.play(); if (p && p.catch) p.catch(() => {});
+        });
+      };
       const webrtc = () => Promise.resolve(h.callWS({ type: 'camera/webrtc/get_client_config', entity_id: key })).then((cfg) => {
         if (Hh.dead) return;
+        watch(10, () => { diag(`WebRTC sin imagen en 10 s para ${fname(key)} → probando HLS`); stopRtc(Hh); try { v.srcObject = null; } catch (_) { /* ya */ } hls().catch((e) => nothing(e && (e.message || e.code))); });
         const pc = Hh.pc = new RTCPeerConnection((cfg && cfg.configuration) || {});
         if (cfg && cfg.dataChannel) pc.createDataChannel(cfg.dataChannel);
         Hh.stream = new MediaStream();
@@ -1085,7 +1108,9 @@
         if (Hh.dead) return null;
         const t = (cap && cap.frontend_stream_types) || [];
         diag(`cámara ${fname(key)}: ${t.join(', ') || 'sin video en vivo'}`);
-        if (t.includes('web_rtc') && typeof RTCPeerConnection !== 'undefined' && conn && conn.subscribeMessage) return webrtc();
+        if (t.includes('web_rtc') && typeof RTCPeerConnection !== 'undefined' && conn && conn.subscribeMessage) {
+          return webrtc().catch((e) => { diag(`WebRTC no arrancó (${e && (e.message || e.code)})`); stopRtc(Hh); return t.includes('hls') ? hls() : nothing('sin WebRTC'); });
+        }
         if (t.includes('hls')) return hls();
         nothing('Home Assistant no le da video');
         return null;
@@ -1102,6 +1127,7 @@
     function stopHls(Hh) {
       if (!Hh) return;
       Hh.dead = true;
+      clearTimeout(Hh.t);
       stopRtc(Hh);
       try { Hh.video.pause(); Hh.video.srcObject = null; Hh.video.removeAttribute('src'); Hh.video.load(); } catch (_) { /* ya estaba parado */ }
       if (Hh.el.parentNode) Hh.el.parentNode.removeChild(Hh.el);
