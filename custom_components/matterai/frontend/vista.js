@@ -415,7 +415,7 @@
         case 'clima': return m.weather && c.openPanel('weather');
         case 'musica': return c.openMusic();
         case 'actividad': return c.openActivity();
-        case 'camaras': return c.openCameras();
+        case 'camaras': return hlsOk() ? openHlsFull((m.cams || [])[0], m.cams) : c.openCameras();
         case 'seguridad': case 'aberturas': return c.openPanel('open');
         case 'luces': return c.openPanel('lights');
         case 'avisos': return openSheet('avisos');
@@ -612,12 +612,13 @@
           const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}"${EL(i)}>${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
           X.shown[b.id] = c.items || [];
           // video en vivo con el visor de Frigate (se arma aparte y no se corta cuando cambia otra cosa) o foto cada 10 s
-          const video = !!cam && c.video !== 'photo', live = video && liveOk() && !editing();
+          const video = !!cam && c.video !== 'photo', hls = video && !editing() && hlsOk(), live = video && !editing() && !IOS && liveOk();
           // en video: el visor de Frigate en el equipo; mientras carga (y en el editor) el video continuo de la cámara
           const photo = !cam ? '<div class="v-feed none"></div>' : video && IOS ? `<img class="v-feed" data-cam="${esc(cam)}" data-fast="1"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`
             : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
-          const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>` : photo;
+          const feed = hls ? `<div class="v-feed v-lslot" data-hls="${esc(b.id)}" data-key="${esc(cam)}" data-cam="${esc(cam)}"></div>${list.length > 1 ? `<button class="v-hnav prev" data-camnext="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-camnext="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}<span class="v-hname">${esc(fname(cam))}</span>`
+            : live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>` : photo;
           // en video no va ningún cartel encima (como el visor de Frigate original); en modo foto se avisa que es foto
           const badge = !cam || video ? '' : '<span class="v-live photo">FOTO · cada 10 s</span>';
           const gateBtn = g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : '';
@@ -625,7 +626,7 @@
             // en video, nada encima de la imagen (como la tarjeta de Frigate original): el visor trae sus flechas y su menú.
             // La tarjeta «Cámaras en vivo (Frigate)» es sólo el visor; la del portero lleva sus botones debajo del video.
             const bar = b.type === 'frigate' ? '' : `${extra}${gateBtn}`;
-            return `${t}<div class="v-cam clean ${live ? 'is-live' : ''}">${feed}${badge}</div>${bar ? `<div class="v-cbar">${bar}</div>` : ''}`;
+            return `${t}<div class="v-cam clean ${live || hls ? 'is-live' : ''}">${feed}${badge}</div>${bar ? `<div class="v-cbar">${bar}</div>` : ''}`;
           }
           return `${t}<div class="v-cam">${feed}${badge}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
             <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${b.type === 'frigate' ? '' : extra + gateBtn}</span></div>`;
@@ -1004,6 +1005,80 @@
     const camSafe = () => { const d = typeof globalThis !== 'undefined' && globalThis.MaeDiag; return !!(d && d.camSafe()); };
     const diag = (t) => { const d = typeof globalThis !== 'undefined' && globalThis.MaeDiag; if (d) d.add(t); };
     function liveOk() { const c = card(); return !camSafe() && !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
+    /* iPhone / iPad: el video en vivo como lo hace la app de Home Assistant cuando no hay WebRTC: Home Assistant arma el
+       video HLS de la cámara (camera/stream) y lo pasa el reproductor de Apple, en un <video> común. Un solo video a la vez.
+       (El reproductor de go2rtc del visor de cámaras hace que iOS cierre la página: ver ios-video.js y diag.js.) */
+    function hlsOk() { const h = hass(); return IOS && !camSafe() && !X.hlsFail && !!(h && h.callWS); }
+    X.hls = {};
+    function startHls(key) {
+      const v = document.createElement('video');
+      v.className = 'v-feed v-hls'; v.muted = true; v.autoplay = true; v.playsInline = true;
+      v.setAttribute('playsinline', ''); v.setAttribute('muted', ''); v.setAttribute('autoplay', '');
+      v.poster = camSrc(key); v.dataset.camv = key;
+      const Hh = { el: v, key, dead: false };
+      Promise.resolve(hass().callWS({ type: 'camera/stream', entity_id: key, format: 'hls' })).then((r) => {
+        if (Hh.dead || !r || !r.url) return;
+        v.src = url(r.url);
+        const p = v.play(); if (p && p.catch) p.catch(() => {});
+        diag(`video de Apple (HLS): ${fname(key)}`);
+      }).catch((e) => {
+        Hh.failed = true;
+        diag(`video de Apple (HLS) no disponible para ${fname(key)}: ${(e && (e.message || e.code)) || '?'} → fotos`);
+        if (!Hh.full) { X.hlsFail = true; X.cache = {}; X.partCache = {}; render(); }
+      });
+      return Hh;
+    }
+    function stopHls(Hh) {
+      if (!Hh) return;
+      Hh.dead = true;
+      try { Hh.el.pause(); Hh.el.removeAttribute('src'); Hh.el.load(); } catch (_) { /* ya estaba parado */ }
+      if (Hh.el.parentNode) Hh.el.parentNode.removeChild(Hh.el);
+    }
+    function stopAllHls() { Object.keys(X.hls).forEach((k) => { stopHls(X.hls[k]); delete X.hls[k]; }); }
+    function mountHls() {
+      if (!X.el.querySelectorAll) return;
+      if (X.hlsPause || X.el.hidden) { stopAllHls(); return; }
+      const seen = new Set();
+      X.el.querySelectorAll('[data-hls]').forEach((slot) => {
+        const id = slot.dataset.hls, key = slot.dataset.key; seen.add(id);
+        let Hh = X.hls[id];
+        if (!Hh || Hh.key !== key) { stopHls(Hh); Hh = X.hls[id] = startHls(key); }
+        if (Hh.el.parentNode !== slot) { slot.innerHTML = ''; slot.appendChild(Hh.el); }
+      });
+      Object.keys(X.hls).forEach((id) => { if (!seen.has(id)) { stopHls(X.hls[id]); delete X.hls[id]; } });
+    }
+    /* Pantalla completa (al tocar la cámara o «Cámaras» abajo): un video, flechas para cambiar y ✕. */
+    function openHlsFull(id, list) {
+      closeHlsFull(true);
+      const cams = (list && list.length ? list : (M() || {}).cams || []).filter((x) => st(x));
+      if (!cams.length) return;
+      let i = Math.max(0, cams.indexOf(id));
+      X.hlsPause = true; stopAllHls(); // la de la tarjeta se para mientras tanto: siempre un solo video
+      const box = document.createElement('div');
+      box.className = 'v-hfull';
+      box.innerHTML = `<div class="v-hfv"></div><div class="v-hft"><b></b><button data-hx aria-label="Cerrar">${ic('x')}</button></div>`
+        + `${cams.length > 1 ? `<button class="v-hnav prev" data-hp="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-hp="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}`;
+      const show = () => {
+        stopHls(X.hfull);
+        const Hh = X.hfull = startHls(cams[i]); Hh.full = true;
+        box.querySelector('.v-hfv').appendChild(Hh.el);
+        box.querySelector('.v-hft b').textContent = fname(cams[i]);
+      };
+      box.addEventListener('click', (e) => {
+        const t = e.target;
+        if (t.closest && t.closest('[data-hx]')) { closeHlsFull(); return; }
+        const p = t.closest && t.closest('[data-hp]');
+        if (p) { i = (i + Number(p.dataset.hp) + cams.length) % cams.length; vib(); show(); }
+      });
+      (document.body || X.el).appendChild(box);
+      X.hfullBox = box;
+      show();
+    }
+    function closeHlsFull(quiet) {
+      stopHls(X.hfull); X.hfull = null;
+      if (X.hfullBox) { X.hfullBox.remove(); X.hfullBox = null; }
+      if (X.hlsPause) { X.hlsPause = false; if (!quiet) render(); }
+    }
     /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
     function mountLive() {
       if (!X.el.querySelectorAll || editing()) return;
@@ -1054,7 +1129,7 @@
         const sigE = `embed|${editing()}|${light}|${st}`;
         if (X.shell !== sigE) { X.shell = sigE; X.cache = {}; X.colSig = {}; X.partCache = {}; X.el.className = `vista embed k-phone${editing() ? ' editing' : ''}${light ? ' light' : ''} st-${st}`; X.el.innerHTML = `<div class="v-col v-embed" id="v-c1" data-zone="room-${ctx.embed}"></div>`; }
         setCol('#v-c1', L.blocks || [], m, editing() ? addSlot(0, `room-${ctx.embed}`) : '');
-        mountLive();
+        mountLive(); mountHls();
         return;
       }
       const cols = K === 'tablet' ? (Array.isArray(L.cols) && L.cols.length ? L.cols.slice(0, 4) : [0, 1, 1]) : [1];
@@ -1100,7 +1175,7 @@
       if (editing() && ctx.edit.room) { if (X.sheet !== 'roomedit') openSheet('roomedit'); }
       else if (X.sheet === 'roomedit') closeSheet();
       if (X.sheet) renderSheet();
-      mountLive();
+      mountLive(); mountHls();
       editMarks();
       spreadPins();
       refreshXtra();
@@ -1376,7 +1451,7 @@
         return c.call('media_player', 'media_play_pause', { entity_id: id });
       }
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
-      const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, 1);
+      const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, Number(cn.dataset.camnext) || 1);
       if (t.closest('[data-camall]')) return c.openCameras();
       const av = t.closest('[data-actv]'); if (av) return c.openActivity(av.dataset.actv ? { room: av.dataset.actv } : undefined);
       if (t.closest('[data-bri]')) return undefined; // el brillo se maneja al soltar (change)
@@ -1411,7 +1486,10 @@
       if (kk.dataset.k === 'player') return c.openMusic();
     }
     // cámaras: la tarjeta de Frigate (grabaciones, todas las cámaras) si está configurada; si no, la ventana del equipo
-    function openCam(id) { const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id); }
+    function openCam(id, list) {
+      if (hlsOk()) return openHlsFull(id, list || (X.camList && Object.values(X.camList).find((l) => l.includes(id))));
+      const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
+    }
     function nextCam(elx, d) {
       const b = blockOf(elx), list = b && X.camList && X.camList[b.id]; if (!list || list.length < 2) return;
       X.camIdx[b.id] = ((X.camIdx[b.id] || 0) + d + list.length) % list.length; vib(); render();
@@ -1610,6 +1688,7 @@
     X.camT = setInterval(refreshCam, 10000);
     // las fotos seguidas de iOS: cada 2 s, sólo si la anterior ya cargó (no se apilan pedidos)
     if (IOS) X.fastT = setInterval(() => {
+      if (X.el && X.el.hidden && Object.keys(X.hls).length) stopAllHls();
       if (!X.el || X.el.hidden || (typeof document !== 'undefined' && document.hidden)) return;
       X.el.querySelectorAll('img[data-fast]').forEach((im) => {
         if (!im.complete) return;
@@ -1627,7 +1706,7 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
-      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
+      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); stopAllHls(); closeHlsFull(true); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };
   }

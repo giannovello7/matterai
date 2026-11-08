@@ -35,6 +35,21 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-cam{position:relative;aspect-ratio:16/10;border-radius:18px;overflow:hidden;background:#0b0e12;border:1px solid var(--line)}
 .k-tablet .v-cam{aspect-ratio:16/9}
 .v-feed{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;cursor:pointer}
+/* iPhone / iPad: video de Apple (HLS) en la tarjeta y en pantalla completa */
+.v-feed.v-hls{background:#000;display:block}
+.v-cam .v-hnav{position:absolute;top:50%;transform:translateY(-50%);z-index:3;width:38px;height:38px;border-radius:50%;border:0;display:grid;place-items:center;background:rgba(0,0,0,.42);color:#fff;-webkit-backdrop-filter:none;backdrop-filter:none}
+.v-cam .v-hnav.prev{left:8px}.v-cam .v-hnav.next{right:8px}
+.v-hnav svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2}
+.v-hname{position:absolute;left:10px;bottom:9px;z-index:3;padding:4px 9px;border-radius:999px;background:rgba(0,0,0,.45);color:#fff;font-size:12px;pointer-events:none}
+.v-hfull{position:fixed;inset:0;z-index:9000;background:#000;display:flex;align-items:center;justify-content:center}
+.v-hfull .v-hfv{position:absolute;inset:0;display:flex;align-items:center;justify-content:center}
+.v-hfull video{position:static;width:100%;height:100%;object-fit:contain;background:#000}
+.v-hfull .v-hft{position:absolute;left:0;right:0;top:0;padding:calc(env(safe-area-inset-top) + 10px) 14px 10px;display:flex;align-items:center;gap:10px;color:#fff;background:linear-gradient(#000a,#0000)}
+.v-hfull .v-hft b{flex:1;font-size:16px}
+.v-hfull .v-hft button{width:40px;height:40px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center}
+.v-hfull .v-hft svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:2}
+.v-hfull .v-hnav{position:absolute;top:50%;transform:translateY(-50%);width:48px;height:48px;border-radius:50%;border:0;background:rgba(255,255,255,.16);color:#fff;display:grid;place-items:center}
+.v-hfull .v-hnav.prev{left:12px}.v-hfull .v-hnav.next{right:12px}
 .v-feed.none{background:radial-gradient(75% 70% at 55% 40%,#2c333f,#13171d 75%)}
 .v-cam::after{content:"";position:absolute;inset:auto 0 0 0;height:45%;background:linear-gradient(180deg,transparent,rgba(10,13,16,.85));pointer-events:none}
 .v-live{position:absolute;z-index:1;top:10px;left:10px;display:flex;align-items:center;gap:6px;padding:4px 9px;border-radius:20px;background:rgba(22,27,33,.85);font-size:10.5px;font-weight:700;letter-spacing:.1em}
@@ -580,3 +595,4 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .mae-xtra:empty{display:none}
 .vista.editing{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
 .vista.editing .lift{transform:scale(1.03);box-shadow:0 0 0 2px var(--warm),0 14px 30px rgba(0,0,0,.4)!important;transition:transform .15s,box-shadow .15s}
+.v-hnav.prev svg{transform:rotate(180deg)}
