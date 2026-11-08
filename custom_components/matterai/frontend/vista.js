@@ -998,9 +998,9 @@
       try { swap(old, nu); return true; } catch (_) { return false; }
     }
     /** ¿Se puede mostrar video en vivo? (la tarjeta MatterAI sabe armar el visor de Frigate) */
-    // iPhone / iPad: el visor en vivo adentro del inicio (go2rtc) puede terminar en MJPEG y iOS cierra la página;
-    // ahí la tarjeta muestra fotos seguidas y el video se ve al tocarla (en el visor, sin MJPEG)
-    function liveOk() { const c = card(); return !IOS && !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
+    // en vivo también en iPhone / iPad: la app le saca al visor el modo MJPEG (el que llenaba la memoria y hacía que iOS
+    // cerrara la página) y usa WebRTC o MSE. Mientras carga el visor, o si no está, fotos seguidas.
+    function liveOk() { const c = card(); return !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
     /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
     function mountLive() {
       if (!X.el.querySelectorAll || editing()) return;
