@@ -618,7 +618,7 @@
             : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
           const feed = hls ? `<div class="v-feed v-lslot" data-hls="${esc(b.id)}" data-key="${esc(cam)}" data-cam="${esc(cam)}"></div>${list.length > 1 ? `<button class="v-hnav prev" data-camnext="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-camnext="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}<span class="v-hname">${esc(fname(cam))}</span>`
-            : live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>` : photo;
+            : live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>${IOS && list.length > 1 ? `<button class="v-hnav prev" data-camnext="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-camnext="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}` : photo;
           // en video no va ningún cartel encima (como el visor de Frigate original); en modo foto se avisa que es foto
           const badge = !cam || video ? '' : '<span class="v-live photo">FOTO · cada 10 s</span>';
           const gateBtn = g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : '';
@@ -1185,7 +1185,9 @@
         const id = slot.dataset.live, key = slot.dataset.key; seen.add(id);
         let L = X.live[id];
         if (!L || L.key !== key) {
-          const ids = [key].concat((X.camList[id] || []).filter((x) => x !== key));
+          // iPhone / iPad: el visor con una sola cámara (con todas, arranca las 6 de golpe y iOS cierra la página);
+          // se cambia con las flechas de la tarjeta, y la anterior se corta al salir (un solo video a la vez)
+          const ids = IOS ? [key] : [key].concat((X.camList[id] || []).filter((x) => x !== key));
           const elx = card().liveCam(ids);
           if (!elx) { diag('visor: esperando que cargue el visor de cámaras'); waitLive(); return; }
           diag(`visor: armado en el inicio con ${ids.length} cámara${ids.length > 1 ? 's' : ''}`);
