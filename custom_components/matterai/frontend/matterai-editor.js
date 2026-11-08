@@ -279,6 +279,7 @@
       if (act === 'dup') return this.change(() => { const nb = clone(B[i]); nb.id = this.newId(nb.type); B.splice(i + 1, 0, nb); this.sel = nb.id; });
       if (act === 'del') {
         const name = (window.MaeVista.CATALOG[B[i].type] || {}).name || B[i].type;
+        if (this.rscope) { this.change(() => { B.splice(i, 1); }); this.toast(`Tarjeta «${name}» sacada del ambiente · Ctrl+Z para deshacer`); this.backToRoom(); return undefined; }
         this.change(() => { B.splice(i, 1); if (this.sel === id) { this.sel = null; this.el = null; this.roomEd = null; this.rdraft = null; } });
         this.toast(`Tarjeta «${name}» borrada · Ctrl+Z para deshacer`);
       }
@@ -287,6 +288,16 @@
     newId(type) { return `${type}-${window.MaeVista.uid()}`.slice(0, 24); }
     /** Arrastrar dentro de la vista previa: antes / después de otra tarjeta, o al final de una columna. */
     moveTo(from, where) {
+      if (this.inRoom(from)) {
+        this.change(() => {
+          const B = this.rdraft.cards, i = B.findIndex((b) => b.id === from); if (i < 0) return;
+          const [b] = B.splice(i, 1);
+          const j = where.target ? B.findIndex((x) => x.id === where.target) : -1;
+          if (j >= 0) { b.zone = B[j].zone || 'top'; B.splice(j + (where.after ? 1 : 0), 0, b); }
+          else { b.zone = String(where.zone || 'room-top').replace('room-', '') === 'bottom' ? 'bottom' : 'top'; B.push(b); }
+        });
+        return;
+      }
       this.change(() => {
         const B = this.blocks(), i = B.findIndex((b) => b.id === from); if (i < 0) return;
         const [b] = B.splice(i, 1);
@@ -303,6 +314,14 @@
     }
     /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
     addBlock(type, col, zone) {
+      if (zone && String(zone).startsWith('room-') && this.rdraft) {
+        const CAT0 = window.MaeVista.CATALOG, rcfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
+        const nb = { id: this.newId(type), type, zone: zone === 'room-bottom' ? 'bottom' : 'top', cfg: rcfg };
+        if (!['kpis', 'plan', 'clock'].includes(type)) nb.title = type === 'frigate' ? 'Cámaras' : CAT0[type].name;
+        this.change(() => { (this.rdraft.cards = this.rdraft.cards || []).push(nb); });
+        this.pick(nb.id);
+        return;
+      }
       const K = this.K, CAT = window.MaeVista.CATALOG;
       const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
       const titled = ['frigate', 'rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text', 'agenda', 'irrigation'];
@@ -316,11 +335,12 @@
     /** Catálogo de tarjetas (como «Agregar tarjeta» de Home Assistant), con buscador. */
     openCatalog(col, zone) {
       this.closeCatalog();
-      const CAT = window.MaeVista.CATALOG, K = this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
+      const inRoomZ = zone && String(zone).startsWith('room-');
+      const CAT = window.MaeVista.CATALOG, K = inRoomZ ? 'phone' : this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
         weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list', frigate: 'cam', openings: 'door', agenda: 'cal', irrigation: 'water', batteries: 'battery' };
       const box = document.createElement('div');
       box.className = 'catp';
-      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${K === 'tablet' ? (zone ? ` · banda de ${zone === 'top' ? 'arriba' : 'abajo'}` : col != null ? ` · ${this.colName(col).toLowerCase()}` : '') : ''}</b><button class="eb sm" data-cx>✕</button></div>
+      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${inRoomZ ? ` · ${esc(this.rdraft ? this.rdraft.name : 'ambiente')} (${zone === 'room-bottom' ? 'abajo' : 'arriba'} de los equipos)` : K === 'tablet' ? (zone ? ` · banda de ${zone === 'top' ? 'arriba' : 'abajo'}` : col != null ? ` · ${this.colName(col).toLowerCase()}` : '') : ''}</b><button class="eb sm" data-cx>✕</button></div>
         <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div></div>`;
       this.wrap.appendChild(box);
       this.catBox = box;
@@ -384,9 +404,12 @@
     set K(k) { this._k = k; }
     lay() { const L = this.v.layouts || (this.v.layouts = {}); return L[this.K] || (L[this.K] = { blocks: [] }); }
     /** Lugares de la tablet: cada columna y las bandas de arriba y de abajo. */
-    placeOpts() { const { n } = this.colsInfo(); return [['top', 'Banda de arriba'], ...Array.from({ length: n }, (_, i) => [`c${i}`, this.colName(i)]), ['bottom', 'Banda de abajo']]; }
-    placeOf(b) { return b.zone ? b.zone : `c${Math.min(this.colsInfo().n - 1, +b.col || 0)}`; }
-    setPlace(b, k) { if (k === 'top' || k === 'bottom') { b.zone = k; b.fill = false; } else { delete b.zone; b.col = +String(k).replace('c', ''); } }
+    placeOpts() {
+      if (this.rscope) return [['top', 'Arriba de los equipos'], ['bottom', 'Abajo de los equipos']];
+      const { n } = this.colsInfo(); return [['top', 'Banda de arriba'], ...Array.from({ length: n }, (_, i) => [`c${i}`, this.colName(i)]), ['bottom', 'Banda de abajo']]; }
+    placeOf(b) { if (this.rscope) return b.zone === 'bottom' ? 'bottom' : 'top'; return b.zone ? b.zone : `c${Math.min(this.colsInfo().n - 1, +b.col || 0)}`; }
+    setPlace(b, k) {
+      if (this.rscope) { b.zone = k === 'bottom' ? 'bottom' : 'top'; return; } if (k === 'top' || k === 'bottom') { b.zone = k; b.fill = false; } else { delete b.zone; b.col = +String(k).replace('c', ''); } }
     /** Elegir las columnas de la tablet (y si la primera va al costado). */
     chooseCols() {
       const P = window.MaeVista.TABLET_PRESETS || [], cur = this.colsInfo();
@@ -426,7 +449,12 @@
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
     toast(t) { const e = this.$('#toastE'); e.textContent = t; e.style.display = 'block'; clearTimeout(this.tt); this.tt = setTimeout(() => { e.style.display = 'none'; }, 2200); }
     dirty() { return JSON.stringify(this.v) !== JSON.stringify(this.saved); }
-    push() { this.undo.push(JSON.stringify(this.v)); if (this.undo.length > 80) this.undo.shift(); this.redo = []; }
+    snap() { return JSON.stringify({ v: this.v, r: this.rdraft || null }); }
+    unsnap(t) {
+      const st = JSON.parse(t);
+      if (st && st.v && 'r' in st) { this.v = st.v; this.rdraft = st.r; if (!st.r) { this.roomEd = null; this.rscope = false; } else this.roomEd = st.r.name; } else this.v = st;
+    }
+    push() { this.undo.push(this.snap()); if (this.undo.length > 80) this.undo.shift(); this.redo = []; }
     change(fn) {
       this.push(); fn(); this.draw();
       if (!this.dlgOpen()) this.autosave();
@@ -457,10 +485,12 @@
     /** Abre la ventana de una tarjeta (o de la parte de arriba / la barra): guarda cómo estaba para «Cancelar». */
     dlgStart() { if (!this.dlgSnap) { this.dlgSnap = JSON.stringify(this.v); this.dlgUndo = this.undo.length; this.tab = 'cfg'; } }
     dlgCancel() {
+      if (this.rscope) { if (this.rSnap) this.rdraft = JSON.parse(this.rSnap); this.backToRoom(); return; }
       if (this.dlgSnap) { this.v = JSON.parse(this.dlgSnap); this.undo.length = Math.min(this.undo.length, this.dlgUndo); }
       this.dlgClose();
     }
     async dlgOk() {
+      if (this.rscope) { if (this.roomDirty()) await this.saveRoom(false, true); this.backToRoom(); return; }
       if (this.rdraft && this.roomDirty()) await this.saveRoom(false);
       this.dlgClose();
       this.autosave();
@@ -476,7 +506,7 @@
       this.$('#ed').classList.toggle('dlgon', open);
       if (!open) { this.$('#dlgh').innerHTML = ''; this.$('#dlgf').innerHTML = ''; return; }
       const b = this.selBlock(), CAT = window.MaeVista.CATALOG;
-      const title = this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Estilo y fondo' : this.zone === 'allb' ? 'Botón «Toda la casa»'
+      const title = this.rscope && b ? `${this.rdraft ? this.rdraft.name : 'Ambiente'} › ${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Estilo y fondo' : this.zone === 'allb' ? 'Botón «Toda la casa»'
         : b ? `${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : '';
       const sub = this.roomEd != null || this.el != null || this.pz != null;
       const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Contenido'], ['lay', 'Aspecto'], ['vis', 'Cuándo se ve']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
@@ -513,7 +543,26 @@
       else if (hint) hint.innerHTML = this.dlgOpen() ? '' : 'Tocá una tarjeta para editarla · Arrastrala para moverla · <b>+ Agregar tarjeta</b> al final de cada columna · Tocá arriba o la barra de abajo para cambiarlas';
       this.drawPreview(); this.drawProps(); this.drawDlg(); this.bind();
     }
-    blocks() { const l = this.lay(); return l.blocks || (l.blocks = []); }
+    blocks() {
+      if (this.rscope && this.rdraft) return this.rdraft.cards || (this.rdraft.cards = []);
+      const l = this.lay(); return l.blocks || (l.blocks = []);
+    }
+    /** ¿Esta tarjeta es de adentro del ambiente abierto? */
+    inRoom(id) { return !!(id && this.rdraft && (this.rdraft.cards || []).some((c) => c.id === id)); }
+    /** Entrar a editar una tarjeta del ambiente (el ambiente sigue abierto; Guardar / Cancelar vuelven a él). */
+    enterRoomCard(id) {
+      if (!this.rscope) { this.roomBack = this.sel; this.rSnap = JSON.stringify(this.rdraft); }
+      this.rscope = true; this.sel = id; this.dlgSnap = null; this.tab = 'cfg';
+    }
+    backToRoom() {
+      this.rscope = false; this.sel = this.roomBack || null; this.el = null; this.rSnap = null;
+      this.drawProps(); this.drawDlg(); this.syncPreview(); this.bind(); this.draw();
+    }
+    /** {top, bottom} de las tarjetas de un ambiente (sin el lado, que es del editor). */
+    static roomPageOf(cards) {
+      const strip = (c) => { const b = clone(c); delete b.zone; delete b.col; return b; };
+      return { top: (cards || []).filter((c) => c.zone !== 'bottom').map(strip), bottom: (cards || []).filter((c) => c.zone === 'bottom').map(strip) };
+    }
     drawList() {
       if (!this.$('#edl')) return; // ya no hay lista a la izquierda: se edita en la pantalla (como Lovelace)
       const K = this.K, CAT = window.MaeVista.CATALOG;
@@ -597,14 +646,23 @@
     editCtx() {
       const R = this.rdraft;
       return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
-        onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
+        onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' || a === 'menu' ? this.pick(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone) => this.openCatalog(col, zone), onRoom: (a, i) => this.roomAct(a, i),
-        room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null };
+        room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null,
+        roomPage: R ? Object.assign({ name: R.name }, Editor.roomPageOf(R.cards || [])) : null };
     }
     /** Tocar algo en la pantalla del medio: la tarjeta, y si fue un ambiente, se abre por dentro para editarlo. */
     pick(id, sub) {
       id = id || null;
+      if (this.inRoom(id)) {
+        this.enterRoomCard(id);
+        this.el = sub && sub.el != null ? sub.el : null; this.focus = null;
+        const rb = this.selBlock(); if (rb && this.el != null && this.el !== 'cam' && this.isAuto(rb)) { this.push(); this.materialize(rb); }
+        this.drawProps(); this.drawDlg(); this.syncPreview(); this.bind(); this.draw();
+        return;
+      }
+      if (this.rscope) { this.rscope = false; this.rSnap = null; }
       if (!id && !(sub && sub.zone)) { if (this.dlgOpen()) this.dlgOk(); return; }
       if (this.dlgOpen() && (id !== this.sel || ((sub && sub.zone) || null) !== (this.zone || null))) { this.dlgSnap = null; this.autosaveAfter = true; } // otra tarjeta: la anterior queda
       this.dlgStart(); if (!sub || (sub.el == null && !sub.room && sub.pz == null)) this.tab = this.tab || 'cfg';
@@ -652,7 +710,7 @@
         return;
       }
       const list = clone(this.roomsCfg()), i = R._orig != null ? list.findIndex((x) => x.name === R._orig) : -1;
-      const d = clone(R); delete d._orig;
+      const d = clone(R); delete d._orig; delete d.cards; delete d.local; delete d._origCards; delete d._origLocal; // las tarjetas de adentro las dibuja el motor
       if (i >= 0) list[i] = Object.assign({}, list[i], d); else list.push(d);
       const sig = JSON.stringify(d);
       try {
@@ -698,13 +756,18 @@
       const R = this.rdraft; if (!R) return false;
       if (R._orig == null) return true;
       const o = this.roomsCfg().find((x) => x.name === R._orig) || {};
-      return JSON.stringify([o.name, o.icon || '', o.entities || []]) !== JSON.stringify([R.name, R.icon || '', R.entities || []]);
+      return JSON.stringify([o.name, o.icon || '', o.entities || []]) !== JSON.stringify([R.name, R.icon || '', R.entities || []])
+        || JSON.stringify(R.cards || []) !== (R._origCards || '[]') || !!R.local !== !!R._origLocal;
     }
     ensureDraft() {
       if (this.rdraft) return this.rdraft;
       const list = this.roomsCfg(), i = list.findIndex((x) => x.name === this.roomEd);
       this.rdraft = i >= 0 ? clone(list[i]) : { name: this.roomEd || 'Ambiente nuevo', entities: [] };
       this.rdraft._orig = i >= 0 ? list[i].name : null;
+      const own = (this.v.room_pages || {})[this.rdraft.name], page = own || this.rdraft.page || {};
+      this.rdraft.cards = [...(page.top || []).map((b) => Object.assign(clone(b), { zone: 'top' })), ...(page.bottom || []).map((b) => Object.assign(clone(b), { zone: 'bottom' }))];
+      this.rdraft.local = !!own; this.rdraft._origLocal = !!own; this.rdraft._origCards = JSON.stringify(this.rdraft.cards);
+      delete this.rdraft.page;
       return this.rdraft;
     }
     /** Lo que se hace desde el ambiente abierto en la pantalla del medio. */
@@ -958,9 +1021,9 @@
       const span = +b.span || (b.size === 'half' ? 2 : 4);
       let lay = hs ? `<h4>Cómo se ve</h4>${hs}` : '';
       lay += `<h4>Tamaño y lugar</h4><div class="fld"><span>Ancho</span><span class="eseg">${[[1, '¼'], [2, '½'], [3, '¾'], [4, 'Completo']].map(([k, l]) => `<button data-span="${k}" class="${span === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
-      if (this.K === 'tablet') {
+      if (this.K === 'tablet' || this.rscope) {
         lay += `<div class="fld"><span>Dónde va</span><span class="eseg wrap">${this.placeOpts().map(([k, l]) => `<button data-place="${k}" class="${this.placeOf(b) === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</span></div>`;
-        if (!b.zone) lay += `<label class="chk"><input type="checkbox" data-fill ${b.fill ? 'checked' : ''}> Llenar el alto que sobra en su columna (ideal para el plano)</label>`;
+        if (!b.zone && !this.rscope) lay += `<label class="chk"><input type="checkbox" data-fill ${b.fill ? 'checked' : ''}> Llenar el alto que sobra en su columna (ideal para el plano)</label>`;
       }
       lay += '<p class="hint">Para moverla, también podés arrastrarla en la pantalla. Con ⋮ (en la tarjeta) se duplica, se copia a otro dashboard o se borra.</p>';
       const tab = this.$('#edl') ? 'all' : (this.tab || 'cfg');
@@ -1012,7 +1075,7 @@
     }
     /** Subir, bajar, sacar o agregar un elemento (desde la pantalla del medio o desde el panel). */
     onElem(id, act, i) {
-      if (this.sel !== id) { this.sel = id; this.roomEd = null; this.rdraft = null; }
+      if (this.sel !== id) { if (this.inRoom(id)) this.enterRoomCard(id); else { this.sel = id; this.roomEd = null; this.rdraft = null; this.rscope = false; } }
       const b = this.selBlock(); if (!b) return;
       if (act === 'add' && b.type === 'plan') { this.planEditor().then(() => { this.drawing = []; this.zsel = null; return this.drawPlan(); }); return; }
       if (act === 'add') { this.elemAdd(b); return; }
@@ -1178,15 +1241,25 @@
         ${(R.entities || []).map((x, i) => { const id = eid(x), d = id.split('.')[0]; return `<div class="rme" draggable="true" data-sr="room" data-i="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="dtag">${esc(DOM_NAME[d] || d)}</span><span class="tx"><b>${esc((x && x.name) || this.fname(id))}</b><small>${esc(id)}${this.states()[id] ? '' : ' · no existe'}</small></span>
           <button data-rdel="${i}" title="Sacar">✕</button></div>`; }).join('') || '<p class="hint">Todavía no tiene equipos.</p>'}
         <div class="fld">${this.cbBtn('', 'data-radd="1"').replace('Elegir un equipo…', '+ Agregar un equipo')}</div>
+        <h4>Tarjetas del ambiente</h4>
+        <p class="hint" style="margin-top:0">Cualquier tarjeta (cámara, escenas, botones, música, texto…), arriba o abajo de sus equipos. Tocala en la pantalla para editarla y arrastrala para ordenarla.</p>
+        ${(R.cards || []).map((c) => `<div class="rme"><span class="dtag">${c.zone === 'bottom' ? 'Abajo' : 'Arriba'}</span><span class="tx"><b>${esc(c.title || (window.MaeVista.CATALOG[c.type] || {}).name || c.type)}</b><small>${esc((window.MaeVista.CATALOG[c.type] || {}).name || c.type)}</small></span>
+          <button data-rcpick="${esc(c.id)}" title="Editar">✎</button><button data-rcdel="${esc(c.id)}" title="Sacar">✕</button></div>`).join('') || '<p class="hint">Todavía no tiene tarjetas propias.</p>'}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px"><button class="eb sm" data-rcadd="top">+ Tarjeta arriba</button><button class="eb sm" data-rcadd="bottom">+ Tarjeta abajo</button></div>
+        <label class="chk"><input type="checkbox" data-rlocal ${R.local ? 'checked' : ''}> Tarjetas propias de este ambiente sólo en este dashboard (los demás siguen con las de la casa)</label>
         <div style="display:flex;gap:8px;margin-top:12px">${R._orig ? '<button class="eb warn sm" data-rx="del">Borrar este ambiente de la casa</button>' : ''}</div>
         <p class="hint">Los ambientes son de la casa: el cambio se ve en todos los dashboards y en la app al instante.</p>`;
     }
-    async saveRoom(del) {
+    async saveRoom(del, keep) {
       const R = clone(this.rdraft), orig = R._orig; delete R._orig;
+      const cards = R.cards || [], local = !!R.local, page = Editor.roomPageOf(cards), hasCards = page.top.length + page.bottom.length > 0;
+      delete R.cards; delete R.local; delete R._origLocal; delete R._origCards;
       R.name = String(R.name || '').trim() || 'Ambiente';
       if (!R.icon) delete R.icon;
       const list = clone(this.roomsCfg()), i = orig != null ? list.findIndex((x) => x.name === orig) : -1;
-      if (del) { if (i >= 0) list.splice(i, 1); } else if (i >= 0) list[i] = Object.assign({}, list[i], R); else list.push(R);
+      // las tarjetas van a la casa (todas las pantallas) o, con «versión propia», sólo a este dashboard
+      if (!local) { if (hasCards) R.page = page; else delete R.page; } else if (i >= 0 && list[i].page) R.page = list[i].page;
+      if (del) { if (i >= 0) list.splice(i, 1); } else if (i >= 0) { list[i] = Object.assign({}, list[i], R); if (!local && !hasCards) delete list[i].page; } else list.push(R);
       if (!del && list.filter((x) => x.name.toLowerCase() === R.name.toLowerCase()).length > 1) { this.toast('Ya hay un ambiente con ese nombre'); return; }
       const cfg = Object.assign({}, this.cfg, { rooms: list });
       try {
@@ -1202,7 +1275,12 @@
           if (bb) { this.push(); this.materialize(bb); this.elemList(bb).push(R.name); }
         }
         this.newRoomFor = null;
+        // versión propia de este dashboard (se guarda con el dashboard)
+        const rp = this.v.room_pages || {};
+        if (local && !del) { this.change(() => { this.v.room_pages = Object.assign({}, this.v.room_pages || {}, { [R.name]: page }); if (orig && orig !== R.name) delete this.v.room_pages[orig]; }); }
+        else if (rp[orig || R.name] || rp[R.name]) { this.change(() => { delete this.v.room_pages[orig || R.name]; delete this.v.room_pages[R.name]; if (!Object.keys(this.v.room_pages).length) delete this.v.room_pages; }); }
         this.toast(del ? 'Ambiente borrado' : 'Ambiente guardado: ya se ve en la app');
+        if (keep && !del) { this.rdraft = null; this.roomEd = R.name; this.ensureDraft(); this.syncPreview(); return; }
         this.roomEd = null; this.rdraft = null; setTimeout(() => this.draw(), 150); this.syncPreview();
       } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
     }
@@ -1341,6 +1419,10 @@
       });
       W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
       const selB = () => this.blocks().find((y) => y.id === this.sel);
+      W.querySelectorAll('#edr [data-rcpick]').forEach((x) => { x.onclick = () => this.pick(x.dataset.rcpick); });
+      W.querySelectorAll('#edr [data-rcdel]').forEach((x) => { x.onclick = () => this.change(() => { const R = this.rdraft; if (R) R.cards = (R.cards || []).filter((c) => c.id !== x.dataset.rcdel); }); });
+      W.querySelectorAll('#edr [data-rcadd]').forEach((x) => { x.onclick = () => this.openCatalog(null, `room-${x.dataset.rcadd}`); });
+      W.querySelectorAll('#edr [data-rlocal]').forEach((x) => { x.onchange = () => { if (this.rdraft) { this.rdraft.local = x.checked; this.drawProps(); this.bind(); } }; });
       W.querySelectorAll('#edr [data-span]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; const n = +x.dataset.span; if (n >= 4) { delete bb.span; delete bb.size; } else { bb.span = n; if (n === 2) bb.size = 'half'; else delete bb.size; } }); });
       W.querySelectorAll('#edr [data-place]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (bb) this.setPlace(bb, x.dataset.place); }); });
       W.querySelectorAll('#edr [data-fill]').forEach((x) => { x.onchange = () => this.change(() => { const bb = selB(); if (bb) { if (x.checked) bb.fill = true; else delete bb.fill; } }); });
@@ -1459,9 +1541,14 @@
       if (k === 'list') { this.showList = !this.showList; try { localStorage.setItem('matterai.editor.list', this.showList ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } this.draw(); this.sizeFrame(); return; }
       if (k === 'add') return this.openCatalog(null);
       if (k === 'copy') return this.copyFrom(this.K === 'tablet' ? 'phone' : 'tablet');
-      const fix = () => { if (this.sel && !this.blocks().some((b) => b.id === this.sel)) this.sel = null; this.roomEd = null; this.rdraft = null; this.draw(); };
-      if (k === 'undo') { if (this.undo.length) { this.redo.push(JSON.stringify(this.v)); this.v = JSON.parse(this.undo.pop()); fix(); } return; }
-      if (k === 'redo') { if (this.redo.length) { this.undo.push(JSON.stringify(this.v)); this.v = JSON.parse(this.redo.pop()); fix(); } return; }
+      const fix = () => {
+        if (this.rscope && !this.rdraft) this.rscope = false;
+        if (this.sel && !this.blocks().some((b) => b.id === this.sel)) { if (this.rscope) { this.rscope = false; this.sel = this.roomBack || null; } else this.sel = null; }
+        if (!this.rdraft) this.roomEd = null;
+        this.draw(); this.syncPreview();
+      };
+      if (k === 'undo') { if (this.undo.length) { this.redo.push(this.snap()); this.unsnap(this.undo.pop()); fix(); } return; }
+      if (k === 'redo') { if (this.redo.length) { this.undo.push(this.snap()); this.unsnap(this.redo.pop()); fix(); } return; }
       if (k === 'pre') { if (confirm('¿Reemplazar las tarjetas por el prearmado con los equipos de esta casa?')) this.prearmado(false); else this.draw(); return; }
       if (k === 'reset') { if (!confirm('¿Descartar todos los cambios sin guardar?')) { this.draw(); return; } this.push(); this.v = clone(this.saved); fix(); return; }
       if (k === 'plan') return this.planEditor();
@@ -1505,7 +1592,7 @@
       const has = (x) => x && ((x.blocks && x.blocks.length) || x.style || x.bg || x.theme || x.header || x.dock);
       const lay = (k) => (has(L[k]) ? { blocks: L[k].blocks && L[k].blocks.length ? L[k].blocks : null, orientation: k === 'tablet' ? L[k].orientation || 'landscape' : null, header: L[k].header || null, dock: L[k].dock || null, theme: L[k].theme || null, style: L[k].style || null, bg: L[k].bg || null, v: L[k].v || null, cols: k === 'tablet' ? L[k].cols || null : null, side: k === 'tablet' && L[k].side != null ? L[k].side : null } : null);
       return { id: v.id, name: v.name, kind: v.kind || 'phone', layouts: { phone: lay('phone'), tablet: lay('tablet') }, blocks: null, orientation: null,
-        plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null };
+        plan: v.plan || null, pinned: v.pinned || [], featured: v.featured || {}, scenes: v.scenes || null, room_pages: v.room_pages || null };
     }
     async endTry() {
       clearTimeout(this.tryT); this.trying = null;

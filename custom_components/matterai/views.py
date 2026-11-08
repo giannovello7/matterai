@@ -24,7 +24,7 @@ from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 
 from .const import DOMAIN
-from .view_schema import BLOCK, PLAN, check_size, layout_schema
+from .view_schema import BLOCK, PLAN, ROOM_PAGES, check_size, layout_schema
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,6 +57,8 @@ VIEW_SCHEMA = vol.Schema({
         vol.Optional("phone"): vol.Any(None, layout_schema(MAX_BLOCKS)),
         vol.Optional("tablet"): vol.Any(None, layout_schema(MAX_BLOCKS)),
     }, extra=vol.REMOVE_EXTRA)),
+    # desde la 2.25: versión propia de un ambiente en este dashboard (si no, la de la casa)
+    vol.Optional("room_pages"): vol.Any(None, ROOM_PAGES),
 }, extra=vol.REMOVE_EXTRA)
 VIEW_SCHEMA = vol.All(VIEW_SCHEMA, check_size)
 

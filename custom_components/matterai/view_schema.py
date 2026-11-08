@@ -204,6 +204,34 @@ def layout_schema(max_blocks: int) -> vol.Schema:
     }, extra=vol.REMOVE_EXTRA)
 
 
+# páginas de ambiente (2.25): tarjetas arriba y abajo de los equipos del ambiente
+MAX_ROOM_BLOCKS = 12
+
+
+def _unique_ids(page: dict[str, Any]) -> dict[str, Any]:
+    ids = [b["id"] for k in ("top", "bottom") for b in (page.get(k) or [])]
+    if len(ids) != len(set(ids)):
+        raise vol.Invalid("hay tarjetas repetidas en el ambiente")
+    return page
+
+
+ROOM_PAGE = vol.All(vol.Schema({
+    vol.Optional("top"): vol.Any(None, vol.All([BLOCK], vol.Length(max=MAX_ROOM_BLOCKS))),
+    vol.Optional("bottom"): vol.Any(None, vol.All([BLOCK], vol.Length(max=MAX_ROOM_BLOCKS))),
+}, extra=vol.REMOVE_EXTRA), _unique_ids)
+ROOM_PAGES = vol.All(vol.Schema({vol.All(str, vol.Length(min=1, max=40)): ROOM_PAGE}), vol.Length(max=60))
+
+
+def validate_room_pages(config: dict[str, Any]) -> dict[str, Any]:
+    """La configuración de la casa: las páginas de sus ambientes pasan por las mismas reglas que los dashboards."""
+    rooms = config.get("rooms")
+    if isinstance(rooms, list):
+        for r in rooms:
+            if isinstance(r, dict) and r.get("page") is not None:
+                r["page"] = ROOM_PAGE(r["page"])
+    return config
+
+
 def check_size(view: dict[str, Any]) -> dict[str, Any]:
     if len(json.dumps(view, ensure_ascii=False)) > MAX_VIEW_BYTES:
         raise vol.Invalid("el dashboard es demasiado grande")

@@ -485,3 +485,27 @@ async def test_layout_v2_columns_bands_spans(hass, hass_ws_client, hass_client_n
     for i, bad in enumerate([{"cols": [1, 1, 1, 1, 1]}, {"cols": [9]}, {"blocks": [{"id": "x", "type": "kpis", "span": 5}]}, {"blocks": [{"id": "x", "type": "kpis", "zone": "left"}]}, {"blocks": [{"id": "x", "type": "kpis", "col": 4}]}]):
         await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"tablet": {"blocks": PHONE, **bad}}}})
         assert not (await ws.receive_json())["success"], bad
+
+
+async def test_room_pages_house_and_dashboard(hass, hass_ws_client) -> None:
+    """Tarjetas dentro de un ambiente: las de la casa (configuración) y la versión propia de un dashboard; se validan igual."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    page = {"top": [{"id": "t1", "type": "camera", "cfg": {"entity": "camera.porton"}}], "bottom": [{"id": "b1", "type": "scenes", "cfg": {"auto": True}}]}
+    await ws.send_json({"id": 1, "type": "matterai/config/save", "config": {"rooms": [{"name": "Quincho", "entities": ["light.quincho"], "page": page}]}})
+    assert (await ws.receive_json())["success"]
+    await ws.send_json({"id": 2, "type": "matterai/config"})
+    cfg = (await ws.receive_json())["result"]["config"]
+    assert cfg["rooms"][0]["page"]["top"][0]["id"] == "t1" and cfg["rooms"][0]["page"]["bottom"][0]["type"] == "scenes"
+    # versión propia en un dashboard
+    await ws.send_json({"id": 3, "type": "matterai/views/save", "view": {"name": "G", "layouts": {"phone": {"blocks": PHONE}}, "room_pages": {"Quincho": {"top": [{"id": "x", "type": "text", "title": "Hola"}]}}}})
+    res = await ws.receive_json()
+    assert res["success"] and res["result"]["room_pages"]["Quincho"]["top"][0]["title"] == "Hola"
+    # NEGATIVO: tarjetas inválidas o repetidas, en la casa y en el dashboard
+    bad_pages = [{"top": [{"id": "z", "type": "hackeo"}]}, {"top": [{"id": "z", "type": "text"}], "bottom": [{"id": "z", "type": "text"}]},
+                 {"top": [{"id": "z", "type": "buttons", "cfg": {"items": [{"tap": {"type": "service", "service": "rm -rf"}}]}}]}]
+    for i, bad in enumerate(bad_pages):
+        await ws.send_json({"id": 10 + i, "type": "matterai/config/save", "config": {"rooms": [{"name": "Quincho", "page": bad}]}})
+        assert not (await ws.receive_json())["success"], bad
+        await ws.send_json({"id": 20 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE}}, "room_pages": {"Quincho": bad}}})
+        assert not (await ws.receive_json())["success"], bad

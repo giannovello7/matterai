@@ -2597,7 +2597,7 @@
     _openRoom(id) {
       this._room = id; this._panel = null;
       // Dos partes: lo que se redibuja con cada cambio (luces, clima…) y las cámaras, que no se tocan para no cortar el video.
-      this._els.sheet.innerHTML = `<div id="sheetdyn"></div><div id="sheetcam"></div><div id="sheetdyn2"></div>
+      this._els.sheet.innerHTML = `<div id="sheettop" class="mae-xtra"></div><div id="sheetdyn"></div><div id="sheetcam"></div><div id="sheetdyn2"></div><div id="sheetbot" class="mae-xtra"></div>
         <p class="hint">Tocá para encender · Deslizá para regular · Mantené presionado para más opciones</p>`;
       this._els.sheetdyn = this._els.sheet.querySelector('#sheetdyn');
       this._els.sheetcam = this._els.sheet.querySelector('#sheetcam');
@@ -2605,6 +2605,9 @@
       this._cache.sheetdyn = null; this._cache.sheetdyn2 = null;
       this._roomCamEl = null; this._roomCamKey = null;
       this._renderSheet();
+      // tarjetas que el instalador agregó a este ambiente (arriba y abajo de sus equipos): las dibuja el motor de dashboards
+      const rr = this._m && this._m.byId && this._m.byId[id];
+      if (rr && typeof this.roomExtra === 'function') { try { this.roomExtra(rr, this._els.sheet.querySelector('#sheettop'), this._els.sheet.querySelector('#sheetbot')); } catch (_) { /* sin tarjetas extra */ } }
       this._els.sheet.scrollTop = 0;
       this._els.sheetwrap.classList.add('open');
       this._haptic('light');
@@ -2614,6 +2617,7 @@
       if (this._panel === 'agenda') this._closeAgenda();
       this._room = null; this._panel = null;
       this._els.sheetwrap.classList.remove('open');
+      if (typeof this.roomExtraClose === 'function') { try { this.roomExtraClose(); } catch (_) { /* nada */ } }
       // cortar el video de las cámaras del ambiente
       this._roomCamEl = null; this._roomCamKey = null;
       this._roomAct = null; clearTimeout(this._raT);

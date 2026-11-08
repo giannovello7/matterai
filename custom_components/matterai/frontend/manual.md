@@ -81,6 +81,7 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **Tamaño del plano**: tocá el plano → Tamaño: chico, mediano, normal o grande.
 - **Cómo se ve cada tarjeta**: Ambientes (lista, grilla o tarjetas grandes), Escenas (botones o portadas de colores), Botones (grilla, lista, mosaicos con interruptor o fila de accesos) y el termostato grande con los modos del aire.
 - **Ambientes por dentro**: abrí un ambiente y arrastrá cada equipo a su lugar directo en la pantalla del medio.
+- **Tarjetas dentro de un ambiente**: con el ambiente abierto, «+ Agregar tarjeta» arriba o abajo de sus equipos (o en el panel: «+ Tarjeta arriba / abajo»). Puede ser cualquier tarjeta: la cámara del ambiente, escenas, botones, música, texto, una imagen… Se tocan, se editan con la misma ventana que todas y se arrastran para ordenarlas. Son **de la casa** (se ven en todos los dashboards y en la app); con «Tarjetas propias de este ambiente sólo en este dashboard» ese dashboard tiene su versión y los demás siguen con la de la casa. Guardar / Cancelar de una tarjeta del ambiente vuelve al ambiente, y Ctrl+Z también deshace lo de adentro.
 - **Plano e imágenes**: el render de la casa (de noche, con luces y de día) y sus ambientes: puntos para paredes de más de 4 lados, mover la zona, doble clic para borrar un punto, Ctrl+Z.
 - **▶ Probar**: usás la pantalla como en el celular (prender luces, entrar a un ambiente).
 - **Simular**: ver cómo queda de noche, con la alarma armada, con música, etc., sin tocar la casa.

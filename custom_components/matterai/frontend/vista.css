@@ -571,3 +571,10 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.editing .dragging{opacity:.28}
 .v-dropline{position:absolute;z-index:61;display:none;border-radius:3px;background:var(--warm);box-shadow:0 0 10px var(--warm);pointer-events:none}
 .vista.editing [data-el],.vista.editing [data-ri]{cursor:grab}
+
+/* ═════════ tarjetas de adentro de un ambiente (2.25): van en la ventana del ambiente, arriba y abajo de sus equipos ═════════ */
+.vista.embed{background:transparent!important;padding:0!important;min-height:0!important;max-width:none!important;margin:0!important;isolation:auto}
+.vista.embed .v-embed{display:flex;flex-direction:column;gap:12px}
+.vista.embed .v-embed>.v-b>h3:first-child{margin-top:4px}
+.vista.embed .v-eadd{margin:4px 0}
+.mae-xtra:empty{display:none}

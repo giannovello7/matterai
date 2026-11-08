@@ -70,7 +70,14 @@ def ws_config_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveCon
 @websocket_api.async_response
 async def ws_config_save(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     rt = _rt(hass)
-    await rt["dashboard"].async_save(msg["config"])
+    from .view_schema import validate_room_pages  # noqa: PLC0415
+
+    try:
+        config = validate_room_pages(msg["config"])
+    except vol.Invalid as err:
+        connection.send_error(msg["id"], "invalid", f"Tarjetas del ambiente inválidas: {err}")
+        return
+    await rt["dashboard"].async_save(config)
     connection.send_result(msg["id"], {"ok": True})
 
 

@@ -346,7 +346,11 @@
     }
 
     /* layout: lo del editor, o el prearmado */
-    function layout(m) { return migrateLayout(layoutRaw(m), kind()); }
+    function layout(m) {
+      // embebido (las tarjetas de adentro de un ambiente): sólo su lista, nunca el prearmado
+      if (ctx.embed) { const v = X.view || {}; return { blocks: v.blocks || [], v: 2, theme: v.theme || null, style: v.style || null, bg: null, plan: v.plan || null }; }
+      return migrateLayout(layoutRaw(m), kind());
+    }
     function layoutRaw(m) {
       const v = X.view || {};
       const mine = !editing() ? load('matterai.template', '') : '';
@@ -1025,6 +1029,13 @@
       if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList) document.documentElement.classList.toggle('mae-light', light);
       // estilo prearmado (MatterAI, tipo Apple, cristal) y fondo propio del diseño
       const st = STYLES.includes(L.style) ? L.style : 'matterai', bgx = bgCSS(L.bg, light);
+      if (ctx.embed) { // las tarjetas de adentro de un ambiente: una columna, sin hora ni barras
+        const sigE = `embed|${editing()}|${light}|${st}`;
+        if (X.shell !== sigE) { X.shell = sigE; X.cache = {}; X.colSig = {}; X.partCache = {}; X.el.className = `vista embed k-phone${editing() ? ' editing' : ''}${light ? ' light' : ''} st-${st}`; X.el.innerHTML = `<div class="v-col v-embed" id="v-c1" data-zone="room-${ctx.embed}"></div>`; }
+        setCol('#v-c1', L.blocks || [], m, editing() ? addSlot(0, `room-${ctx.embed}`) : '');
+        mountLive();
+        return;
+      }
       const cols = K === 'tablet' ? (Array.isArray(L.cols) && L.cols.length ? L.cols.slice(0, 4) : [0, 1, 1]) : [1];
       const side = K === 'tablet' && L.side !== false, nCol = cols.length;
       const sig = `${K}|${vertical}|${editing()}|${light}|${st}|${bgx ? 1 : 0}|${side}|${cols.join(',')}`;
@@ -1071,6 +1082,49 @@
       mountLive();
       editMarks();
       spreadPins();
+      refreshXtra();
+    }
+    /* ── tarjetas de adentro de los ambientes: la ventana del ambiente (de la tarjeta) le pide al motor que las dibuje ── */
+    /** La página de un ambiente: lo que se está editando, la versión propia de este dashboard o la de la casa. */
+    function roomPage(name) {
+      const ed = editing() && ctx.edit.roomPage;
+      if (ed && ed.name === name) return ed;
+      const own = X.view && X.view.room_pages && X.view.room_pages[name];
+      if (own) return own;
+      const cfg = card() && card()._config, rc = cfg && Array.isArray(cfg.rooms) ? cfg.rooms.find((x) => x && x.name === name) : null;
+      return (rc && rc.page) || {};
+    }
+    function adoptCss(node) {
+      const rn = node && node.getRootNode ? node.getRootNode() : null;
+      if (!rn || !rn.host || rn.querySelector('link[data-mae-vista]')) return;
+      const lk = typeof document !== 'undefined' && document.querySelector('link[href*="vista.css"]');
+      if (!lk) return;
+      const c = lk.cloneNode(); c.setAttribute('data-mae-vista', '1'); rn.appendChild(c);
+    }
+    function mountXtra(r, top, bot) {
+      closeXtra();
+      if (!top || !bot || ctx.embed) return;
+      adoptCss(top);
+      const L = X.layout || {};
+      const mk = (el0, zone) => { const inst = create(el0, Object.assign({}, ctx, { embed: zone, kind: 'phone' })); return inst; };
+      X.xtra = { r, top: mk(top, 'top'), bot: mk(bot, 'bottom'), theme: L.theme, style: L.style };
+      refreshXtra(true);
+    }
+    function refreshXtra(force) {
+      const x = X.xtra; if (!x) return;
+      const p = roomPage(x.r.name), L = X.layout || {};
+      const sig = JSON.stringify([p.top || [], p.bottom || [], L.theme, L.style, editing(), editing() && ctx.edit.selected]);
+      if (!force && x.sig === sig) return;
+      x.sig = sig;
+      x.top.setCtx({ edit: ctx.edit }); x.bot.setCtx({ edit: ctx.edit });
+      x.top.setView({ blocks: p.top || [], theme: L.theme, style: L.style, plan: L.plan });
+      x.bot.setView({ blocks: p.bottom || [], theme: L.theme, style: L.style, plan: L.plan });
+    }
+    function closeXtra() { const x = X.xtra; X.xtra = null; if (x) { try { x.top.destroy(); x.bot.destroy(); } catch (_) { /* ya estaban */ } } }
+    if (!ctx.embed) {
+      // la pantalla más nueva es la que dibuja (si la app vuelve a crear el inicio, la tarjeta habla con la nueva)
+      const hook = () => { const c = card(); if (c && !X.destroyed) { c.roomExtra = (r, top, bot) => mountXtra(r, top, bot); c.roomExtraClose = () => closeXtra(); } };
+      hook(); setTimeout(hook, 500);
     }
     /** Carteles del plano que se pisan (ambientes angostos o pegados): se separan solos, uno hacia arriba y otro hacia
      *  abajo. Los que el instalador ubicó a mano (arrastrándolos en el editor) quedan donde están. */
@@ -1404,7 +1458,8 @@
     const ghostOf = (node) => {
       const r = node.getBoundingClientRect(), g = node.cloneNode(true);
       g.classList.add('v-ghost'); g.removeAttribute('id');
-      Object.assign(g.style, { position: 'fixed', left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${Math.min(r.height, 260)}px`, margin: '0', pointerEvents: 'none', zIndex: '60', overflow: 'hidden' });
+      const base = X.el.getBoundingClientRect();
+      Object.assign(g.style, { position: 'absolute', left: `${r.left - base.left}px`, top: `${r.top - base.top}px`, width: `${r.width}px`, height: `${Math.min(r.height, 260)}px`, margin: '0', pointerEvents: 'none', zIndex: '60', overflow: 'hidden' });
       X.el.appendChild(g);
       return { g, dx: 0, dy: 0, r };
     };
@@ -1425,7 +1480,7 @@
       const horiz = sibs.some((n) => sideways(n, target));
       return horiz ? (x < r.left + r.width / 2 ? 'left' : 'right') : (y < r.top + r.height / 2 ? 'top' : 'bottom');
     };
-    const under = (x, y) => (X.el.ownerDocument.elementFromPoint ? X.el.ownerDocument.elementFromPoint(x, y) : null);
+    const under = (x, y) => { const rn = X.el.getRootNode ? X.el.getRootNode() : null, d = rn && rn.elementFromPoint ? rn : X.el.ownerDocument; return d.elementFromPoint ? d.elementFromPoint(x, y) : null; };
     const autoScroll = (x, y) => {
       const n = under(x, y), sc = n && n.closest && n.closest('.v-col,.v-sin,.v-side');
       const box = sc || X.el.ownerDocument.scrollingElement;
@@ -1452,7 +1507,7 @@
         dnd.ghost.dx = e.clientX - dnd.ghost.r.left; dnd.ghost.dy = e.clientY - dnd.ghost.r.top;
       }
       e.preventDefault();
-      dnd.ghost.g.style.left = `${e.clientX - dnd.ghost.dx}px`; dnd.ghost.g.style.top = `${e.clientY - dnd.ghost.dy}px`;
+      { const base = X.el.getBoundingClientRect(); dnd.ghost.g.style.left = `${e.clientX - dnd.ghost.dx - base.left}px`; dnd.ghost.g.style.top = `${e.clientY - dnd.ghost.dy - base.top}px`; }
       autoScroll(e.clientX, e.clientY);
       const n = under(e.clientX, e.clientY);
       dnd.drop = null;
@@ -1522,7 +1577,7 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
-      destroy() { clearInterval(X.camT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
+      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };
   }
