@@ -211,7 +211,8 @@
     const roomsCfg = (style) => Object.assign({}, rooms ? rooms.cfg : { auto: true }, { style });
     const plan = base.blocks.find((b) => b.type === 'plan');
     const T = kind === 'tablet';
-    let B;
+    let B, G = null; // G: cómo se reparte la tablet (columnas, si la primera va al costado)
+    const top = { zone: 'top' }, bot = { zone: 'bottom' };
     // equipos de la casa para los mosaicos y los accesos
     const pick = (pred, n) => Object.keys(S).filter((id) => pred(id, S[id])).slice(0, n);
     const dev = (id, s) => /^(light|switch|fan|media_player|cover|lock|input_boolean)\./.test(id) && !(s.attributes || {}).entity_id && !/grupo|todas|_group/i.test(id + (s.attributes.friendly_name || ''));
@@ -233,9 +234,11 @@
     if (k === 'vision') {
       // Apple Vision Pro: ambientes arriba como pestañas, termostato y música en una columna clara a la derecha,
       // datos grandes y mosaicos cuadrados con su interruptor
+      // tablet: las pestañas de ambientes de lado a lado arriba; ambientes · lo del medio (doble) · hora, clima y música
+      G = { side: false, cols: [1, 2, 1] };
       B = T ? [
+        n('chips', 1, Object.assign({ type: 'buttons', cfg: { style: 'chips', items: roomChips } }, top)),
         n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('photo') }),
-        n('chips', 1, { type: 'buttons', cfg: { style: 'chips', items: roomChips } }),
         n('kpis', 1, { cfg: { auto: true } }),
         n('tiles', 1, { type: 'buttons', title: 'Dispositivos', cfg: { style: 'tiles', cols: 2, items: tilesFor(4) } }),
         n('energy', 1, { title: 'Consumo' }),
@@ -252,15 +255,17 @@
     } else if (k === 'control4') {
       // Control4: arriba la barra de temas (Seguridad, Luces, Clima…), una fila de portadas (escenas),
       // la grilla de controles oscuros (aire, portones, alarma), las cámaras como fotos y la música abajo de lado a lado
+      // tablet: el plano al costado (todo el alto), la barra de temas arriba y la música abajo, de lado a lado
+      G = plan ? { side: true, cols: [0, 1, 1] } : { side: false, cols: [1, 1, 1] };
       B = T ? [
-        plan ? Object.assign({}, plan) : n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('list') }),
-        n('chips', 1, { type: 'buttons', cfg: { style: 'chips', items: themeChips } }),
+        plan ? Object.assign({}, plan, { fill: true }) : n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('list') }),
+        n('chips', 1, Object.assign({ type: 'buttons', cfg: { style: 'chips', items: themeChips } }, top)),
         n('scenes', 1, { title: 'Escenas', cfg: { auto: true, style: 'covers' } }),
         clim ? n('climate', 1, { title: 'Aire', cfg: { entity: clim } }) : null,
         n('grid', 1, { type: 'buttons', cfg: { cols: 2, items: tilesFor(4).concat(m && m.alarm ? [{ entity: m.alarm.entity_id, name: 'Alarma' }] : []).slice(0, 4) } }),
         ...cams.slice(0, 2).map((id, i) => camHalf(id, i, 2)),
         n('routines', 2, { title: 'Rutinas', cfg: { auto: true } }),
-        n('music', 2, { title: 'Música' }),
+        n('music', 1, Object.assign({ title: 'Música' }, bot)),
       ] : [
         n('chips', 0, { type: 'buttons', cfg: { style: 'chips', items: themeChips } }),
         n('scenes', 0, { title: 'Escenas', cfg: { auto: true, style: 'covers' } }),
@@ -271,6 +276,8 @@
     } else if (k === 'savant') {
       // Savant / Lutron: los ambientes son la pantalla (tarjetas grandes), negro y dorado, todo minimalista;
       // a la derecha la hora, las escenas, el clima y la seguridad
+      // tablet: los ambientes ocupan la mitad (columna doble), a la derecha dos columnas angostas
+      G = { side: false, cols: [2, 1, 1] };
       B = T ? [
         n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('photo') }),
         n('clock', 1),
@@ -287,7 +294,9 @@
         n('alarm', 0, { title: 'Seguridad' }),
       ];
     } else return base;
-    return Object.assign({}, base, { blocks: B.filter(Boolean), style: k });
+    const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: k });
+    if (T && G) { out.v = 2; out.side = G.side; out.cols = G.cols; out.blocks.forEach((b) => { if (b.size === 'half' && !b.span) { b.span = 2; delete b.size; } }); }
+    return out;
   }
   const GRADS = Object.fromEntries(GRAD_LIST.map((g) => [g[0], g[2]]));
 
@@ -1455,7 +1464,7 @@
     /* ── editor: arrastrar y soltar, uno solo para todo (tarjetas, lo de adentro de cada tarjeta y los equipos del ambiente).
        Con el puntero (mouse y dedo): se agarra, aparece una copia que sigue el dedo y una línea marca dónde va a caer. */
     let dnd = null;
-    const DRAG_MIN = 6;
+    const DRAG_MIN = 6, LONG_MS = 380;
     const ghostOf = (node) => {
       const r = node.getBoundingClientRect(), g = node.cloneNode(true);
       g.classList.add('v-ghost'); g.removeAttribute('id');
@@ -1498,11 +1507,20 @@
       if (dk && ctx.edit.onDock) { kind0 = 'dock'; node = dk; } else if (it && it.dataset.el !== 'cam' && blk) { kind0 = 'el'; node = it; } else if (ri) { kind0 = 'ri'; node = ri; } else if (blk) { kind0 = 'card'; node = blk; }
       if (!node) return;
       dnd = { kind: kind0, node, sel: kind0 === 'el' ? '[data-el]' : kind0 === 'ri' ? '[data-ri]' : kind0 === 'dock' ? '[data-dkk]' : '[data-block]', x0: e.clientX, y0: e.clientY, on: false, block: blk && blk.dataset.block };
+      // con el dedo: hay que mantenerla apretada un momento (si se mueve antes, es para desplazar la pantalla)
+      if (e.pointerType === 'touch') {
+        const d0 = dnd; d0.touch = true; d0.armed = false;
+        d0.lt = setTimeout(() => { if (dnd !== d0) return; d0.armed = true; node.classList.add('lift'); try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* sin vibración */ } }, LONG_MS);
+      }
     }, true);
     el.addEventListener('pointermove', (e) => {
       if (!dnd) return;
+      if (dnd.touch && !dnd.armed) {
+        if (Math.abs(e.clientX - dnd.x0) + Math.abs(e.clientY - dnd.y0) > 10) { clearTimeout(dnd.lt); dnd = null; } // desplaza la pantalla
+        return;
+      }
       if (!dnd.on) {
-        if (Math.abs(e.clientX - dnd.x0) + Math.abs(e.clientY - dnd.y0) < DRAG_MIN) return;
+        if (!dnd.touch && Math.abs(e.clientX - dnd.x0) + Math.abs(e.clientY - dnd.y0) < DRAG_MIN) return;
         dnd.on = true; X.dnd = true;
         dnd.ghost = ghostOf(dnd.node); dnd.node.classList.add('dragging');
         dnd.ghost.dx = e.clientX - dnd.ghost.r.left; dnd.ghost.dy = e.clientY - dnd.ghost.r.top;
@@ -1551,6 +1569,7 @@
     const endDnd = (ok) => {
       const d = dnd; dnd = null;
       if (!d) return;
+      clearTimeout(d.lt); if (d.node && d.node.classList) d.node.classList.remove('lift');
       hideLine();
       if (d.ghost) d.ghost.g.remove();
       if (d.node && d.node.classList) d.node.classList.remove('dragging');
@@ -1565,6 +1584,9 @@
       else render();
     };
     el.addEventListener('pointerup', () => endDnd(true));
+    // ya agarrada con el dedo, la pantalla no se desplaza ni sale el menú del sistema
+    el.addEventListener('touchmove', (e) => { if (dnd && dnd.armed && e.cancelable) e.preventDefault(); }, { passive: false });
+    el.addEventListener('contextmenu', (e) => { if (editing()) e.preventDefault(); });
     el.addEventListener('pointercancel', () => endDnd(false));
     if (typeof addEventListener === 'function') addEventListener('keydown', (e) => { if (e.key === 'Escape' && dnd) endDnd(false); });
     // el navegador no arrastra imágenes ni textos por su cuenta mientras se edita

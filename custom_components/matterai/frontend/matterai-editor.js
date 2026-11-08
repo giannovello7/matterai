@@ -118,6 +118,9 @@
   .ed-top{grid-column:1/-1!important;grid-row:1}.ed-c{grid-column:1!important;grid-row:2}.ed-l,.ed-r{display:none!important}
   .ed-c{position:relative;transition:padding .2s}.ed.dlgon .ed-c{padding-right:calc(min(540px,46vw) + 24px)}
   .ed-top .saved{font-size:12.5px;color:#7fd6a4;padding:0 6px}.ed-top .saved.dirty{color:#f2b766}
+  .ed-top .tname{display:flex;flex-direction:column;min-width:0;max-width:240px;margin-right:6px}.ed-top .tname h2{margin:0;font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .ed-top .tname .saved{padding:0;font-size:11.5px}
+  .emenu-l .ml{display:block;padding:10px 12px 3px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8f99ab}
   .ehint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:rgba(30,36,46,.92);border:1px solid rgba(160,175,200,.2);color:#c4cad6;font-size:12.5px;white-space:nowrap;pointer-events:none}
   .ehint:empty{display:none}.ehint b{color:#f2b766}
   .dlg{position:fixed;z-index:40;top:62px;right:12px;bottom:12px;width:min(540px,46vw);display:none;flex-direction:column;background:#161b21;border:1px solid rgba(160,175,200,.22);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);overflow:hidden}
@@ -556,27 +559,31 @@
     draw() {
       const v = this.v, K = this.K, ori = this.lay().orientation || 'landscape', dirty = this.dirty();
       const other = K === 'tablet' ? 'phone' : 'tablet', hasOther = !!(((v.layouts || {})[other] || {}).blocks || []).length;
-      this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver">← Volver</button><h2>${esc(v.name)}</h2>
+      const SIMS = [['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']], simOn = SIMS.filter(([k]) => (this.sim || {})[k]);
+      // como Lovelace: a la izquierda volver y el nombre; en el medio qué equipo; a la derecha las acciones y «Listo». El resto, en ⋯
+      this.$('#edt').innerHTML = `<button class="eb ico" data-e="close" title="Volver" aria-label="Volver">←</button>
+          <div class="tname"><h2 title="${esc(v.name)}">${esc(v.name)}</h2><span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span></div>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
-          ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span><button class="eb" data-e="cols" title="Cuántas columnas y de qué ancho">▦ Columnas</button>` : ''}
-          <button class="eb" data-e="dash" title="Plantilla, estilo, fondo, modo de día o de noche y nombre">🎨 Diseño</button>
-          <button class="eb ${this.playing ? 'pri' : ''}" data-e="play" title="${this.playing ? 'Volver a editar' : 'Usar la pantalla como en el celular (prender luces, cambiar de cámara, entrar a un ambiente)'}">${this.playing ? '✎ Editar' : '▶ Probar'}</button>
-          <button class="eb pri2" data-e="add" title="Agregar una tarjeta" ${this.playing ? 'disabled' : ''}>+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
-          <span class="emenu"><button class="eb ${Object.values(this.sim || {}).some(Boolean) ? 'pri2' : ''}" data-e="simm" title="Ver cómo queda en otras situaciones (no toca la casa)">Simular${Object.values(this.sim || {}).filter(Boolean).length ? ` (${Object.values(this.sim || {}).filter(Boolean).length})` : ''} ▾</button>${this.simOpen ? `<span class="emenu-l" style="left:0;right:auto">
-            ${[['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']].map(([k, l]) => `<button data-sim="${k}">${(this.sim || {})[k] ? '✓ ' : ''}${l}</button>`).join('')}</span>` : ''}</span>
+          ${K === 'tablet' ? `<button class="eb" data-ori="${ori === 'landscape' ? 'portrait' : 'landscape'}" title="Girar la tablet">${ori === 'landscape' ? '▭ Horizontal' : '▯ Vertical'}</button>` : ''}
+          ${this.trying ? '<button class="eb pri2" data-e="tryend" title="Los equipos vuelven al diseño guardado">En los equipos · Terminar ✕</button>' : ''}
+          ${simOn.length ? `<button class="eb pri2" data-e="simoff" title="Dejar de simular">Simulando: ${esc(simOn.map((x) => x[1].toLowerCase()).join(', '))} ✕</button>` : ''}
           <span class="sp"></span>
           <button class="eb ico" data-e="undo" ${this.undo.length ? '' : 'disabled'} title="Deshacer (Ctrl+Z)">↶</button><button class="eb ico" data-e="redo" ${this.redo.length ? '' : 'disabled'} title="Rehacer (Ctrl+Y)">↷</button>
-          <span class="emenu"><button class="eb" data-e="more" title="Más opciones">Más ▾</button>${this.moreOpen ? `<span class="emenu-l">
-            <button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
-            <button data-e="history">Historial de versiones…</button>
+          <button class="eb" data-e="dash" title="Plantilla, estilo, fondo, modo de día o de noche y nombre" ${this.playing ? 'disabled' : ''}>🎨 Diseño</button>
+          <button class="eb pri2" data-e="add" title="Agregar una tarjeta" ${this.playing ? 'disabled' : ''}>+ Tarjeta</button>
+          <button class="eb ${this.playing ? 'pri' : ''}" data-e="play" title="${this.playing ? 'Volver a editar' : 'Usar la pantalla como en el celular (prender luces, cambiar de cámara, entrar a un ambiente)'}">${this.playing ? '✎ Editar' : '▶ Probar'}</button>
+          <span class="emenu"><button class="eb ico" data-e="more" title="Más opciones" aria-label="Más opciones">⋯</button>${this.moreOpen ? `<span class="emenu-l">
+            ${K === 'tablet' ? '<button data-e="cols">▦ Columnas…</button>' : ''}<button data-e="plan">Plano e imágenes…</button>
+            <span class="ml">Simular (no toca la casa)</span>${SIMS.map(([k, l]) => `<button data-sim="${k}">${(this.sim || {})[k] ? '✓ ' : ''}${l}</button>`).join('')}
+            <span class="ml">Este diseño</span><button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
+            <button data-e="history">Historial de versiones…</button>${this.trying ? '<button data-e="tryend">■ Terminar la prueba en los equipos</button>' : '<button data-e="try">Probar en los equipos de la casa (15 min, sin guardar)</button>'}
             <button data-e="export">Exportar como plantilla (archivo)</button><button data-e="import">Importar una plantilla…</button>
             </span>` : ''}</span>
-          <span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span>
           <button class="eb pri" data-e="close" title="Terminar de editar">Listo</button>`;
       const hint = this.$('#ehint');
       this.$('#ed').classList.toggle('playing', !!this.playing);
       if (hint && this.playing) hint.innerHTML = 'Modo prueba: usalo como en el celular (luces, cámaras, ambientes). Los equipos se mueven de verdad. <b>✎ Editar</b> vuelve al editor.';
-      else if (hint) hint.innerHTML = this.dlgOpen() ? '' : 'Tocá una tarjeta para editarla · Arrastrala para moverla · <b>+ Agregar tarjeta</b> al final de cada columna · Tocá arriba o la barra de abajo para cambiarlas';
+      else if (hint) hint.innerHTML = this.dlgOpen() ? '' : 'Tocá una tarjeta para editarla · Arrastrala para moverla (con el dedo: mantenela apretada) · <b>+ Agregar tarjeta</b> al final de cada columna · Tocá arriba o la barra de abajo para cambiarlas';
       this.drawPreview(); this.drawProps(); this.drawDlg(); this.bind();
     }
     blocks() {
@@ -1007,7 +1014,7 @@
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
         case 'plan':
           hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
-          h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
+          h += '<p class="hint">El plano se arma en «Plano e imágenes» (en ⋯, arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
         case 'weather': h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
         case 'climate':
@@ -1603,6 +1610,7 @@
       }
       if (k === 'dash') return this.pick(null, { zone: 'dash' });
       if (k === 'simm') { this.simOpen = !this.simOpen; this.draw(); return; }
+      if (k === 'simoff') { this.sim = {}; if (this.vista) this.vista.setCtx({ sim: this.sim }); this.draw(); return; }
       if (k === 'list') { this.showList = !this.showList; try { localStorage.setItem('matterai.editor.list', this.showList ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } this.draw(); this.sizeFrame(); return; }
       if (k === 'add') return this.openCatalog(null);
       if (k === 'copy') return this.copyFrom(this.K === 'tablet' ? 'phone' : 'tablet');
@@ -1946,6 +1954,7 @@
     }
     bindPlan() {
       const pe = this.pe, P = this.v.plan;
+      this.chipify(pe);
       const img = pe.querySelector('#peimg'), svg = pe.querySelector('#pesvg');
       const ptsOf = (poly) => poly.map(([x, y]) => `${x * 1000},${y * 1000}`).join(' ');
       const paint = () => {

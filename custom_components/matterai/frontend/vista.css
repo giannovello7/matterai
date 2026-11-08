@@ -578,3 +578,5 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.embed .v-embed>.v-b>h3:first-child{margin-top:4px}
 .vista.embed .v-eadd{margin:4px 0}
 .mae-xtra:empty{display:none}
+.vista.editing{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}
+.vista.editing .lift{transform:scale(1.03);box-shadow:0 0 0 2px var(--warm),0 14px 30px rgba(0,0,0,.4)!important;transition:transform .15s,box-shadow .15s}
