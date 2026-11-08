@@ -95,7 +95,7 @@ CFG = vol.Schema({
     vol.Optional("rooms"): vol.All([_name], vol.Length(max=24)),
     vol.Optional("items"): vol.All([ITEM], vol.Length(max=24)),  # botones, resumen
     vol.Optional("auto"): bool,                                 # true: que lo elija la app según la casa
-    vol.Optional("style"): vol.Any(None, vol.In(["list", "grid", "big", "compact", "separator"])),
+    vol.Optional("style"): vol.Any(None, vol.In(["list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers"])),
     # desde la 2.16
     vol.Optional("cols"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=4))),  # botones por fila
     vol.Optional("text"): vol.Any(None, vol.All(str, vol.Length(max=600))),               # tarjeta de texto

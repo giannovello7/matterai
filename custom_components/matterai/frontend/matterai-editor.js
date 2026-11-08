@@ -180,6 +180,7 @@
   .tsw.tk-vision{background:linear-gradient(160deg,#8d735d,#5a4636)}.tsw.tk-vision i{background:rgba(255,255,255,.3);border-radius:7px}.tsw.tk-vision i:first-child{background:#d4f05a}
   .tsw.tk-control4{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.tsw.tk-control4 i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}
   .tsw.tk-savant{background:#050505}.tsw.tk-savant i{background:#161616;border-radius:2px}.tsw.tk-savant i:first-child{background:#c9a96e}
+  .eseg.wrap{flex-wrap:wrap;height:auto}
   .bgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px;margin-bottom:6px}
   .bgs>button,.bgs>label{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:0;background:none;color:inherit;cursor:pointer;font:inherit}
   .bgs .bsw{position:relative;width:100%;aspect-ratio:3/4;border-radius:10px;border:2px solid rgba(160,175,200,.2);display:grid;place-items:center;font-size:18px;color:#8f99ab;overflow:hidden;box-sizing:border-box}
@@ -363,6 +364,11 @@
     get K() { return this._k || (this.v && this.v.kind) || 'phone'; }
     set K(k) { this._k = k; }
     lay() { const L = this.v.layouts || (this.v.layouts = {}); return L[this.K] || (L[this.K] = { blocks: [] }); }
+    /** «Cómo se ve» de una tarjeta: botones para tocar (no una lista desplegable). */
+    styleSeg(c, opts, def) {
+      const cur = c.style || def;
+      return `<div class="fld"><span>Cómo se ve</span><span class="eseg wrap">${opts.map(([k, l]) => `<button data-cst="${k}" class="${cur === (k || def) ? 'on' : ''}">${esc(l)}</button>`).join('')}</span></div>`;
+    }
     /** Estilo prearmado y fondo del diseño: se elige tocando, como en una galería. */
     lookEditor() {
       const V = window.MaeVista || {}, L = this.lay(), st = L.style || 'matterai', bg = L.bg || { kind: 'none' };
@@ -617,7 +623,39 @@
         const m = pc.model && pc.model(), r = m && m.rooms.find((x) => x.name === d.name);
         if (r && (pc._room !== r.id || !this.pcRoomOn)) { pc.openRoom(r.id); }
         this.pcRoomOn = true;
+        this.roomDrag(pc);
       } catch (_) { /* si algo falla, queda la pantalla como estaba */ }
+    }
+    /** En el ambiente abierto en la pantalla del medio, cada equipo se arrastra a su lugar (como en Home Assistant). */
+    roomDrag(pc) {
+      const sheet = pc && pc._els && pc._els.sheet; if (!sheet) return;
+      const mark = () => sheet.querySelectorAll('[data-eid]').forEach((x) => { if (!x.draggable) { x.draggable = true; x.style.cursor = 'grab'; } });
+      mark();
+      if (sheet._maeDrag) return;
+      sheet._maeDrag = true;
+      // la tarjeta vuelve a dibujar el ambiente con cada cambio de la casa: se marcan otra vez
+      try { new (sheet.ownerDocument.defaultView.MutationObserver)(() => { if (this.rdraft) mark(); }).observe(sheet, { childList: true, subtree: true }); } catch (_) { /* sin observador */ }
+      const idOf = (x) => (typeof x === 'string' ? x : x && x.entity);
+      let from = null;
+      const clear = () => sheet.querySelectorAll('.mae-dropb,.mae-dragging').forEach((x) => { x.classList.remove('mae-dropb', 'mae-dragging'); x.style.outline = ''; x.style.opacity = ''; });
+      sheet.addEventListener('dragstart', (e) => {
+        const it = this.rdraft && e.target.closest && e.target.closest('[data-eid]'); if (!it) return;
+        from = it.dataset.eid; it.style.opacity = '.35'; it.classList.add('mae-dragging');
+        try { e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', from); } catch (_) { /* viejo */ }
+      });
+      sheet.addEventListener('dragover', (e) => {
+        if (from == null) return; const it = e.target.closest && e.target.closest('[data-eid]'); if (!it) return;
+        e.preventDefault(); sheet.querySelectorAll('.mae-dropb').forEach((x) => { x.classList.remove('mae-dropb'); x.style.outline = ''; });
+        it.classList.add('mae-dropb'); it.style.outline = '2px solid #f2b766'; it.style.outlineOffset = '2px';
+      });
+      sheet.addEventListener('dragend', () => { from = null; clear(); });
+      sheet.addEventListener('drop', (e) => {
+        e.preventDefault();
+        const it = e.target.closest && e.target.closest('[data-eid]'), a = from; from = null; clear();
+        const R = this.rdraft; if (!it || !R || !a || it.dataset.eid === a) return;
+        const L = R.entities || [], i = L.findIndex((x) => idOf(x) === a), j = L.findIndex((x) => idOf(x) === it.dataset.eid);
+        if (i >= 0 && j >= 0) this.reorder('room', i, j);
+      });
     }
     roomDirty() {
       const R = this.rdraft; if (!R) return false;
@@ -810,17 +848,17 @@
           if (b.type === 'camera') h += this.elemSection(b);
           break;
         case 'rooms':
-          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="list" ${c.style !== 'grid' ? 'selected' : ''}>Lista</option><option value="grid" ${c.style === 'grid' ? 'selected' : ''}>Grilla</option></select></label>`;
+          h += this.styleSeg(c, [['list', 'Lista'], ['grid', 'Grilla'], ['photo', 'Tarjetas grandes']], 'list');
           if (this.roomEd != null) { r.innerHTML = this.roomEditor(); return; }
           h += this.elemSection(b);
           h += '<p class="hint">Cada persona también puede fijar o sacar ambientes desde su celular (mantener apretado).</p>';
           break;
-        case 'scenes': h += this.elemSection(b); break;
+        case 'scenes': h += this.styleSeg(c, [['', 'Botones'], ['covers', 'Portadas de colores']], ''); h += this.elemSection(b); break;
         case 'routines':
           h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="">Un botón que abre todas las rutinas</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Lista en la pantalla (las primeras 4)</option></select></label>`;
           h += this.elemSection(b); break;
         case 'buttons':
-          h += `<label class="fld"><span>Cómo se ve</span><select data-f="cfg.style"><option value="grid" ${c.style !== 'list' ? 'selected' : ''}>Grilla</option><option value="list" ${c.style === 'list' ? 'selected' : ''}>Lista</option></select></label>`;
+          h += this.styleSeg(c, [['grid', 'Grilla'], ['list', 'Lista'], ['tiles', 'Mosaicos'], ['chips', 'Fila de accesos']], 'grid');
           h += this.elemSection(b); break;
         case 'alarm': h += this.ent('Alarma (vacío: la de la casa)', 'al', c.entity, PICK.alarm, 'cfg.entity'); break;
         case 'away': h += this.ent('Interruptor, escena o script', 'aw', c.entity, PICK.away, 'cfg.entity'); break;
@@ -1259,6 +1297,10 @@
         row.ondrop = (e) => { e.preventDefault(); const d = this.srDrag; this.srDrag = null; if (d && d.g === row.dataset.sr) this.reorder(d.g, d.i, +row.dataset.i); };
       });
       W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
+      W.querySelectorAll('#edr [data-cst]').forEach((x) => { x.onclick = () => this.change(() => {
+        const bb = this.blocks().find((y) => y.id === this.sel); if (!bb) return;
+        bb.cfg = bb.cfg || {}; if (x.dataset.cst) bb.cfg.style = x.dataset.cst; else delete bb.cfg.style;
+      }); });
       W.querySelectorAll('#edr [data-plz]').forEach((x) => { x.onclick = () => this.change(() => {
         const bb = this.blocks().find((y) => y.id === this.sel); if (!bb) return;
         bb.cfg = bb.cfg || {}; if (x.dataset.plz) bb.cfg.zoom = x.dataset.plz; else delete bb.cfg.zoom;

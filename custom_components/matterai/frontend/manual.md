@@ -34,7 +34,7 @@ El paso a paso de la instalación, en 5 grupos: la casa, panel central y copias,
 ## Dashboards
 Lo que ve cada persona en su pantalla. Cada dashboard tiene **un diseño para el celular y otro para la tablet**.
 
-- **Armar con el asistente**: para un cliente nuevo. Elegís una **plantilla**: **MatterAI** (la de siempre), **Vision** (vidrio sobre la casa, como Apple Vision Pro), **Control4** (oscuro con color, música con tapas, cámaras) o **Savant** (negro y dorado, minimalista). Se completa sola con lo que tiene la casa y después la ajustás en el editor.
+- **Armar con el asistente**: para un cliente nuevo. Elegís una **plantilla**: **MatterAI** (la de siempre); **Vision** (como Apple Vision Pro: vidrio claro, barra lateral, pestañas de ambientes, datos grandes, mosaicos con interruptor y una columna clara con hora, termostato y música); **Control4** (oscuro con color: barra de temas arriba, escenas como portadas, controles en grilla, cámaras como fotos y la música abajo); o **Savant / Lutron** (negro y dorado, minimalista: los ambientes en tarjetas grandes, títulos finos espaciados). Se completa sola con lo que tiene la casa y después la ajustás en el editor.
 - **Editar celular / Editar tablet**: abre el editor en ese diseño. Las miniaturas muestran cómo está armado cada uno («prearmado» = todavía se arma solo).
 - **★**: el dashboard por defecto. Lo ven los equipos que no tienen uno elegido. Sin ★, esos equipos ven el «Inicio automático».
 - **+ equipo**: elegís quién lo ve. Una persona con celular y tablet: marcá los dos.
@@ -77,6 +77,8 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **Celular / Tablet** y, en la tablet, **Horizontal / Vertical**.
 - **🎨 Estilo**: estilo (MatterAI, tipo Apple, Cristal, Vision, Control4 o Savant), fondo (degradés, un color o una foto de la casa) y modo claro, oscuro o automático. Cada diseño tiene el suyo.
 - **Tamaño del plano**: tocá el plano → Tamaño: chico, mediano, normal o grande.
+- **Cómo se ve cada tarjeta**: Ambientes (lista, grilla o tarjetas grandes), Escenas (botones o portadas de colores), Botones (grilla, lista, mosaicos con interruptor o fila de accesos) y el termostato grande con los modos del aire.
+- **Ambientes por dentro**: abrí un ambiente y arrastrá cada equipo a su lugar directo en la pantalla del medio.
 - **Plano e imágenes**: el render de la casa (de noche, con luces y de día) y sus ambientes: puntos para paredes de más de 4 lados, mover la zona, doble clic para borrar un punto, Ctrl+Z.
 - **▶ Probar**: usás la pantalla como en el celular (prender luces, entrar a un ambiente).
 - **Simular**: ver cómo queda de noche, con la alarma armada, con música, etc., sin tocar la casa.

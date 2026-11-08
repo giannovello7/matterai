@@ -171,7 +171,7 @@
     const base = defaults(kind, m, legacy, S, floorplan);
     if (!k || k === 'matterai') return base;
     S = S || {};
-    const n = (t, col, extra) => Object.assign({ id: `${k}-${t}`.slice(0, 24), type: t, col: kind === 'tablet' ? col : 0, cfg: {} }, extra || {});
+    const n = (t, col, extra) => Object.assign({ id: `${k}-${t}`.slice(0, 24), type: t, col: kind === 'tablet' ? col : 0, cfg: {} }, extra || {}, { col: kind === 'tablet' ? col : 0 });
     const clim = Object.keys(S).find((x) => x.startsWith('climate.'));
     const lock = m && (m.access || []).find((x) => x.startsWith('lock.'));
     const cams = (m && m.cams) || [];
@@ -180,33 +180,79 @@
     const plan = base.blocks.find((b) => b.type === 'plan');
     const T = kind === 'tablet';
     let B;
+    // equipos de la casa para los mosaicos y los accesos
+    const pick = (pred, n) => Object.keys(S).filter((id) => pred(id, S[id])).slice(0, n);
+    const dev = (id, s) => /^(light|switch|fan|media_player|cover|lock|input_boolean)\./.test(id) && !(s.attributes || {}).entity_id && !/grupo|todas|_group/i.test(id + (s.attributes.friendly_name || ''));
+    const tilesFor = (n) => {
+      const gar = pick((id, s) => id.startsWith('cover.') && ['garage', 'gate'].includes(s.attributes.device_class), 2);
+      const rest = pick((id, s) => dev(id, s) && !gar.includes(id), n);
+      return [...gar, ...rest].slice(0, n).map((id) => ({ entity: id }));
+    };
+    const roomChips = (m && m.rooms ? m.rooms.slice().sort((x, y) => (y.count || 0) - (x.count || 0)).slice(0, 6) : []).map((r) => ({ name: r.name, icon: '', tap: { type: 'room', room: r.name } })); // pestañas sin ícono, como en Vision
+    const themeChips = [
+      { name: 'Seguridad', icon: 'shield', tap: { type: 'screen', screen: 'seguridad' } },
+      { name: 'Luces', icon: 'bulb', tap: { type: 'screen', screen: 'luces' } },
+      clim ? { name: 'Clima', icon: 'temp', tap: { type: 'more_info', entity: clim } } : { name: 'Clima', icon: 'cloud', tap: { type: 'screen', screen: 'clima' } },
+      { name: 'Aberturas', icon: 'door', tap: { type: 'screen', screen: 'aberturas' } },
+      cams.length ? { name: 'Cámaras', icon: 'cam', tap: { type: 'screen', screen: 'camaras' } } : null,
+      { name: 'Música', icon: 'music', tap: { type: 'screen', screen: 'musica' } },
+    ].filter(Boolean);
+    const camHalf = (id, i, col) => n(`cam${i}`, col, { type: 'camera', title: S[id] && S[id].attributes.friendly_name ? String(S[id].attributes.friendly_name).replace(/^(c[aá]mara|camera)\s*/i, '') : 'Cámara', size: 'half', cfg: { entity: id, video: 'photo' } });
     if (k === 'vision') {
+      // Apple Vision Pro: ambientes arriba como pestañas, termostato y música en una columna clara a la derecha,
+      // datos grandes y mosaicos cuadrados con su interruptor
       B = T ? [
-        clim ? n('climate', 0, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : n('clock', 0),
-        n('music', 0, { title: 'Música' }),
-        n('weather', 1), n('kpis', 1, { cfg: { auto: true } }), n('lights', 1, { title: 'Luces' }), lock ? n('lock', 1, { title: 'Entrada', cfg: { entity: lock } }) : null,
-        n('scenes', 2, { title: 'Escenas', cfg: { auto: true } }), n('energy', 2, { title: 'Consumo' }), n('rooms', 2, { title: 'Ambientes', cfg: roomsCfg('grid') }),
+        n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('photo') }),
+        n('chips', 1, { type: 'buttons', cfg: { style: 'chips', items: roomChips } }),
+        n('kpis', 1, { cfg: { auto: true } }),
+        n('tiles', 1, { type: 'buttons', title: 'Dispositivos', cfg: { style: 'tiles', cols: 2, items: tilesFor(4) } }),
+        n('energy', 1, { title: 'Consumo' }),
+        n('clock', 2),
+        clim ? n('climate', 2, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : n('weather', 2),
+        n('music', 2, { title: 'Música' }),
       ] : [
-        n('kpis', 0, { cfg: { auto: true } }), clim ? n('climate', 0, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : null,
-        n('lights', 0, { title: 'Luces' }), n('scenes', 0, { title: 'Escenas', cfg: { auto: true } }), n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('grid') }),
+        n('chips', 0, { type: 'buttons', cfg: { style: 'chips', items: roomChips } }),
+        n('kpis', 0, { cfg: { auto: true } }),
+        clim ? n('climate', 0, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : null,
+        n('tiles', 0, { type: 'buttons', title: 'Dispositivos', cfg: { style: 'tiles', cols: 2, items: tilesFor(4) } }),
+        n('music', 0, { title: 'Música' }),
       ];
     } else if (k === 'control4') {
+      // Control4: arriba la barra de temas (Seguridad, Luces, Clima…), una fila de portadas (escenas),
+      // la grilla de controles oscuros (aire, portones, alarma), las cámaras como fotos y la música abajo de lado a lado
       B = T ? [
         plan ? Object.assign({}, plan) : n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('list') }),
-        n('kpis', 1, { cfg: { auto: true } }), clim ? n('climate', 1, { title: 'Aire', cfg: { entity: clim } }) : null, n('music', 1, { title: 'Música' }), n('scenes', 1, { title: 'Escenas', cfg: { auto: true } }),
-        cams.length ? n('frigate', 2, { title: 'Cámaras' }) : null, n('routines', 2, { title: 'Rutinas', cfg: { auto: true } }), n('openings', 2, { title: 'Puertas y ventanas' }), lock ? n('lock', 2, { title: 'Entrada', cfg: { entity: lock } }) : null,
+        n('chips', 1, { type: 'buttons', cfg: { style: 'chips', items: themeChips } }),
+        n('scenes', 1, { title: 'Escenas', cfg: { auto: true, style: 'covers' } }),
+        clim ? n('climate', 1, { title: 'Aire', cfg: { entity: clim } }) : null,
+        n('grid', 1, { type: 'buttons', cfg: { cols: 2, items: tilesFor(4).concat(m && m.alarm ? [{ entity: m.alarm.entity_id, name: 'Alarma' }] : []).slice(0, 4) } }),
+        ...cams.slice(0, 2).map((id, i) => camHalf(id, i, 2)),
+        n('routines', 2, { title: 'Rutinas', cfg: { auto: true } }),
+        n('music', 2, { title: 'Música' }),
       ] : [
-        n('kpis', 0, { cfg: { auto: true } }), n('scenes', 0, { title: 'Escenas', cfg: { auto: true } }), n('routines', 0, { title: 'Rutinas', cfg: { auto: true, style: 'list' } }),
-        cams.length ? n('frigate', 0, { title: 'Cámaras' }) : null, n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('list') }),
+        n('chips', 0, { type: 'buttons', cfg: { style: 'chips', items: themeChips } }),
+        n('scenes', 0, { title: 'Escenas', cfg: { auto: true, style: 'covers' } }),
+        n('grid', 0, { type: 'buttons', cfg: { cols: 2, items: tilesFor(4) } }),
+        n('routines', 0, { title: 'Rutinas', cfg: { auto: true, style: 'list' } }),
+        ...cams.slice(0, 2).map((id, i) => camHalf(id, i, 0)),
       ];
     } else if (k === 'savant') {
+      // Savant / Lutron: los ambientes son la pantalla (tarjetas grandes), negro y dorado, todo minimalista;
+      // a la derecha la hora, las escenas, el clima y la seguridad
       B = T ? [
-        n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('grid') }),
-        n('clock', 1), n('scenes', 1, { title: 'Escenas', cfg: { auto: true } }), clim ? n('climate', 1, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : null,
-        n('alarm', 2, { title: 'Seguridad' }), cams.length ? n('frigate', 2, { title: 'Cámaras' }) : null, n('music', 2, { title: 'Música' }),
+        n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('photo') }),
+        n('clock', 1),
+        n('scenes', 1, { title: 'Escenas', cfg: { auto: true } }),
+        clim ? n('climate', 1, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : n('weather', 1),
+        n('alarm', 2, { title: 'Seguridad' }),
+        lock ? n('lock', 2, { title: 'Entrada', cfg: { entity: lock } }) : null,
+        cams.length ? n('frigate', 2, { title: 'Cámaras' }) : null,
+        n('music', 2, { title: 'Música' }),
       ] : [
-        n('scenes', 0, { title: 'Escenas', cfg: { auto: true } }), n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('grid') }),
-        clim ? n('climate', 0, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : null, n('alarm', 0, { title: 'Seguridad' }),
+        n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('photo') }),
+        n('scenes', 0, { title: 'Escenas', cfg: { auto: true } }),
+        clim ? n('climate', 0, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : null,
+        n('alarm', 0, { title: 'Seguridad' }),
       ];
     } else return base;
     return Object.assign({}, base, { blocks: B.filter(Boolean), style: k });
@@ -538,15 +584,21 @@
           const names = (c.rooms && c.rooms.length) ? c.rooms : m.rooms.slice(0, 4).map((r) => r.name);
           const pairs = names.map((n, i) => [roomByName(m, n), i]).filter((p) => p[0]);
           X.roomNames = names; X.shown[b.id] = names;
-          const grid = c.style === 'grid' || (K === 'tablet' && c.style !== 'list');
+          const grid = c.style === 'grid' || c.style === 'photo' || (K === 'tablet' && c.style !== 'list');
           if (!pairs.length) return `${t}<p class="v-empty">${editing() ? 'Esta tarjeta no tiene ambientes todavía.' : 'Mantené apretado un ambiente en «Toda la casa» para fijarlo acá.'}</p>${elAdd('Agregar un ambiente')}`;
-          return `${t}<div class="${grid ? 'v-tiles' : 'v-rooms'}">${pairs.map(([r, i]) => (grid ? roomTile(r, i) : roomRow(r, false, i))).join('')}</div>${elAdd('Agregar un ambiente')}`;
+          return `${t}<div class="${grid ? `v-tiles${c.style === 'photo' ? ' photo' : ''}` : 'v-rooms'}">${pairs.map(([r, i]) => (grid ? roomTile(r, i) : roomRow(r, false, i))).join('')}</div>${elAdd('Agregar un ambiente')}`;
         }
         case 'scenes': {
           const list = listOf(c, [...maeRole('scene'), ...(m.scenes || [])], 12).filter((x) => st(x.entity) || editing());
           X.shown[b.id] = list;
           if (!list.length) return editing() ? `${t}<p class="v-empty">La casa no tiene escenas todavía.</p>${elAdd('Agregar una escena')}` : '';
           const icn = (n) => (/noche|dormir|night/i.test(n) ? 'moon' : /cine|pel[ií]cula|tv/i.test(n) ? 'film' : /sal|me voy|ausen/i.test(n) ? 'car' : /bienven|lleg/i.test(n) ? 'home' : /apag/i.test(n) ? 'power' : 'spark');
+          if (c.style === 'covers') {
+            // como las portadas de la música de Control4: un cuadrado de color por escena, con el nombre abajo
+            const hue = (n) => { let h = 0; for (const ch of String(n)) h = (h * 31 + ch.charCodeAt(0)) % 360; return h; };
+            return `${t}<div class="v-scovers">${list.map((x, i) => { const n = x.name || fname(x.entity), hh = hue(n);
+              return `<button class="v-scover" data-scene="${esc(x.entity)}" data-n="${esc(n)}"${EL(i)}><span class="v-sart" style="--h1:${hh};--h2:${(hh + 50) % 360}">${ic(x.icon || icn(n))}</span><b>${esc(n)}</b></button>`; }).join('')}</div>${elAdd('Agregar una escena')}`;
+          }
           return `${t}<div class="${K === 'tablet' ? 'v-sgrid' : 'v-scenes'}">${list.map((x, i) => { const n = x.name || fname(x.entity);
             return `<button class="v-scene" data-scene="${esc(x.entity)}" data-n="${esc(n)}"${EL(i)}><span class="v-sic">${ic(x.icon || icn(n))}</span>${esc(n)}</button>`; }).join('')}</div>${elAdd('Agregar una escena')}`;
         }
@@ -555,6 +607,17 @@
           X.shown[b.id] = items;
           if (!items.length) return editing() ? `${t}<p class="v-empty">Esta tarjeta no tiene botones todavía.</p>${elAdd('Agregar un botón')}` : '';
           const cols = c.style !== 'list' && c.cols ? ` style="grid-template-columns:repeat(${Math.max(1, Math.min(4, +c.cols))},minmax(0,1fr))"` : '';
+          const icOf = (it) => it.icon || (it.entity ? defIcon(it.entity) : 'spark');
+          if (c.style === 'chips') {
+            return `${t}<div class="v-chips">${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false };
+              return `<button class="v-chp ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}>${it.icon === '' ? '' : ic(icOf(it))}<span>${esc(it.name || fname(it.entity) || 'Botón')}</span></button>`; }).join('')}</div>${elAdd('Agregar un botón')}`;
+          }
+          if (c.style === 'tiles') {
+            const sw = (id) => id && !/^(scene|script|button|input_button|camera|alarm_control_panel)\./.test(id);
+            return `${t}<div class="v-mosaic"${cols}>${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false, txt: '' };
+              return `<button class="v-mtile ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}><span class="v-mtop"><span class="v-mdot">${ic('grid')}</span>${sw(it.entity) ? `<i class="v-msw ${s.on ? 'on' : ''}"></i>` : ''}</span>
+                <span class="v-mbot"><span class="v-tx"><span>${esc(s.txt || '')}</span><b>${esc(it.name || fname(it.entity) || 'Botón')}</b></span>${ic(icOf(it))}</span></button>`; }).join('')}</div>${elAdd('Agregar un botón')}`;
+          }
           return `${t}<div class="v-btns ${c.style === 'list' ? 'list' : ''}"${cols}>${items.map((it, i) => {
             const s = it.entity ? entState(it.entity) : { on: false, txt: it.tap && it.tap.type === 'screen' ? SCREEN_NAMES[it.tap.screen] || '' : '' };
             return `<button class="v-btn ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}><span class="v-bic">${ic(it.icon || (it.entity ? defIcon(it.entity) : 'spark'))}</span><span class="v-tx"><b>${esc(it.name || fname(it.entity) || 'Botón')}</b><span>${esc(s.txt)}</span></span></button>`;
@@ -623,7 +686,8 @@
             const pct = Number.isFinite(tg) && hi > lo ? Math.max(0, Math.min(1, (tg - lo) / (hi - lo))) : 0;
             return `<div class="v-card v-clim v-dial ${on ? 'on' : ''} m-${esc(s.state)}">${t}<div class="v-dring"><svg viewBox="0 0 120 120" aria-hidden="true"><circle cx="60" cy="60" r="50" class="d0" pathLength="100"/><circle cx="60" cy="60" r="50" class="d1" pathLength="100" style="stroke-dasharray:${(pct * 75).toFixed(1)} 100"/></svg>
               <div class="v-dmid" data-more="${esc(id)}"><small>${esc(on ? MODE_TXT[s.state] || s.state : 'Apagado')}</small><b>${Number.isFinite(tg) ? dec(tg) : '—'}<i>°</i></b><span>${a.current_temperature != null ? `Adentro ${dec(a.current_temperature)}°` : esc(fname(id))}</span></div></div>
-              <div class="v-dbar"><button class="v-cb" data-ctemp="${esc(id)}" data-d="-1" aria-label="Bajar">−</button><button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button><button class="v-cb" data-ctemp="${esc(id)}" data-d="1" aria-label="Subir">+</button></div></div>`;
+              <div class="v-dbar"><button class="v-cb" data-ctemp="${esc(id)}" data-d="-1" aria-label="Bajar">−</button><button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button><button class="v-cb" data-ctemp="${esc(id)}" data-d="1" aria-label="Subir">+</button></div>
+              ${(a.hvac_modes || []).filter((x) => x !== 'off').length > 1 ? `<div class="v-modes">${(a.hvac_modes || []).filter((x) => x !== 'off').slice(0, 4).map((mo) => `<button class="${s.state === mo ? 'on' : ''}" data-hvac="${esc(mo)}" data-eid="${esc(id)}">${ic({ cool: 'snow', heat: 'sun', fan_only: 'fan', dry: 'water', heat_cool: 'temp', auto: 'temp' }[mo] || 'temp')}<span>${esc(MODE_TXT[mo] || mo)}</span></button>`).join('')}</div>` : ''}</div>`;
           }
           return `<div class="v-card v-clim ${on ? 'on' : ''}">${t}<div class="v-row"><span class="v-bic">${ic('snow')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(fname(id))}</b>
             <span>${esc(on ? MODE_TXT[s.state] || s.state : 'Apagado')}${a.current_temperature != null ? ` · adentro ${dec(a.current_temperature)}°` : ''}</span></span><button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
@@ -1196,6 +1260,7 @@
       if (t.closest('[data-camall]')) return c.openCameras();
       const av = t.closest('[data-actv]'); if (av) return c.openActivity(av.dataset.actv ? { room: av.dataset.actv } : undefined);
       if (t.closest('[data-bri]')) return undefined; // el brillo se maneja al soltar (change)
+      const hv = t.closest('[data-hvac]'); if (hv) { vib(); return c.call('climate', 'set_hvac_mode', { entity_id: hv.dataset.eid, hvac_mode: hv.dataset.hvac }); }
       const ct = t.closest('[data-ctemp]'); if (ct) {
         const s = st(ct.dataset.ctemp); if (!s) return undefined;
         const a = s.attributes, step = Number(a.target_temp_step) || 1, cur = Number(a.temperature != null ? a.temperature : a.current_temperature || 24);
