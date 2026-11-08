@@ -2537,7 +2537,7 @@
 
     /* Advanced Camera Card dentro del dashboard (una cámara a la vez, con flechas, video fluido por go2rtc).
        Si la tarjeta no está disponible en 20 s, se vuelve a las miniaturas. */
-    _camInline() { const c = this._config; return !IOS_DEV && !!(c.camera_card && c.camera_inline !== false && !this._camFail && !featOff(c, 'cameras')); }
+    _camInline() { const c = this._config; return !!(c.camera_card && c.camera_inline !== false && !this._camFail && !featOff(c, 'cameras')); }
 
     /** Dentro de HA pero fuera de un dashboard (el panel MatterAI), HA no carga las tarjetas de HACS:
      *  se trae la de cámaras (Frigate / advanced-camera-card) de los recursos de Lovelace. En la app la carga la app. */
