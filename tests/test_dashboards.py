@@ -447,3 +447,18 @@ async def test_new_cards_223_are_valid(hass, hass_ws_client) -> None:
     res = await ws.receive_json()
     assert res["success"], res
     assert [b["type"] for b in res["result"]["layouts"]["phone"]["blocks"]] == ["openings", "agenda", "irrigation", "batteries", "climate"]
+
+
+async def test_templates_and_plan_size(hass, hass_ws_client) -> None:
+    """Plantillas Vision, Control4 y Savant (estilos nuevos) y el tamaño del plano se guardan; lo inventado no."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    lays = {"phone": {"blocks": [{"id": "savant-rooms", "type": "rooms", "cfg": {"style": "grid"}}], "style": "savant"},
+            "tablet": {"blocks": [{"id": "plan", "type": "plan", "col": 0, "cfg": {"zoom": "s"}}], "style": "control4", "bg": {"kind": "gradient", "gradient": "violeta"}}}
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Plantilla", "layouts": lays}})
+    res = await ws.receive_json()
+    assert res["success"], res
+    assert res["result"]["layouts"]["tablet"]["blocks"][0]["cfg"]["zoom"] == "s"
+    for i, bad in enumerate([{"style": "lutron"}, {"blocks": [{"id": "p", "type": "plan", "cfg": {"zoom": "gigante"}}]}]):
+        await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE, **bad}}}})
+        assert not (await ws.receive_json())["success"], bad  # NEGATIVO

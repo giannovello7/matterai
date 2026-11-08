@@ -143,6 +143,9 @@
     ['matterai', 'MatterAI', 'Grafito y acento cálido, letra Red Hat'],
     ['apple', 'Tipo Apple', 'Tarjetas redondeadas sin bordes, letra del sistema, títulos grandes'],
     ['cristal', 'Cristal', 'Burbujas translúcidas sobre un fondo de color'],
+    ['vision', 'Vision', 'Vidrio esmerilado sobre la casa, números grandes y finos (como Apple Vision Pro)'],
+    ['control4', 'Control4', 'Oscuro con color: tarjetas sólidas, música con tapas y acentos azules'],
+    ['savant', 'Savant', 'Negro elegante y minimalista, títulos finos y acento dorado'],
   ];
   const STYLES = STYLE_LIST.map((x) => x[0]);
   const GRAD_LIST = [
@@ -153,7 +156,61 @@
     ['noche', 'Noche', 'radial-gradient(120% 80% at 50% 0%,#232b3b 0,#0b0e14 70%)'],
     ['arena', 'Arena (claro)', 'linear-gradient(170deg,#f6efe6 0%,#ead9c4 60%,#d9c2a5 100%)'],
     ['nube', 'Nube (claro)', 'linear-gradient(170deg,#eef3fa 0%,#dbe6f4 55%,#c9d8ee 100%)'],
+    ['calido', 'Living cálido', 'radial-gradient(80% 60% at 20% 20%,#a8876a 0,transparent 60%),radial-gradient(70% 60% at 85% 80%,#6f5643 0,transparent 60%),linear-gradient(160deg,#8d735d,#5a4636)'],
+    ['violeta', 'Noche violeta', 'radial-gradient(90% 70% at 85% 10%,#6b2c4f 0,transparent 60%),radial-gradient(80% 70% at 10% 90%,#2b2e6b 0,transparent 60%),#141522'],
   ];
+  /* Plantillas: un estilo + un orden de tarjetas para celular y tablet. Se completan solas con lo de cada casa
+     (las tarjetas en automático eligen los equipos, ambientes, escenas y cámaras que haya). */
+  const TEMPLATE_LIST = [
+    ['matterai', 'MatterAI', 'La de siempre: plano, resumen, escenas, cámara y ambientes'],
+    ['vision', 'Vision', 'Vidrio sobre la casa: termostato grande, clima, luces y ambientes'],
+    ['control4', 'Control4', 'Oscuro con color: accesos por tema, música con tapas, cámaras y aire'],
+    ['savant', 'Savant', 'Negro y dorado, minimalista: ambientes grandes, escenas, aire y seguridad'],
+  ];
+  function template(k, kind, m, legacy, S, floorplan) {
+    const base = defaults(kind, m, legacy, S, floorplan);
+    if (!k || k === 'matterai') return base;
+    S = S || {};
+    const n = (t, col, extra) => Object.assign({ id: `${k}-${t}`.slice(0, 24), type: t, col: kind === 'tablet' ? col : 0, cfg: {} }, extra || {});
+    const clim = Object.keys(S).find((x) => x.startsWith('climate.'));
+    const lock = m && (m.access || []).find((x) => x.startsWith('lock.'));
+    const cams = (m && m.cams) || [];
+    const rooms = base.blocks.find((b) => b.type === 'rooms');
+    const roomsCfg = (style) => Object.assign({}, rooms ? rooms.cfg : { auto: true }, { style });
+    const plan = base.blocks.find((b) => b.type === 'plan');
+    const T = kind === 'tablet';
+    let B;
+    if (k === 'vision') {
+      B = T ? [
+        clim ? n('climate', 0, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : n('clock', 0),
+        n('music', 0, { title: 'Música' }),
+        n('weather', 1), n('kpis', 1, { cfg: { auto: true } }), n('lights', 1, { title: 'Luces' }), lock ? n('lock', 1, { title: 'Entrada', cfg: { entity: lock } }) : null,
+        n('scenes', 2, { title: 'Escenas', cfg: { auto: true } }), n('energy', 2, { title: 'Consumo' }), n('rooms', 2, { title: 'Ambientes', cfg: roomsCfg('grid') }),
+      ] : [
+        n('kpis', 0, { cfg: { auto: true } }), clim ? n('climate', 0, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : null,
+        n('lights', 0, { title: 'Luces' }), n('scenes', 0, { title: 'Escenas', cfg: { auto: true } }), n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('grid') }),
+      ];
+    } else if (k === 'control4') {
+      B = T ? [
+        plan ? Object.assign({}, plan) : n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('list') }),
+        n('kpis', 1, { cfg: { auto: true } }), clim ? n('climate', 1, { title: 'Aire', cfg: { entity: clim } }) : null, n('music', 1, { title: 'Música' }), n('scenes', 1, { title: 'Escenas', cfg: { auto: true } }),
+        cams.length ? n('frigate', 2, { title: 'Cámaras' }) : null, n('routines', 2, { title: 'Rutinas', cfg: { auto: true } }), n('openings', 2, { title: 'Puertas y ventanas' }), lock ? n('lock', 2, { title: 'Entrada', cfg: { entity: lock } }) : null,
+      ] : [
+        n('kpis', 0, { cfg: { auto: true } }), n('scenes', 0, { title: 'Escenas', cfg: { auto: true } }), n('routines', 0, { title: 'Rutinas', cfg: { auto: true, style: 'list' } }),
+        cams.length ? n('frigate', 0, { title: 'Cámaras' }) : null, n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('list') }),
+      ];
+    } else if (k === 'savant') {
+      B = T ? [
+        n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('grid') }),
+        n('clock', 1), n('scenes', 1, { title: 'Escenas', cfg: { auto: true } }), clim ? n('climate', 1, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : null,
+        n('alarm', 2, { title: 'Seguridad' }), cams.length ? n('frigate', 2, { title: 'Cámaras' }) : null, n('music', 2, { title: 'Música' }),
+      ] : [
+        n('scenes', 0, { title: 'Escenas', cfg: { auto: true } }), n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('grid') }),
+        clim ? n('climate', 0, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : null, n('alarm', 0, { title: 'Seguridad' }),
+      ];
+    } else return base;
+    return Object.assign({}, base, { blocks: B.filter(Boolean), style: k });
+  }
   const GRADS = Object.fromEntries(GRAD_LIST.map((g) => [g[0], g[2]]));
 
   function create(el, ctx) {
@@ -213,6 +270,14 @@
     /* layout: lo del editor, o el prearmado */
     function layout(m) {
       const v = X.view || {};
+      const mine = !editing() ? load('matterai.template', '') : '';
+      if (mine && TEMPLATE_LIST.some((x) => x[0] === mine)) {
+        const cfg0 = card() && card()._config;
+        const d = template(mine, kind(), m, v, (hass() || {}).states, cfg0 && cfg0.floorplan);
+        if (v.plan) d.plan = v.plan;
+        d.header = v.header || null; d.dock = v.dock || null; d.theme = v.theme || null; d.style = mine; d.bg = null;
+        return d;
+      }
       if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null, style: v.style || null, bg: v.bg || null };
       const cfg = card() && card()._config;
       const d = defaults(kind(), m, v, (hass() || {}).states, cfg && cfg.floorplan);
@@ -537,7 +602,7 @@
           const d = new Date(), w = m.weather;
           return `<div class="v-clock" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || 'sun')}${esc(Math.round(Number(w.attributes.temperature)))}°</button>` : ''}</div>`;
         }
-        case 'plan': return planHTML(m);
+        case 'plan': return planHTML(m, c.zoom);
         case 'weather': {
           const w = (c.entity && st(c.entity)) || m.weather;
           if (!w) return editing() ? `${t}<p class="v-empty">La casa no tiene clima: agregá una integración del clima (Met.no).</p>` : '';
@@ -693,8 +758,8 @@
       void S;
       return h;
     }
-    function planHTML(m) {
-      const p = X.layout.plan;
+    function planHTML(m, zoom) {
+      const p = X.layout.plan, sz = ['s', 'm', 'xl'].includes(zoom) ? ` sz-${zoom}` : '';
       if (!p || !p.image) return editing() ? '<div class="v-plan empty"><p>Subí el render de la casa en «Plano» para verlo acá.</p></div>' : '';
       const off = img(p.image), on = img(p.image_on || p.image), day = p.image_day ? img(p.image_day) : '';
       const isDay = day && !isNight();
@@ -704,7 +769,7 @@
       X.zonePolys = zones;
       const zoneOn = (z) => (z.lights || []).filter((id) => (st(id) || {}).state === 'on').length;
       const cen = (z) => { const P = z.pin || [z.poly.reduce((a, q) => a + q[0], 0) / z.poly.length, z.poly.reduce((a, q) => a + q[1], 0) / z.poly.length]; return P; };
-      return `<div class="v-plan" style="aspect-ratio:${ar}"><svg viewBox="0 0 1000 ${(1000 / ar).toFixed(0)}" preserveAspectRatio="none">
+      return `<div class="v-plan${sz}" style="aspect-ratio:${ar}"><svg viewBox="0 0 1000 ${(1000 / ar).toFixed(0)}" preserveAspectRatio="none">
         <defs>${zones.map((z, i) => `<mask id="vz${i}" maskUnits="userSpaceOnUse"><polygon points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}" fill="#fff"/></mask>`).join('')}</defs>
         <image href="${esc(isDay ? day : off)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" data-planimg="1"/>
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
@@ -839,7 +904,10 @@
     /** En el editor: al final de cada columna, «+ Agregar tarjeta» (como en Home Assistant). */
     const addSlot = (col) => (editing() && ctx.edit.onAdd ? `<button class="v-eadd" data-eadd="${col}">+ Agregar tarjeta</button>` : '');
     function render() {
-      if (!X.el || X.el.hidden || X.sliding) return; // mientras se arrastra un brillo no se redibuja (si no, se suelta solo)
+      // mientras se arrastra un brillo no se redibuja (si no, se suelta solo). Si el «soltar» se perdió (la ventana se
+      // cerró con el dedo apoyado), a los 3 s se destraba: si no, la pantalla quedaba congelada hasta cerrar la app
+      if (X.sliding && Date.now() - (X.slideAt || 0) > 3000) X.sliding = false;
+      if (!X.el || X.el.hidden || X.sliding) return;
       const m0 = M();
       if (!m0) { if (X.el.innerHTML === '') X.el.innerHTML = '<p class="v-empty">Conectando con tu casa…</p>'; return; }
       const m = buildSim(m0);
@@ -1166,6 +1234,7 @@
     let holdT = null, swipe = null;
     function onDown(e) {
       if (editing()) return;
+      X.held = false; // un toque nuevo: lo de antes (deslizar la cámara, mantener) ya no se come este toque
       const cv = e.target.closest('.v-cam'); swipe = cv ? { x: e.clientX, y: e.clientY, el: cv } : null;
       const r = e.target.closest('[data-room],[data-zone],[data-it]'); if (!r) return;
       if (e.target.closest('button') && !e.target.closest('[data-it]')) return; // el interruptor de un ambiente no abre el menú de fijar
@@ -1188,7 +1257,7 @@
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, onUp));
     el.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-room],[data-zone],[data-it]')) e.preventDefault(); });
     // brillo de las luces: se manda al soltar el deslizador
-    el.addEventListener('pointerdown', (e) => { if (!editing() && e.target.closest && e.target.closest('[data-bri]')) X.sliding = true; }, true);
+    el.addEventListener('pointerdown', (e) => { if (!editing() && e.target.closest && e.target.closest('[data-bri]')) { X.sliding = true; X.slideAt = Date.now(); setTimeout(() => { if (X.sliding && Date.now() - X.slideAt >= 3000) { X.sliding = false; render(); } }, 3100); } }, true);
     el.addEventListener('change', (e) => {
       const r = e.target.closest && e.target.closest('[data-bri]'); X.sliding = false;
       if (!r || editing()) return;
@@ -1196,6 +1265,7 @@
     });
     const endSlide = () => { if (X.sliding) { X.sliding = false; setTimeout(render, 400); } };
     ['pointerup', 'pointercancel'].forEach((ev) => { if (typeof addEventListener === 'function') addEventListener(ev, endSlide); });
+    if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', endSlide); // al volver a la app, nunca trabada
     // editor: los carteles del plano se arrastran a su lugar
     let pinDrag = null;
     el.addEventListener('pointerdown', (e) => {
@@ -1306,5 +1376,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
+  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
 })(typeof window !== 'undefined' ? window : globalThis);

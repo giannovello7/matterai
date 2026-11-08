@@ -104,6 +104,7 @@ CFG = vol.Schema({
     vol.Optional("max"): vol.Any(None, vol.Coerce(float)),
     vol.Optional("tap"): ACTION,                                                          # acción de la tarjeta
     vol.Optional("video"): vol.Any(None, vol.In(["live", "photo"])),                      # cámara: video en vivo o foto
+    vol.Optional("zoom"): vol.Any(None, vol.In(["s", "m", "xl"])),                         # tamaño del plano (2.23.1)
 }, extra=vol.REMOVE_EXTRA)
 
 COND = vol.Schema({
@@ -170,8 +171,8 @@ HEADER = vol.Schema({
 
 
 # estilos prearmados y degradés de fondo (las mismas claves que app/vista.js)
-STYLES = ("matterai", "apple", "cristal")
-GRADIENTS = ("aurora", "atardecer", "oceano", "bosque", "noche", "arena", "nube")
+STYLES = ("matterai", "apple", "cristal", "vision", "control4", "savant")
+GRADIENTS = ("aurora", "atardecer", "oceano", "bosque", "noche", "arena", "nube", "calido", "violeta")
 
 BG = vol.Schema({
     vol.Required("kind"): vol.In(["none", "color", "gradient", "image"]),

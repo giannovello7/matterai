@@ -169,6 +169,9 @@
   .stp-matterai .sw{background:#161b21}.stp-matterai .sw i{background:#1e242e;border:1px solid rgba(160,175,200,.2)}.stp-matterai .sw i:first-child{background:#f2b766}
   .stp-apple .sw{background:#000}.stp-apple .sw i{background:#1c1c1e;border-radius:6px}.stp-apple .sw i:first-child{background:#0a84ff}
   .stp-cristal .sw{background:linear-gradient(135deg,#2b5876,#4e4376 60%,#1d6b5f)}.stp-cristal .sw i{background:rgba(255,255,255,.28);border-radius:8px;border:1px solid rgba(255,255,255,.4)}
+  .stp-vision .sw{background:linear-gradient(160deg,#8d735d,#5a4636)}.stp-vision .sw i{background:rgba(255,255,255,.3);border-radius:8px}.stp-vision .sw i:first-child{background:#d4f05a}
+  .stp-control4 .sw{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.stp-control4 .sw i{background:rgba(48,51,66,.95);border-left:3px solid #4c9bff;border-radius:3px}
+  .stp-savant .sw{background:#050505}.stp-savant .sw i{background:#151515;border-radius:2px}.stp-savant .sw i:first-child{background:#c9a96e}
   .bgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px;margin-bottom:6px}
   .bgs>button,.bgs>label{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:0;background:none;color:inherit;cursor:pointer;font:inherit}
   .bgs .bsw{position:relative;width:100%;aspect-ratio:3/4;border-radius:10px;border:2px solid rgba(160,175,200,.2);display:grid;place-items:center;font-size:18px;color:#8f99ab;overflow:hidden;box-sizing:border-box}
@@ -813,7 +816,10 @@
         case 'alarm': h += this.ent('Alarma (vacío: la de la casa)', 'al', c.entity, PICK.alarm, 'cfg.entity'); break;
         case 'away': h += this.ent('Interruptor, escena o script', 'aw', c.entity, PICK.away, 'cfg.entity'); break;
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
-        case 'plan': h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>'; break;
+        case 'plan':
+          h += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
+          h += '<p class="hint">El plano se arma en «Plano e imágenes» (arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
+          break;
         case 'weather': h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
         case 'climate':
           h += this.ent('Aire o termostato', 'cl', c.entity, ['climate'], 'cfg.entity');
@@ -1244,6 +1250,10 @@
         row.ondrop = (e) => { e.preventDefault(); const d = this.srDrag; this.srDrag = null; if (d && d.g === row.dataset.sr) this.reorder(d.g, d.i, +row.dataset.i); };
       });
       W.querySelectorAll('#edr [data-actroom]').forEach((x) => { x.onchange = () => this.change(() => { if (x.value) b.cfg.rooms = [x.value]; else delete b.cfg.rooms; }); });
+      W.querySelectorAll('#edr [data-plz]').forEach((x) => { x.onclick = () => this.change(() => {
+        const bb = this.blocks().find((y) => y.id === this.sel); if (!bb) return;
+        bb.cfg = bb.cfg || {}; if (x.dataset.plz) bb.cfg.zoom = x.dataset.plz; else delete bb.cfg.zoom;
+      }); });
       W.querySelectorAll('#edr [data-cal]').forEach((x) => { x.onchange = () => this.change(() => {
         const bb = this.blocks().find((y) => y.id === this.sel); if (!bb) return;
         const cc = bb.cfg = bb.cfg || {}, set = new Set(cc.entities || []);

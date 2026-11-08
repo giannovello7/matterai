@@ -167,6 +167,16 @@
   .wz-o b{display:block;font-size:14.5px}.wz-o small{display:block;opacity:.72;font-size:12.5px;margin-top:3px;line-height:1.4}.wz-o select{margin-top:6px}
   .wz-f{display:flex;flex-direction:column;gap:6px}.wz-f>span{font-size:12.5px;font-weight:600;opacity:.75}
   .wz-f input,.wz-o select{padding:9px 12px;border-radius:10px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:var(--secondary-background-color,transparent);color:inherit;font:inherit;font-size:14px}
+  .wz-tk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:-2px 0 4px 34px}
+  @media (max-width:600px){.wz-tk{grid-template-columns:minmax(0,1fr);margin-left:0}}
+  .wz-t{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:10px;text-align:left;padding:10px;border-radius:12px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:none;color:inherit;font:inherit;cursor:pointer}
+  .wz-t.on{border-color:var(--primary-color,#03a9f4);background:rgba(3,169,244,.08)}.wz-t b{font-size:14px}.wz-t small{font-size:11.5px;opacity:.7;line-height:1.35}
+  .wz-t .sw{grid-row:1/3;width:54px;height:40px;border-radius:9px;display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:5px;box-sizing:border-box}
+  .wz-t .sw i{display:block;border-radius:4px}
+  .tk-matterai .sw{background:#161b21}.tk-matterai .sw i{background:#1e242e}.tk-matterai .sw i:first-child{background:#f2b766}
+  .tk-vision .sw{background:linear-gradient(160deg,#8d735d,#5a4636)}.tk-vision .sw i{background:rgba(255,255,255,.3);border-radius:7px}.tk-vision .sw i:first-child{background:#d4f05a}
+  .tk-control4 .sw{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.tk-control4 .sw i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}
+  .tk-savant .sw{background:#050505}.tk-savant .sw i{background:#161616;border-radius:2px}.tk-savant .sw i:first-child{background:#c9a96e}
   .wz-st{display:flex;gap:8px;flex-wrap:wrap}.wz-st button{padding:8px 14px;border-radius:999px;border:1px solid var(--divider-color,rgba(127,127,127,.3));background:none;color:inherit;font:inherit;cursor:pointer}
   .wz-st button.on{border-color:var(--primary-color,#03a9f4);color:var(--primary-color,#03a9f4);background:rgba(3,169,244,.1)}
   .wz-rv{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:6px}
@@ -1150,7 +1160,7 @@ ${eqBox}
       const Card = customElements.get('matterai-home-card'), hc = Card ? document.createElement('matterai-home-card') : null;
       if (hc) { hc.setAttribute('headless', ''); hc.setConfig(Object.assign({}, this._draft || {})); hc.hass = this._hass; }
       const model = () => (hc && hc.model ? hc.model() : null);
-      const W = { step: 1, src: 'auto', tpl: null, copy: views[0] ? views[0].id : '', name: '', who: new Set(), def: !r.default, style: 'matterai', res: null };
+      const W = { step: 1, src: 'auto', tk: 'matterai', tpl: null, copy: views[0] ? views[0].id : '', name: '', who: new Set(), def: !r.default, style: 'matterai', res: null };
       const ov = document.createElement('div');
       ov.className = 'wz-ov';
       this.shadowRoot.appendChild(ov);
@@ -1161,7 +1171,8 @@ ${eqBox}
         if (W.step === 1) {
           const opt = (k, ic, t, d, extra = '') => `<button class="wz-o ${W.src === k ? 'on' : ''}" data-src="${k}"><ha-icon icon="${ic}"></ha-icon><span><b>${t}</b><small>${d}</small>${extra}</span></button>`;
           body = `<h3>1 · ¿De dónde sale el diseño?</h3>
-            ${opt('auto', 'mdi:auto-fix', 'Estructura MatterAI', 'Se arma sola con los ambientes, escenas, cámaras y plano de esta casa, y se sigue adaptando cuando agregás equipos.')}
+            ${opt('auto', 'mdi:auto-fix', 'Una plantilla MatterAI', 'Se arma sola con los ambientes, escenas, cámaras y plano de esta casa. Elegí el estilo:')}
+            ${W.src === 'auto' ? `<div class="wz-tk">${(V.TEMPLATE_LIST || []).map(([k, n, d]) => `<button class="wz-t tk-${k} ${W.tk === k ? 'on' : ''}" data-tk="${k}"><span class="sw"><i></i><i></i><i></i><i></i></span><b>${esc(n)}</b><small>${esc(d)}</small></button>`).join('')}</div>` : ''}
             ${opt('file', 'mdi:file-upload-outline', 'Una plantilla tuya (archivo)', 'Exportada desde el editor de otra casa («⋯ → Exportar como plantilla»). Lo que no existe acá se adapta solo.', W.tpl ? `<small class="ok">✓ «${esc(W.tpl.name || 'plantilla')}» cargada</small>` : '')}
             ${views.length ? opt('copy', 'mdi:content-copy', 'Copiar un dashboard de esta casa', `<select data-copy>${views.map((x) => `<option value="${esc(x.id)}" ${W.copy === x.id ? 'selected' : ''}>${esc(x.name)}</option>`).join('')}</select>`) : ''}
             <input type="file" accept="application/json,.json" data-tplf hidden>`;
@@ -1187,7 +1198,10 @@ ${eqBox}
         if (!W.name.trim()) { this._toast('Ponele un nombre'); return; }
         const S = this._hass.states, m = model();
         let layouts = { phone: null, tablet: null }, missing = [], plan = null;
-        if (W.src === 'file' && W.tpl) {
+        if (W.src === 'auto' && W.tk !== 'matterai' && V.template) {
+          const mm = m || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, fp0 = (this._draft || {}).floorplan;
+          ['phone', 'tablet'].forEach((k) => { const t = V.template(W.tk, k, mm, {}, S, fp0); layouts[k] = { blocks: t.blocks, orientation: k === 'tablet' ? 'landscape' : null, style: W.tk }; });
+        } else if (W.src === 'file' && W.tpl) {
           layouts = JSON.parse(JSON.stringify(W.tpl.layouts));
           missing = E.entitiesIn(layouts).filter((id) => !S[id]);
           Object.values(layouts).forEach((l) => l && E.adapt(l.blocks, S, m));
@@ -1197,6 +1211,7 @@ ${eqBox}
         }
         // estilo elegido: en los dos diseños (aunque sean el prearmado)
         ['phone', 'tablet'].forEach((k) => { if (W.style !== 'matterai' || (layouts[k] && layouts[k].style)) { layouts[k] = layouts[k] || { blocks: null }; layouts[k].style = W.style === 'matterai' ? null : W.style; } });
+        // la revisión mira las tarjetas de verdad (las de la plantilla, o el prearmado)
         let nv;
         try { nv = await this._hass.callWS({ type: 'matterai/views/save', view: { name: W.name.trim().slice(0, 40), kind: 'phone', pinned: [], layouts, plan } }); }
         catch (e) { this._toast(`No se pudo crear: ${e.message || e}`); return; }
@@ -1216,6 +1231,7 @@ ${eqBox}
         const q = (sel) => ov.querySelectorAll(sel);
         q('[data-x]').forEach((b) => { b.onclick = close; });
         q('[data-src]').forEach((b) => { b.onclick = (e) => { if (e.target.closest('select')) return; W.src = b.dataset.src; if (W.src === 'file') ov.querySelector('[data-tplf]').click(); draw(); }; });
+        q('[data-tk]').forEach((b) => { b.onclick = () => { W.tk = b.dataset.tk; W.style = b.dataset.tk; draw(); }; });
         q('[data-copy]').forEach((sel) => { sel.onchange = () => { W.copy = sel.value; W.src = 'copy'; draw(); }; });
         q('[data-tplf]').forEach((inp) => { inp.onchange = async () => {
           const f = inp.files && inp.files[0]; if (!f) return;

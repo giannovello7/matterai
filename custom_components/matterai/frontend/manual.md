@@ -34,7 +34,7 @@ El paso a paso de la instalación, en 5 grupos: la casa, panel central y copias,
 ## Dashboards
 Lo que ve cada persona en su pantalla. Cada dashboard tiene **un diseño para el celular y otro para la tablet**.
 
-- **Armar con el asistente**: para un cliente nuevo (ver arriba).
+- **Armar con el asistente**: para un cliente nuevo. Elegís una **plantilla**: **MatterAI** (la de siempre), **Vision** (vidrio sobre la casa, como Apple Vision Pro), **Control4** (oscuro con color, música con tapas, cámaras) o **Savant** (negro y dorado, minimalista). Se completa sola con lo que tiene la casa y después la ajustás en el editor.
 - **Editar celular / Editar tablet**: abre el editor en ese diseño. Las miniaturas muestran cómo está armado cada uno («prearmado» = todavía se arma solo).
 - **★**: el dashboard por defecto. Lo ven los equipos que no tienen uno elegido. Sin ★, esos equipos ven el «Inicio automático».
 - **+ equipo**: elegís quién lo ve. Una persona con celular y tablet: marcá los dos.
@@ -75,7 +75,8 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **⋮** en cada tarjeta: duplicar, copiar a otro dashboard, borrar.
 - **+ Tarjeta**: el catálogo con buscador. **+ Agregar tarjeta** al final de cada columna.
 - **Celular / Tablet** y, en la tablet, **Horizontal / Vertical**.
-- **🎨 Estilo**: estilo (MatterAI, tipo Apple o Cristal), fondo (degradés, un color o una foto de la casa) y modo claro, oscuro o automático. Cada diseño tiene el suyo.
+- **🎨 Estilo**: estilo (MatterAI, tipo Apple, Cristal, Vision, Control4 o Savant), fondo (degradés, un color o una foto de la casa) y modo claro, oscuro o automático. Cada diseño tiene el suyo.
+- **Tamaño del plano**: tocá el plano → Tamaño: chico, mediano, normal o grande.
 - **Plano e imágenes**: el render de la casa (de noche, con luces y de día) y sus ambientes: puntos para paredes de más de 4 lados, mover la zona, doble clic para borrar un punto, Ctrl+Z.
 - **▶ Probar**: usás la pantalla como en el celular (prender luces, entrar a un ambiente).
 - **Simular**: ver cómo queda de noche, con la alarma armada, con música, etc., sin tocar la casa.
@@ -97,7 +98,7 @@ Las tarjetas «en automático» se arman solas con lo que tiene la casa. Si eleg
 - **Actividad**: qué pasó en la casa, por equipo, día, tipo y ambiente.
 - **Agenda, clima y avisos** (la campanita).
 - **Voz: «Mate»**. Tocás el micrófono y pedís («prendé la luz del living», «poné música en el quincho»). Con **«Escuchar «Mate»»** prendido (Opciones → Pantalla, o en la pantalla de voz) no hace falta tocar nada: decís **«Mate»**, suena un tilín y pedís. Escucha en el equipo, sin internet (el audio no sale de la tablet o el celular), mientras la app está abierta: ideal para la tablet de pared. La primera vez baja la voz en español (unos 40 MB). «Mate» se activa sola al principio de la frase, así que «tomamos mate» no la despierta.
-- **Opciones**: pantalla (modo claro u oscuro, protector, tablet de pared), conexión (local o remota), huella, accesos rápidos (widgets, botones rápidos, NFC), agregar otro celular y desvincular.
+- **Opciones**: pantalla (modo claro u oscuro, **estilo de la pantalla**: el de tu instalador o una de las plantillas Vision, Control4 o Savant, protector, tablet de pared), conexión (local o remota), huella, accesos rápidos (widgets, botones rápidos, NFC), agregar otro celular y desvincular.
 - **Tablet de pared**: queda siempre prendida, fijada en la app, con protector de pantalla, se despierta al acercarse y escucha «Mate». El portero aparece como una llamada.
 - **Android Auto**: botones del portón, luces y escenas en el auto.
 
