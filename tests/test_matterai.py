@@ -169,7 +169,10 @@ async def test_status(hass: HomeAssistant, hass_ws_client) -> None:
 
 async def test_cors_formats(hass: HomeAssistant) -> None:
     import os
-    both = ["https://app.matterai.com.ar", "http://localhost:5500"]
+    from custom_components.matterai.const import APP_ORIGINS
+
+    both = list(APP_ORIGINS)  # Android/web, iPhone y pruebas
+    assert "capacitor://app.matterai.com.ar" in both, "la app de iPhone se conecta desde capacitor://"
     _http_file(hass, {"stable": {"cors_allowed_origins": both}, "pending": None})  # HA 2026
     st = await cors_status(hass)
     assert st["known"] and st["missing"] == [] and st["needs_restart"] is False

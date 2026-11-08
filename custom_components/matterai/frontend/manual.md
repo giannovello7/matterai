@@ -3,7 +3,7 @@
 MatterAI son cuatro piezas que trabajan juntas:
 
 - **La integración MatterAI** (esta): se instala por HACS en el Home Assistant de cada casa. Tiene este panel, guarda los dashboards, crea los accesos de cada celular, corre las automatizaciones MatterAI y vigila que todo ande.
-- **La app MatterAI** (Android, y la app web en app.matterai.com.ar): es lo único que usa la familia. **El cliente nunca ve Home Assistant.**
+- **La app MatterAI** (Android, iPhone / iPad, y la app web en app.matterai.com.ar): es lo único que usa la familia. **El cliente nunca ve Home Assistant.**
 - **El panel central** (panel.matterai.com.ar): tu panel de instalador. Ves todas las casas, sabés cuál se cayó, guardás copias y plantillas, y reenvía los avisos a los celulares.
 - **Firebase** (Google): entrega los avisos al celular aunque la app esté cerrada. Es un solo proyecto («MatterAI») para todos los clientes.
 
@@ -140,4 +140,5 @@ Nada más: cada celular se registra solo. El panel sólo reenvía avisos a celul
 
 - **Publicar en tandas**: se juntan varios cambios y se publica todo junto (integración por HACS, app web y APK).
 - **Compilar la app**: `matterai-android\compilar-silencioso.ps1`. El APK queda en `android\app\build\outputs\apk\debug`.
+- **App de iPhone / iPad**: en una Mac, `matterai-android/preparar-ios.sh` y seguir `IOS.md` (Xcode, cuenta de Apple Developer, Firebase para iOS y la clave de avisos de Apple). Cada casa necesita también el origen `capacitor://app.matterai.com.ar` en CORS (lo avisa la Puesta en marcha).
 - **Archivos de Firebase**: `google-services.json` va en `matterai-android\android\app\` y la cuenta de servicio en `Documentos\secretos`. Nunca se suben a GitHub.

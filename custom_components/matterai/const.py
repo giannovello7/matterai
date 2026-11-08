@@ -1,7 +1,7 @@
 """Constantes de la integración MatterAI."""
 
 DOMAIN = "matterai"
-VERSION = "2.23.1"
+VERSION = "2.23.2"
 
 # Configuración del dashboard (lo que antes era el YAML del panel)
 STORAGE_KEY = f"{DOMAIN}.dashboard"
@@ -27,7 +27,7 @@ APP_USER_NAME = "App MatterAI"
 APP_CLIENT_NAME = "MatterAI App"
 
 # Desde dónde abre la app: Home Assistant tiene que permitirlo (CORS)
-APP_ORIGINS = ["https://app.matterai.com.ar", "http://localhost:5500"]
+APP_ORIGINS = ["https://app.matterai.com.ar", "capacitor://app.matterai.com.ar", "http://localhost:5500"]  # Android/web, iPhone (Capacitor) y pruebas
 
 # Opciones de la configuración
 CONF_NAME = "name"

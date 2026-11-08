@@ -62,7 +62,7 @@ def _loose_entities(hass: HomeAssistant) -> int:
     return n
 
 
-def collect(hass: HomeAssistant) -> dict[str, Any]:
+def collect(hass: HomeAssistant, cors: dict[str, Any] | None = None) -> dict[str, Any]:
     rt = hass.data[DOMAIN]
     o, house = _opts(rt), rt["house"]
     hb, wd, views = rt.get("heartbeat"), rt.get("watchdog"), rt.get("views")
@@ -81,6 +81,11 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
     add("remote", "casa", "El acceso remoto responde", "La vigilancia prueba la dirección remota cada pocos minutos.",
         None if remote is None else remote.get("kind") == "ok", "wd",
         detail="" if remote is None else {"ok": "Responde", "tunnel": "El túnel está caído", "internet": "La casa no tiene internet"}.get(remote.get("kind"), ""))
+    if cors is not None:
+        missing = cors.get("missing") or []
+        add("cors", "casa", "Permiso de la app (CORS)", "En Home Assistant: Ajustes → Red → Orígenes permitidos por CORS, las direcciones de la app (Android, iPhone y web). Se aplica al reiniciar.",
+            None if not cors.get("known") else (not missing and not cors.get("needs_restart")), "house",
+            detail=("Falta: " + ", ".join(missing)) if missing else ("Reiniciá Home Assistant" if cors.get("needs_restart") else ""))
     n_areas = len(ar.async_get(hass).async_list_areas())
     loose = _loose_entities(hass)
     add("areas", "casa", "Ambientes armados", "Cada equipo en su Área de Home Assistant (o en La casa → Ambientes): así aparecen en la app.",
@@ -125,12 +130,14 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
 
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/setup"})
 @websocket_api.require_admin
-@callback
-def ws_setup(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+@websocket_api.async_response
+async def ws_setup(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     if not (hass.data.get(DOMAIN) or {}).get("house"):
         connection.send_error(msg["id"], "not_setup", "La integración MatterAI no está configurada")
         return
-    connection.send_result(msg["id"], collect(hass))
+    from .cors import cors_status  # noqa: PLC0415
+
+    connection.send_result(msg["id"], collect(hass, await cors_status(hass)))
 
 
 @websocket_api.websocket_command({
