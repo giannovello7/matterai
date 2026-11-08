@@ -415,7 +415,7 @@
         case 'clima': return m.weather && c.openPanel('weather');
         case 'musica': return c.openMusic();
         case 'actividad': return c.openActivity();
-        case 'camaras': return hlsOk() ? openHlsFull((m.cams || [])[0], m.cams) : c.openCameras();
+        case 'camaras': return IOS ? openHlsFull((m.cams || [])[0], m.cams) : c.openCameras();
         case 'seguridad': case 'aberturas': return c.openPanel('open');
         case 'luces': return c.openPanel('lights');
         case 'avisos': return openSheet('avisos');
@@ -614,7 +614,7 @@
           // video en vivo con el visor de Frigate (se arma aparte y no se corta cuando cambia otra cosa) o foto cada 10 s
           const video = !!cam && c.video !== 'photo', hls = video && !editing() && hlsOk(), live = video && !editing() && !IOS && liveOk();
           // en video: el visor de Frigate en el equipo; mientras carga (y en el editor) el video continuo de la cámara
-          const photo = !cam ? '<div class="v-feed none"></div>' : video && IOS ? `<img class="v-feed" data-cam="${esc(cam)}" data-fast="1"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`
+          const photo = !cam ? '<div class="v-feed none"></div>' : video && IOS ? `<img class="v-feed" data-cam="${esc(cam)}" data-fast="1"${EL('cam')} alt="" onerror="this.style.visibility='hidden'" onload="this.style.visibility=''" src="${esc(camSrc(cam))}">`
             : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
           const feed = hls ? `<div class="v-feed v-lslot" data-hls="${esc(b.id)}" data-key="${esc(cam)}" data-cam="${esc(cam)}"></div>${list.length > 1 ? `<button class="v-hnav prev" data-camnext="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-camnext="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}<span class="v-hname">${esc(fname(cam))}</span>`
@@ -1008,30 +1008,102 @@
     /* iPhone / iPad: el video en vivo como lo hace la app de Home Assistant cuando no hay WebRTC: Home Assistant arma el
        video HLS de la cámara (camera/stream) y lo pasa el reproductor de Apple, en un <video> común. Un solo video a la vez.
        (El reproductor de go2rtc del visor de cámaras hace que iOS cierre la página: ver ios-video.js y diag.js.) */
-    function hlsOk() { const h = hass(); return IOS && !camSafe() && !X.hlsFail && !!(h && h.callWS); }
+    function hlsOk() { const h = hass(); return IOS && !camSafe() && !!(h && h.callWS); }
+    X.camNo = {}; // cámaras sin video en vivo (ni WebRTC ni HLS): sólo esas muestran foto
     X.hls = {};
+    /* Igual que la versión web de Home Assistant (ha-camera-stream + ha-web-rtc-player):
+       1. camera/capabilities → qué da la cámara (web_rtc, hls).
+       2. WebRTC: camera/webrtc/get_client_config → RTCPeerConnection(configuration), canal de datos si lo pide,
+          audio y video «recvonly»; al negociar, la oferta va por camera/webrtc/offer (suscripción): llegan session,
+          answer, candidate y error; los candidatos propios van por camera/webrtc/candidate con el session_id.
+       3. Si no hay WebRTC: HLS (camera/stream) con el reproductor de Apple. 4. Si no hay ninguno: foto.
+       Siempre adentro de un <video> común, en silencio y adentro de la app (playsinline). */
     function startHls(key) {
       const v = document.createElement('video');
       v.className = 'v-feed v-hls'; v.muted = true; v.autoplay = true; v.playsInline = true;
       v.setAttribute('playsinline', ''); v.setAttribute('muted', ''); v.setAttribute('autoplay', '');
-      v.poster = camSrc(key); v.dataset.camv = key;
-      const Hh = { el: v, key, dead: false };
-      Promise.resolve(hass().callWS({ type: 'camera/stream', entity_id: key, format: 'hls' })).then((r) => {
+      v.dataset.camv = key;
+      const pic = camSrc(key); if (pic) v.poster = pic;
+      const box = document.createElement('div'); box.className = 'v-hbox'; box.appendChild(v);
+      const msg = document.createElement('span'); msg.className = 'v-hmsg'; msg.textContent = 'Conectando…'; box.appendChild(msg);
+      const Hh = { el: box, video: v, key, dead: false, pc: null, unsub: null, sid: null, queue: [], stream: null };
+      const h = hass(), conn = h && h.connection;
+      const done = (how) => { if (Hh.dead) return; msg.textContent = ''; box.classList.add('ok'); diag(`video ${how}: ${fname(key)}`); };
+      const nothing = (why) => {
+        if (Hh.dead) return;
+        X.camNo[key] = true;
+        msg.textContent = pic ? '' : 'Esta cámara no tiene video en vivo';
+        diag(`sin video en vivo para ${fname(key)} (${why}) → foto`);
+      };
+      v.addEventListener('loadeddata', () => done(Hh.pc ? 'WebRTC' : 'HLS'));
+      const hls = () => Promise.resolve(h.callWS({ type: 'camera/stream', entity_id: key, format: 'hls' })).then((r) => {
         if (Hh.dead || !r || !r.url) return;
-        v.src = url(r.url);
-        const p = v.play(); if (p && p.catch) p.catch(() => {});
-        diag(`video de Apple (HLS): ${fname(key)}`);
-      }).catch((e) => {
-        Hh.failed = true;
-        diag(`video de Apple (HLS) no disponible para ${fname(key)}: ${(e && (e.message || e.code)) || '?'} → fotos`);
-        if (!Hh.full) { X.hlsFail = true; X.cache = {}; X.partCache = {}; render(); }
+        v.src = url(r.url); const p = v.play(); if (p && p.catch) p.catch(() => {});
       });
+      const webrtc = () => Promise.resolve(h.callWS({ type: 'camera/webrtc/get_client_config', entity_id: key })).then((cfg) => {
+        if (Hh.dead) return;
+        const pc = Hh.pc = new RTCPeerConnection((cfg && cfg.configuration) || {});
+        if (cfg && cfg.dataChannel) pc.createDataChannel(cfg.dataChannel);
+        Hh.stream = new MediaStream();
+        pc.ontrack = (e) => { if (Hh.dead || e.track.kind === 'audio') return; Hh.stream.addTrack(e.track); v.srcObject = Hh.stream; const p = v.play(); if (p && p.catch) p.catch(() => {}); };
+        pc.onicecandidate = (e) => {
+          if (Hh.dead || !e.candidate || !e.candidate.candidate) return;
+          if (Hh.sid) h.callWS({ type: 'camera/webrtc/candidate', entity_id: key, session_id: Hh.sid, candidate: e.candidate.toJSON() }).catch(() => {});
+          else Hh.queue.push(e.candidate);
+        };
+        pc.oniceconnectionstatechange = () => { if (!Hh.dead && pc.iceConnectionState === 'failed' && pc.restartIce) pc.restartIce(); };
+        pc.addTransceiver('audio', { direction: 'recvonly' });
+        pc.addTransceiver('video', { direction: 'recvonly' });
+        pc.onnegotiationneeded = async () => {
+          try {
+            const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
+            if (Hh.dead || Hh.pc !== pc) return;
+            await pc.setLocalDescription(offer);
+            if (Hh.dead || Hh.pc !== pc) return;
+            let sdp = offer.sdp; while (Hh.queue.length) { const c = Hh.queue.pop(); if (c) sdp += `a=${c.candidate}\r\n`; }
+            Hh.unsub = conn.subscribeMessage(async (ev) => {
+              if (Hh.dead || Hh.pc !== pc || !ev) return;
+              if (ev.type === 'session') {
+                Hh.sid = ev.session_id;
+                Hh.queue.splice(0).forEach((c) => h.callWS({ type: 'camera/webrtc/candidate', entity_id: key, session_id: Hh.sid, candidate: c.toJSON() }).catch(() => {}));
+              } else if (ev.type === 'answer') {
+                if (['stable', 'closed'].includes(pc.signalingState)) return;
+                try { await pc.setRemoteDescription({ type: 'answer', sdp: ev.answer }); } catch (e) { diag(`WebRTC: no aceptó la respuesta (${e && e.message})`); }
+              } else if (ev.type === 'candidate') {
+                const c = ev.candidate || {};
+                try { await pc.addIceCandidate(c.sdpMid || c.sdpMLineIndex != null ? c : { candidate: c.candidate, sdpMid: '0' }); } catch (_) { /* como HA: se ignora */ }
+              } else if (ev.type === 'error') {
+                diag(`WebRTC: ${ev.message || ev.code || 'error'} → probando HLS`);
+                stopRtc(Hh); hls().catch((e) => nothing(e && (e.message || e.code)));
+              }
+            }, { type: 'camera/webrtc/offer', entity_id: key, offer: sdp });
+            Hh.unsub.catch((e) => { if (!Hh.dead) { diag(`WebRTC no arrancó (${e && (e.message || e.code)}) → probando HLS`); stopRtc(Hh); hls().catch((e2) => nothing(e2 && (e2.message || e2.code))); } });
+          } catch (e) { if (!Hh.dead) { stopRtc(Hh); hls().catch((e2) => nothing(e2 && (e2.message || e2.code))); } }
+        };
+      });
+      Promise.resolve(h.callWS({ type: 'camera/capabilities', entity_id: key })).then((cap) => {
+        if (Hh.dead) return null;
+        const t = (cap && cap.frontend_stream_types) || [];
+        diag(`cámara ${fname(key)}: ${t.join(', ') || 'sin video en vivo'}`);
+        if (t.includes('web_rtc') && typeof RTCPeerConnection !== 'undefined' && conn && conn.subscribeMessage) return webrtc();
+        if (t.includes('hls')) return hls();
+        nothing('Home Assistant no le da video');
+        return null;
+      }).catch((e) => nothing(e && (e.message || e.code)));
       return Hh;
+    }
+    function stopRtc(Hh) {
+      if (Hh.stream) { Hh.stream.getTracks().forEach((t) => { try { t.stop(); } catch (_) { /* ya */ } }); Hh.stream = null; }
+      const pc = Hh.pc; Hh.pc = null;
+      if (pc) { try { pc.close(); } catch (_) { /* ya */ } pc.ontrack = pc.onicecandidate = pc.oniceconnectionstatechange = pc.onnegotiationneeded = null; }
+      if (Hh.unsub) { Hh.unsub.then((u) => u(), () => undefined); Hh.unsub = null; }
+      Hh.sid = null; Hh.queue = [];
     }
     function stopHls(Hh) {
       if (!Hh) return;
       Hh.dead = true;
-      try { Hh.el.pause(); Hh.el.removeAttribute('src'); Hh.el.load(); } catch (_) { /* ya estaba parado */ }
+      stopRtc(Hh);
+      try { Hh.video.pause(); Hh.video.srcObject = null; Hh.video.removeAttribute('src'); Hh.video.load(); } catch (_) { /* ya estaba parado */ }
       if (Hh.el.parentNode) Hh.el.parentNode.removeChild(Hh.el);
     }
     function stopAllHls() { Object.keys(X.hls).forEach((k) => { stopHls(X.hls[k]); delete X.hls[k]; }); }
@@ -1487,7 +1559,7 @@
     }
     // cámaras: la tarjeta de Frigate (grabaciones, todas las cámaras) si está configurada; si no, la ventana del equipo
     function openCam(id, list) {
-      if (hlsOk()) return openHlsFull(id, list || (X.camList && Object.values(X.camList).find((l) => l.includes(id))));
+      if (IOS) return openHlsFull(id, list || (X.camList && Object.values(X.camList).find((l) => l.includes(id))));
       const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
     }
     function nextCam(elx, d) {
@@ -1706,6 +1778,8 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
+      /** iPhone / iPad: la pantalla de cámaras propia (video como la web de Home Assistant). false si no corresponde. */
+      openCams(id, list) { if (!IOS) return false; const m = M() || {}; openHlsFull(id || (m.cams || [])[0], list && list.length ? list : m.cams); return true; },
       destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); stopAllHls(); closeHlsFull(true); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };

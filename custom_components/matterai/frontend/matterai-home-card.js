@@ -127,6 +127,8 @@
 
   /* ───────────────────────── Utilidades ───────────────────────── */
   /** El instalador apagó esta sección con `features: { clave: false }` (o las claves viejas: cameras/weather/people/alarm: false). */
+  // iPhone / iPad: el visor de go2rtc y el video MJPEG hacen que iOS cierre la página (la app usa su propio video, vista.js)
+  const IOS_DEV = typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1));
   const featOff = (c, k) => { const f = c.features || {}; return f[k] === false || (k === 'cameras' && c.cameras === false) || (k === 'weather' && c.weather === false) || (k === 'people' && c.people === false); };
   const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const dom = (id) => id.slice(0, id.indexOf('.'));
@@ -2496,7 +2498,7 @@
     /* Vista previa en vivo (MJPEG de HA). Con camera_preview: snapshot se usan fotos cada 10 s. */
     _cam(id, i = 0, snap = false) {
       const st = this._hass.states[id], a = st.attributes, pv = this._config.camera_preview;
-      const live = pv !== 'snapshot' && (pv === 'live' || !snap) && a.access_token;
+      const live = !IOS_DEV && pv !== 'snapshot' && (pv === 'live' || !snap) && a.access_token;
       const src = live ? `/api/camera_proxy_stream/${id}?token=${a.access_token}` : (a.entity_picture || '');
       const poster = a.entity_picture || '';
       return `<div class="cam" data-action="more" data-eid="${id}" style="--i:${i}"><img src="${esc(this._url(src))}" data-src="${esc(src)}" data-poster="${esc(this._url(poster))}" ${live ? 'data-live="1"' : ''} alt="">
@@ -2535,7 +2537,7 @@
 
     /* Advanced Camera Card dentro del dashboard (una cámara a la vez, con flechas, video fluido por go2rtc).
        Si la tarjeta no está disponible en 20 s, se vuelve a las miniaturas. */
-    _camInline() { const c = this._config; return !!(c.camera_card && c.camera_inline !== false && !this._camFail && !featOff(c, 'cameras')); }
+    _camInline() { const c = this._config; return !IOS_DEV && !!(c.camera_card && c.camera_inline !== false && !this._camFail && !featOff(c, 'cameras')); }
 
     /** Dentro de HA pero fuera de un dashboard (el panel MatterAI), HA no carga las tarjetas de HACS:
      *  se trae la de cámaras (Frigate / advanced-camera-card) de los recursos de Lovelace. En la app la carga la app. */
