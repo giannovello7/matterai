@@ -172,6 +172,14 @@
   .stp-vision .sw{background:linear-gradient(160deg,#8d735d,#5a4636)}.stp-vision .sw i{background:rgba(255,255,255,.3);border-radius:8px}.stp-vision .sw i:first-child{background:#d4f05a}
   .stp-control4 .sw{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.stp-control4 .sw i{background:rgba(48,51,66,.95);border-left:3px solid #4c9bff;border-radius:3px}
   .stp-savant .sw{background:#050505}.stp-savant .sw i{background:#151515;border-radius:2px}.stp-savant .sw i:first-child{background:#c9a96e}
+  .tpc{border:1px solid rgba(160,175,200,.18);border-radius:14px;padding:10px 12px;margin-top:8px;background:#1e242e}
+  .tpt{display:flex;gap:12px;align-items:center}.tpt b{display:block;font-size:14px}.tpt small{display:block;color:#8f99ab;font-size:12px;line-height:1.35}
+  .tpb{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
+  .tsw{flex:none;width:54px;height:40px;border-radius:9px;display:grid;grid-template-columns:1fr 1fr;gap:3px;padding:5px;box-sizing:border-box}.tsw i{display:block;border-radius:4px}
+  .tsw.tk-matterai{background:#161b21}.tsw.tk-matterai i{background:#262e3a}.tsw.tk-matterai i:first-child{background:#f2b766}
+  .tsw.tk-vision{background:linear-gradient(160deg,#8d735d,#5a4636)}.tsw.tk-vision i{background:rgba(255,255,255,.3);border-radius:7px}.tsw.tk-vision i:first-child{background:#d4f05a}
+  .tsw.tk-control4{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.tsw.tk-control4 i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}
+  .tsw.tk-savant{background:#050505}.tsw.tk-savant i{background:#161616;border-radius:2px}.tsw.tk-savant i:first-child{background:#c9a96e}
   .bgs{display:grid;grid-template-columns:repeat(auto-fill,minmax(62px,1fr));gap:8px;margin-bottom:6px}
   .bgs>button,.bgs>label{display:flex;flex-direction:column;align-items:center;gap:4px;padding:0;border:0;background:none;color:inherit;cursor:pointer;font:inherit}
   .bgs .bsw{position:relative;width:100%;aspect-ratio:3/4;border-radius:10px;border:2px solid rgba(160,175,200,.2);display:grid;place-items:center;font-size:18px;color:#8f99ab;overflow:hidden;box-sizing:border-box}
@@ -451,6 +459,7 @@
           <span class="emenu"><button class="eb" data-e="more" title="Más opciones">Más ▾</button>${this.moreOpen ? `<span class="emenu-l">
             <button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
             <button data-e="history">Historial de versiones…</button>
+            <button data-e="tpl">Aplicar una plantilla (MatterAI, Vision, Control4, Savant)…</button>
             <button data-e="export">Exportar como plantilla (archivo)</button><button data-e="import">Importar una plantilla…</button>
             </span>` : ''}</span>
           <span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span>
@@ -1367,6 +1376,7 @@
       if (k === 'reset') { if (!confirm('¿Descartar todos los cambios sin guardar?')) { this.draw(); return; } this.push(); this.v = clone(this.saved); fix(); return; }
       if (k === 'plan') return this.planEditor();
       if (k === 'history') return this.historyDlg();
+      if (k === 'tpl') return this.chooseTemplate();
       if (k === 'export') return this.exportDesign();
       if (k === 'import') return this.importDesign();
       if (k === 'try') {
@@ -1537,6 +1547,31 @@
         this.toast(miss.length ? `Plantilla adaptada a esta casa: ${miss.length} equipo${miss.length > 1 ? 's' : ''} de la otra casa no estaba${miss.length > 1 ? 'n' : ''}; esas tarjetas quedaron en automático o para elegir` : 'Plantilla cargada: revisala y guardá');
       };
       inp.click();
+    }
+    /** Aplicar una plantilla a este dashboard: cambia las tarjetas y el estilo, con las cosas de esta casa (se puede deshacer). */
+    chooseTemplate() {
+      const V = window.MaeVista, TL = V.TEMPLATE_LIST || [], here = this.K === 'tablet' ? 'la tablet' : 'el celular';
+      const cards = TL.map(([k, n, d]) => `<div class="tpc"><div class="tpt"><span class="tsw tk-${k}"><i></i><i></i><i></i><i></i></span><span><b>${esc(n)}</b><small>${esc(d)}</small></span></div>
+        <div class="tpb"><button class="eb sm" data-tpk="${k}" data-tpw="one">Sólo ${here}</button><button class="eb sm pri" data-tpk="${k}" data-tpw="both">Celular y tablet</button></div></div>`).join('');
+      this.modal('Aplicar una plantilla', `<p class="hint" style="margin-top:0">Reemplaza las tarjetas y el estilo por los de la plantilla, armados con lo que tiene esta casa. El plano, el nombre y quién lo ve no cambian. Se puede deshacer (Ctrl+Z) y no se guarda hasta que toques Guardar.</p>${cards}`, (e) => {
+        const b = e.target.closest('[data-tpk]'); if (!b) return;
+        this.applyTemplate(b.dataset.tpk, b.dataset.tpw === 'both' ? ['phone', 'tablet'] : [this.K]);
+        this.closeCatalog();
+      });
+    }
+    applyTemplate(k, kinds) {
+      const V = window.MaeVista, m = this.model() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }, name = ((V.TEMPLATE_LIST || []).find((x) => x[0] === k) || [, k])[1];
+      this.change(() => {
+        kinds.forEach((kk) => {
+          const t = V.template(k, kk, m, this.v, this.states(), this.cfg.floorplan);
+          const L = (this.v.layouts = this.v.layouts || {})[kk] = this.v.layouts[kk] || {};
+          L.blocks = clone(t.blocks).map((b) => Object.assign(b, { id: this.newId(b.type) }));
+          L.style = k === 'matterai' ? null : k;
+          if (kk === 'tablet' && !L.orientation) L.orientation = 'landscape';
+        });
+        this.sel = null; this.el = null; this.roomEd = null; this.rdraft = null;
+      });
+      this.toast(`Plantilla «${name}» aplicada${kinds.length > 1 ? ' al celular y la tablet' : ''}: revisala y guardá`);
     }
     /** Copia la tarjeta elegida al diseño de celular o tablet de otro dashboard (se guarda al toque). */
     async copyTo(b) {

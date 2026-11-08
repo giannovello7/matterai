@@ -80,7 +80,7 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **Plano e imágenes**: el render de la casa (de noche, con luces y de día) y sus ambientes: puntos para paredes de más de 4 lados, mover la zona, doble clic para borrar un punto, Ctrl+Z.
 - **▶ Probar**: usás la pantalla como en el celular (prender luces, entrar a un ambiente).
 - **Simular**: ver cómo queda de noche, con la alarma armada, con música, etc., sin tocar la casa.
-- **⋯**: historial de versiones, probar en un equipo real por 15 minutos, exportar o importar plantilla.
+- **⋯**: **aplicar una plantilla** (MatterAI, Vision, Control4 o Savant) a este dashboard, sólo a este diseño o al celular y la tablet juntos (se puede deshacer); historial de versiones; probar en un equipo real por 15 minutos; exportar o importar plantilla.
 - **Guardar** se lo manda a los equipos al instante (sin actualizar la app).
 
 ## Las tarjetas
