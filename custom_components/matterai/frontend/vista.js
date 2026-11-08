@@ -998,7 +998,9 @@
       try { swap(old, nu); return true; } catch (_) { return false; }
     }
     /** ¿Se puede mostrar video en vivo? (la tarjeta MatterAI sabe armar el visor de Frigate) */
-    function liveOk() { const c = card(); return !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
+    // iPhone / iPad: el visor en vivo adentro del inicio (go2rtc) puede terminar en MJPEG y iOS cierra la página;
+    // ahí la tarjeta muestra fotos seguidas y el video se ve al tocarla (en el visor, sin MJPEG)
+    function liveOk() { const c = card(); return !IOS && !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
     /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
     function mountLive() {
       if (!X.el.querySelectorAll || editing()) return;
