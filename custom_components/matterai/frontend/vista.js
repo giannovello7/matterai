@@ -415,7 +415,7 @@
         case 'clima': return m.weather && c.openPanel('weather');
         case 'musica': return c.openMusic();
         case 'actividad': return c.openActivity();
-        case 'camaras': return IOS && !liveOk() ? openHlsFull((m.cams || [])[0], m.cams) : c.openCameras();
+        case 'camaras': return c.openCameras();
         case 'seguridad': case 'aberturas': return c.openPanel('open');
         case 'luces': return c.openPanel('lights');
         case 'avisos': return openSheet('avisos');
@@ -612,7 +612,7 @@
           const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}"${EL(i)}>${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
           X.shown[b.id] = c.items || [];
           // video en vivo con el visor de Frigate (se arma aparte y no se corta cuando cambia otra cosa) o foto cada 10 s
-          const video = !!cam && c.video !== 'photo', live = video && !editing() && liveOk(), hls = video && !editing() && !live && hlsOk();
+          const video = !!cam && c.video !== 'photo', live = video && !editing() && liveOk(), hls = false; // sin reproductor de reserva: el de Frigate
           // en video: el visor de Frigate en el equipo; mientras carga (y en el editor) el video continuo de la cámara
           const photo = !cam ? '<div class="v-feed none"></div>' : video && IOS ? `<img class="v-feed" data-cam="${esc(cam)}" data-fast="1"${EL('cam')} alt="" onerror="this.style.visibility='hidden'" onload="this.style.visibility=''" src="${esc(camSrc(cam))}">`
             : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
@@ -1585,7 +1585,7 @@
     }
     // cámaras: la tarjeta de Frigate (grabaciones, todas las cámaras) si está configurada; si no, la ventana del equipo
     function openCam(id, list) {
-      if (IOS && !liveOk()) return openHlsFull(id, list || (X.camList && Object.values(X.camList).find((l) => l.includes(id))));
+
       const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
     }
     function nextCam(elx, d) {
@@ -1804,8 +1804,8 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
-      /** iPhone / iPad: la pantalla de cámaras propia (video como la web de Home Assistant). false si no corresponde. */
-      openCams(id, list) { if (!IOS || liveOk()) return false; const m = M() || {}; openHlsFull(id || (m.cams || [])[0], list && list.length ? list : m.cams); return true; },
+      /** Sin reproductor de reserva: las cámaras siempre en el visor de Frigate (la app no abre otro). */
+      openCams() { return false; },
       destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); stopAllHls(); closeHlsFull(true); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };
