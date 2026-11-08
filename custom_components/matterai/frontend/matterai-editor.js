@@ -158,7 +158,21 @@
   .catin input{margin:12px 16px;padding:10px 12px;border-radius:10px;border:1px solid #f2b766;background:#0d1116;color:#e9ecf2;font:inherit;outline:0}
   .catg{overflow:auto;display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;padding:0 16px 16px}
   .catg button{display:flex;gap:10px;align-items:flex-start;padding:12px;border-radius:14px;background:#1e242e;border:1px solid rgba(160,175,200,.15);text-align:left}
-  .catg button:hover{border-color:#f2b766}.catg b{display:block;font-weight:600}.catg small{color:#8f99ab;font-size:12px}
+  .catg button:hover{border-color:#f2b766}
+  .catgh{grid-column:1/-1;margin:10px 2px 2px;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8f99ab}
+  .cth{flex:none;width:58px;height:44px;border-radius:9px;background:#0d1116;display:grid;gap:3px;padding:6px;box-sizing:border-box}
+  .cth i{display:block;border-radius:3px;background:#2f3a49}
+  .ct-rows{grid-template-rows:repeat(4,1fr)}.ct-rows i:first-child{background:#f2b766}
+  .ct-grid{grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr}.ct-grid i:first-child{background:#f2b766}
+  .ct-kpi{grid-template-columns:repeat(4,1fr)}.ct-kpi i{height:18px;align-self:center}
+  .ct-pills{grid-template-columns:1fr 1fr;align-content:center}.ct-pills i{height:9px;border-radius:9px}.ct-pills i:nth-child(2){background:#f2b766}
+  .ct-cam{grid-template-columns:1fr;background:linear-gradient(135deg,#1f2a36,#0b0f14)}.ct-cam i{display:none}.ct-cam::after{content:"";width:9px;height:9px;border-radius:50%;background:#f08a7c;align-self:start;justify-self:end}
+  .ct-dial{grid-template-columns:1fr;place-items:center}.ct-dial i{display:none}.ct-dial::after{content:"";width:28px;height:28px;border-radius:50%;border:4px solid #7cc4f0;border-bottom-color:#2f3a49}
+  .ct-plan{grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}.ct-plan i:nth-child(1){grid-row:1/3;background:#3b4b5f}.ct-plan i:nth-child(2){background:#f2b766;opacity:.6}
+  .ct-big{grid-template-columns:1fr}.ct-big i:not(:first-child){display:none}.ct-big i:first-child{background:#3b4b5f}
+  .ct-text{grid-template-rows:repeat(4,1fr)}.ct-text i{height:3px;align-self:center}.ct-text i:first-child{width:60%;height:5px;background:#e9ecf2}
+  .ct-clock{place-items:center}.ct-clock b{font:600 14px/1 "Red Hat Mono",monospace;color:#e9ecf2}
+  .ct-card{grid-template-rows:1fr 2fr}.ct-card i:not(:nth-child(-n+2)){display:none}.catg b{display:block;font-weight:600}.catg small{color:#8f99ab;font-size:12px}
   .cic{flex:none;width:36px;height:36px;border-radius:10px;display:grid;place-items:center;background:#262e3a}.cic svg{width:20px;height:20px;fill:none;stroke:#f2b766;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
   .stl{display:grid;grid-template-columns:1fr;gap:8px;margin-bottom:6px}
   .stc{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto;column-gap:12px;align-items:center;text-align:left;padding:10px 12px;border-radius:14px;border:1px solid rgba(160,175,200,.18);background:#1e242e;color:inherit;cursor:pointer}
@@ -181,6 +195,10 @@
   .tsw.tk-control4{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.tsw.tk-control4 i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}
   .tsw.tk-savant{background:#050505}.tsw.tk-savant i{background:#161616;border-radius:2px}.tsw.tk-savant i:first-child{background:#c9a96e}
   .eseg.wrap{flex-wrap:wrap;height:auto}
+  .chips-of{display:flex;gap:3px;margin-top:2px}
+  .chips-of.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px;padding:4px}
+  .chips-of.icons button{display:grid;place-items:center;padding:7px 0;min-height:32px}
+  .chips-of.icons svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
   .cpk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
   .cpk button{display:flex;flex-direction:column;gap:8px;align-items:flex-start;padding:10px;border-radius:12px;border:1px solid rgba(160,175,200,.18);background:#1e242e;color:inherit;cursor:pointer;text-align:left}
   .cpk button.on{border-color:#f2b766;box-shadow:0 0 0 1px #f2b766 inset}.cpk b{font-size:13px}
@@ -194,6 +212,10 @@
   .bgs input[type=color]{position:absolute;inset:0;width:100%;height:100%;opacity:0;cursor:pointer;border:0;padding:0}
   @media (max-width:1100px){.ed{grid-template-columns:230px minmax(0,1fr) 310px}.ed.nolist{grid-template-columns:0 minmax(0,1fr) 330px}}`;
 
+  /** Miniatura de cada tarjeta en el catálogo (un dibujo esquemático de cómo se ve). */
+  const THUMB = { rooms: 'rows', lights: 'rows', covers: 'rows', routines: 'rows', irrigation: 'rows', openings: 'rows', batteries: 'rows', activity: 'rows', agenda: 'rows', people: 'grid',
+    buttons: 'grid', scenes: 'pills', kpis: 'kpi', camera: 'cam', featured: 'cam', frigate: 'cam', image: 'cam', climate: 'dial', sensor: 'dial', energy: 'big', plan: 'plan',
+    alarm: 'big', lock: 'big', away: 'big', music: 'big', weather: 'big', text: 'text', clock: 'clock' };
   function open(panel, viewId, kind) { return new Editor(panel, viewId, kind).start(); }
 
   class Editor {
@@ -313,12 +335,15 @@
       });
     }
     /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
-    addBlock(type, col, zone) {
+    addBlock(type, col, zone, at) {
       if (zone && String(zone).startsWith('room-') && this.rdraft) {
         const CAT0 = window.MaeVista.CATALOG, rcfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
         const nb = { id: this.newId(type), type, zone: zone === 'room-bottom' ? 'bottom' : 'top', cfg: rcfg };
         if (!['kpis', 'plan', 'clock'].includes(type)) nb.title = type === 'frigate' ? 'Cámaras' : CAT0[type].name;
-        this.change(() => { (this.rdraft.cards = this.rdraft.cards || []).push(nb); });
+        this.change(() => {
+          const L = (this.rdraft.cards = this.rdraft.cards || []), j = at ? L.findIndex((x) => x.id === at.target) : -1;
+          if (j >= 0) { nb.zone = L[j].zone || 'top'; L.splice(j + (at.after ? 1 : 0), 0, nb); } else L.push(nb);
+        });
         this.pick(nb.id);
         return;
       }
@@ -330,10 +355,16 @@
       // el plano llena el alto que sobra en su columna (y deja lugar a las demás tarjetas)
       if (type === 'plan' && K === 'tablet' && !zone) b.fill = true;
       if (titled.includes(type)) b.title = type === 'frigate' ? 'Cámaras' : CAT[type].name;
-      this.change(() => { this.blocks().push(b); this.sel = b.id; this.roomEd = null; this.rdraft = null; });
+      this.change(() => {
+        const B = this.blocks(), j = at ? B.findIndex((x) => x.id === at.target) : -1;
+        // al lado de otra tarjeta: en su columna o banda, arriba o abajo de ella
+        if (j >= 0) { b.col = B[j].col || 0; if (B[j].zone) b.zone = B[j].zone; else delete b.zone; if (b.zone) b.fill = false; B.splice(j + (at.after ? 1 : 0), 0, b); } else B.push(b);
+        this.sel = b.id; this.roomEd = null; this.rdraft = null;
+      });
     }
-    /** Catálogo de tarjetas (como «Agregar tarjeta» de Home Assistant), con buscador. */
-    openCatalog(col, zone) {
+    /** Catálogo de tarjetas (como «Agregar tarjeta» de Home Assistant), con buscador. at = { target, after }: al lado de otra. */
+    openCatalog(col, zone, at) {
+      this.catAt = at || null;
       this.closeCatalog();
       const inRoomZ = zone && String(zone).startsWith('room-');
       const CAT = window.MaeVista.CATALOG, K = inRoomZ ? 'phone' : this.K, ICO = { kpis: 'grid', featured: 'cam', rooms: 'home', scenes: 'spark', buttons: 'power', camera: 'cam', alarm: 'shield', away: 'car', routines: 'robot', music: 'music', lock: 'lock', plan: 'home', clock: 'sun',
@@ -348,14 +379,21 @@
       const paint = () => {
         const q = inp.value.trim().toLowerCase();
         const list = Object.entries(CAT).filter(([, c]) => c.kinds.includes(K)).filter(([k, c]) => !q || `${k} ${c.name} ${c.desc}`.toLowerCase().includes(q));
-        g.innerHTML = list.map(([k, c]) => `<button data-ck="${k}"><span class="cic">${window.MaeVista.icon(ICO[k] || 'grid')}</span><span><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></span></button>`).join('') || '<p class="hint">No hay tarjetas con ese nombre.</p>';
+        const GROUPS = [['La casa', ['rooms', 'plan', 'lights', 'covers', 'climate', 'scenes', 'routines', 'buttons', 'irrigation']], ['Seguridad', ['alarm', 'lock', 'frigate', 'camera', 'featured', 'openings', 'away', 'people']],
+          ['Información', ['kpis', 'clock', 'weather', 'energy', 'sensor', 'agenda', 'activity', 'batteries']], ['Multimedia', ['music']], ['Otras', ['text', 'image']]];
+        const known = new Set(GROUPS.flatMap((x) => x[1]));
+        const item = ([k, c]) => `<button data-ck="${k}"><span class="cth ct-${THUMB[k] || 'card'}">${THUMB[k] === 'clock' ? '<b>12:30</b>' : '<i></i><i></i><i></i><i></i>'}</span><span><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></span></button>`;
+        g.innerHTML = [...GROUPS, ['Más', list.map((x) => x[0]).filter((k) => !known.has(k))]].map(([gn, ks]) => {
+          const its = list.filter(([k]) => ks.includes(k));
+          return its.length ? `<h5 class="catgh">${gn}</h5>${its.map(item).join('')}` : '';
+        }).join('') || '<p class="hint">No hay tarjetas con ese nombre.</p>';
       };
       inp.oninput = paint;
       inp.onkeydown = (e) => { if (e.key === 'Enter') { const f = g.querySelector('[data-ck]'); if (f) f.click(); } };
       box.onclick = (e) => {
         if (e.target === box || e.target.closest('[data-cx]')) return this.closeCatalog();
         const ck = e.target.closest('[data-ck]'); if (!ck) return undefined;
-        this.closeCatalog(); this.addBlock(ck.dataset.ck, col, zone);
+        const at0 = this.catAt; this.closeCatalog(); this.addBlock(ck.dataset.ck, col, zone, at0);
         return undefined;
       };
       paint(); inp.focus();
@@ -506,7 +544,7 @@
       this.$('#ed').classList.toggle('dlgon', open);
       if (!open) { this.$('#dlgh').innerHTML = ''; this.$('#dlgf').innerHTML = ''; return; }
       const b = this.selBlock(), CAT = window.MaeVista.CATALOG;
-      const title = this.rscope && b ? `${this.rdraft ? this.rdraft.name : 'Ambiente'} › ${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Estilo y fondo' : this.zone === 'allb' ? 'Botón «Toda la casa»'
+      const title = this.rscope && b ? `${this.rdraft ? this.rdraft.name : 'Ambiente'} › ${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Diseño de este dashboard' : this.zone === 'allb' ? 'Botón «Toda la casa»'
         : b ? `${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : '';
       const sub = this.roomEd != null || this.el != null || this.pz != null;
       const tabs = b && !sub ? `<div class="tabs">${[['cfg', 'Contenido'], ['lay', 'Aspecto'], ['vis', 'Cuándo se ve']].map(([k, l]) => `<button data-tab="${k}" class="${this.tab === k ? 'on' : ''}">${l}</button>`).join('')}</div>` : '';
@@ -521,8 +559,7 @@
       this.$('#edt').innerHTML = `<button class="eb" data-e="close" title="Volver">← Volver</button><h2>${esc(v.name)}</h2>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<span class="eseg">${[['landscape', 'Horizontal'], ['portrait', 'Vertical']].map(([k, l]) => `<button data-ori="${k}" class="${ori === k ? 'on' : ''}">${l}</button>`).join('')}</span><button class="eb" data-e="cols" title="Cuántas columnas y de qué ancho">▦ Columnas</button>` : ''}
-          <span class="eseg" title="Modo de día o de noche de este diseño (el cliente también lo puede cambiar en Opciones)">${[['dark', '☾ Oscuro'], ['light', '☀ Claro'], ['auto', 'Auto']].map(([k, l]) => `<button data-theme="${k}" class="${(this.lay().theme || 'dark') === k ? 'on' : ''}">${l}</button>`).join('')}</span>
-          <button class="eb" data-e="dash" title="Estilo, fondo, modo y nombre de este diseño">🎨 Estilo</button>
+          <button class="eb" data-e="dash" title="Plantilla, estilo, fondo, modo de día o de noche y nombre">🎨 Diseño</button>
           <button class="eb ${this.playing ? 'pri' : ''}" data-e="play" title="${this.playing ? 'Volver a editar' : 'Usar la pantalla como en el celular (prender luces, cambiar de cámara, entrar a un ambiente)'}">${this.playing ? '✎ Editar' : '▶ Probar'}</button>
           <button class="eb pri2" data-e="add" title="Agregar una tarjeta" ${this.playing ? 'disabled' : ''}>+ Tarjeta</button><button class="eb" data-e="plan">Plano e imágenes</button>
           <span class="emenu"><button class="eb ${Object.values(this.sim || {}).some(Boolean) ? 'pri2' : ''}" data-e="simm" title="Ver cómo queda en otras situaciones (no toca la casa)">Simular${Object.values(this.sim || {}).filter(Boolean).length ? ` (${Object.values(this.sim || {}).filter(Boolean).length})` : ''} ▾</button>${this.simOpen ? `<span class="emenu-l" style="left:0;right:auto">
@@ -532,7 +569,6 @@
           <span class="emenu"><button class="eb" data-e="more" title="Más opciones">Más ▾</button>${this.moreOpen ? `<span class="emenu-l">
             <button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
             <button data-e="history">Historial de versiones…</button>
-            <button data-e="tpl">Aplicar una plantilla (MatterAI, Vision, Control4, Savant)…</button>
             <button data-e="export">Exportar como plantilla (archivo)</button><button data-e="import">Importar una plantilla…</button>
             </span>` : ''}</span>
           <span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span>
@@ -648,7 +684,8 @@
       return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
         onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' || a === 'menu' ? this.pick(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
-        onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone) => this.openCatalog(col, zone), onRoom: (a, i) => this.roomAct(a, i),
+        onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone) => this.openCatalog(col, zone),
+        onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
         room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null,
         roomPage: R ? Object.assign({ name: R.name }, Editor.roomPageOf(R.cards || [])) : null };
     }
@@ -687,13 +724,14 @@
       const b = this.blocks().find((x) => x.id === id); if (!b) return;
       const K = this.K, CAT = window.MaeVista.CATALOG;
       this.modal(`${(CAT[b.type] || {}).name || b.type}${b.title ? ` · ${b.title}` : ''}`, `<div class="mlist">
-        <button data-cm="edit">✎ Editar</button><button data-cm="dup">⧉ Duplicar</button><button data-cm="copy">↗ Copiar a otro dashboard…</button>
+        <button data-cm="edit">✎ Editar</button><button data-cm="above">＋ Agregar una tarjeta arriba</button><button data-cm="below">＋ Agregar una tarjeta abajo</button><button data-cm="dup">⧉ Duplicar</button><button data-cm="copy">↗ Copiar a otro dashboard…</button>
         ${K === 'tablet' ? this.placeOpts().filter(([k]) => k !== this.placeOf(b)).map(([k, l]) => `<button data-cm="col" data-c="${k}">⇄ Pasar a: ${esc(l)}</button>`).join('') : ''}
         <button data-cm="del" class="warn">✕ Borrar la tarjeta</button></div>`, (e) => {
         const x = e.target.closest('[data-cm]'); if (!x) return;
         this.closeCatalog();
         const k = x.dataset.cm;
         if (k === 'edit') this.pick(id);
+        else if (k === 'above' || k === 'below') this.openCatalog(b.col || 0, b.zone || null, { target: id, after: k === 'below' });
         else if (k === 'copy') this.copyTo(b);
         else if (k === 'col') this.change(() => this.setPlace(b, x.dataset.c));
         else this.blockAct(id, k);
@@ -912,11 +950,14 @@
         return;
       }
       if (!b && this.zone === 'dash') {
-        r.innerHTML = `${this.lookEditor()}<h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}" maxlength="40"></label>
-          <label class="fld"><span>Modo de ${this.K === 'tablet' ? 'la tablet' : 'el celular'}</span><select data-lt="theme">${[['', 'Oscuro'], ['light', 'Claro'], ['auto', 'Automático (como el modo claro u oscuro del equipo)']]
-            .map(([k, l]) => `<option value="${k}" ${(this.lay().theme || '') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
-          <p class="hint">Cada diseño (celular y tablet) tiene su estilo, su fondo y su modo. El cliente lo puede cambiar en la app: Opciones → Pantalla → Modo de día o de noche.</p>
-          <p class="hint">«Simular → De noche» (arriba) es otra cosa: muestra cómo se ve el plano y las tarjetas que dependen de la hora, sin cambiar el modo.</p>`;
+        const V = window.MaeVista, TL = V.TEMPLATE_LIST || [], here = this.K === 'tablet' ? 'la tablet' : 'el celular';
+        r.innerHTML = `<h4>1 · Plantilla</h4><p class="hint" style="margin-top:0">Cambia la disposición y las tarjetas (armadas con lo que tiene esta casa) y el estilo. Lo ves al instante en la pantalla; si no te gusta, Ctrl+Z. El plano, el nombre y quién lo ve no cambian.</p>
+          ${TL.map(([k, n, d]) => `<div class="tpc"><div class="tpt"><span class="tsw tk-${k}"><i></i><i></i><i></i><i></i></span><span><b>${esc(n)}</b><small>${esc(d)}</small></span></div>
+            <div class="tpb"><button class="eb sm" data-tpk="${k}" data-tpw="one">Sólo ${here}</button><button class="eb sm pri" data-tpk="${k}" data-tpw="both">Celular y tablet</button></div></div>`).join('')}
+          <h4 style="margin-top:18px">2 · Estilo, 3 · Fondo</h4>${this.lookEditor()}
+          <h4>4 · Modo</h4><div class="fld"><span class="eseg">${[['', '☾ Oscuro'], ['light', '☀ Claro'], ['auto', 'Auto (como el equipo)']].map(([k, l]) => `<button data-ltheme="${k}" class="${(this.lay().theme || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>
+          <h4>Nombre</h4><label class="fld"><input data-v="name" value="${esc(this.v.name)}" maxlength="40"></label>
+          <div class="guide"><b>Qué puede cambiar el cliente</b>Desde su app (Opciones → Pantalla): el <b style="display:inline">modo</b> y el <b style="display:inline">estilo de la pantalla</b> (el tuyo o una de las plantillas). El resto (tarjetas, ambientes, plano) lo cambiás vos acá.</div>`;
         return;
       }
       if (b && b.type === 'plan' && this.pz != null) { r.innerHTML = this.zoneEditor(this.pz); return; }
@@ -930,8 +971,7 @@
             <li>Arrastrá las tarjetas para moverlas. Con <b style="display:inline">+ Agregar tarjeta</b> sumás una nueva.</li>
             <li><b style="display:inline">Guardar</b> (arriba a la derecha) se lo manda a los equipos al instante.</li></ol></div>
           <h4>Dashboard</h4><label class="fld"><span>Nombre</span><input data-v="name" value="${esc(this.v.name)}"></label>
-          <label class="fld"><span>Tema ${this.K === 'tablet' ? 'de la tablet' : 'del celular'}</span><select data-lt="theme">${[['', 'Oscuro (grafito)'], ['light', 'Claro'], ['auto', 'Automático (igual que el modo claro u oscuro del equipo)']]
-            .map(([k, l]) => `<option value="${k}" ${(this.lay().theme || '') === k ? 'selected' : ''}>${l}</option>`).join('')}</select></label>
+          <p class="hint">Plantilla, estilo, fondo y modo: en <b>🎨 Diseño</b> (arriba).</p>
           <p class="hint">Estás editando el diseño para <b>${this.K === 'tablet' ? 'la tablet' : 'el celular'}</b>. Cambiá arriba entre Celular y Tablet: cada uno tiene el suyo, y los dos se guardan juntos.</p>`;
         return;
       }
@@ -1293,8 +1333,31 @@
       if (val === '' || val == null) delete o[last]; else o[last] = val;
     }
     selBlock() { return this.blocks().find((x) => x.id === this.sel); }
+    /** Cada lista desplegable del panel se ve como botones (como en Lovelace); los íconos, como una grilla con su dibujo.
+     *  La lista queda escondida y sigue siendo la que guarda: tocar un botón la cambia. */
+    chipify(root) {
+      const doc = root.ownerDocument || document;
+      root.querySelectorAll('select').forEach((sel) => {
+        const nx = sel.nextElementSibling; if (nx && nx.classList && nx.classList.contains('chips-of')) nx.remove();
+        const isIcon = /\.icon$/.test(sel.dataset.f || '') || sel.dataset.rn === 'icon';
+        const wrap = doc.createElement('span');
+        wrap.className = `eseg wrap chips-of${isIcon ? ' icons' : ''}`;
+        Array.from(sel.options).forEach((o) => {
+          if (!o.value && /^Elegir/.test(o.text)) return; // «Elegir…» sobra con botones
+          const bt = doc.createElement('button'); bt.type = 'button';
+          bt.className = o.value === sel.value ? 'on' : '';
+          bt.title = o.text;
+          if (isIcon && o.value && window.MaeVista && window.MaeVista.icon) bt.innerHTML = window.MaeVista.icon(o.value); else bt.textContent = isIcon && !o.value ? 'Auto' : (o.text || '—');
+          bt.onclick = () => { sel.value = o.value; sel.dispatchEvent(new Event('change', { bubbles: true })); };
+          wrap.appendChild(bt);
+        });
+        sel.style.display = 'none';
+        sel.after(wrap);
+      });
+    }
     bind() {
       const W = this.wrap;
+      this.chipify(W);
       W.querySelectorAll('[data-e]').forEach((x) => { x.onclick = () => this.cmd(x.dataset.e); });
       const ed = W.querySelector('#ed');
       if (ed) ed.onclick = (e) => { if ((this.moreOpen || this.simOpen) && !e.composedPath().some((x) => x.classList && x.classList.contains('emenu'))) { this.moreOpen = false; this.simOpen = false; this.draw(); } };
@@ -1427,6 +1490,8 @@
       W.querySelectorAll('#edr [data-place]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (bb) this.setPlace(bb, x.dataset.place); }); });
       W.querySelectorAll('#edr [data-fill]').forEach((x) => { x.onchange = () => this.change(() => { const bb = selB(); if (bb) { if (x.checked) bb.fill = true; else delete bb.fill; } }); });
       W.querySelectorAll('#edr [data-ccols]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; bb.cfg = bb.cfg || {}; if (x.dataset.ccols) bb.cfg.cols = +x.dataset.ccols; else delete bb.cfg.cols; }); });
+      W.querySelectorAll('#edr [data-tpk]').forEach((x) => { x.onclick = () => this.applyTemplate(x.dataset.tpk, x.dataset.tpw === 'both' ? ['phone', 'tablet'] : [this.K]); });
+      W.querySelectorAll('#edr [data-ltheme]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().theme = x.dataset.ltheme || null; }); });
       W.querySelectorAll('#edr [data-cst]').forEach((x) => { x.onclick = () => this.change(() => {
         const bb = this.blocks().find((y) => y.id === this.sel); if (!bb) return;
         bb.cfg = bb.cfg || {}; if (x.dataset.cst) bb.cfg.style = x.dataset.cst; else delete bb.cfg.style;

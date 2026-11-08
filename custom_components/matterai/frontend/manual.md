@@ -74,10 +74,12 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **Ancho de cada tarjeta**: ¼, ½, ¾ o completo; las angostas se acomodan una al lado de la otra.
 - **Tablet: ▦ Columnas** (arriba): plano al costado + 1 o 2 columnas, 2, 3 o 4 columnas, o una grande + 2 chicas. Además hay una **banda de arriba** (debajo de la hora) y una **banda de abajo** (arriba de la música), de lado a lado. En «Aspecto → Dónde va» elegís la columna o la banda, y «Llenar el alto que sobra» hace que el plano ocupe el resto de su columna sin tapar a las demás.
 - **Arrastrá** las tarjetas para moverlas (una línea dorada marca dónde van a caer: arriba, abajo o al costado de otra, o en una columna o banda vacía), y lo de adentro de cada tarjeta (escenas, ambientes, botones) para ordenarlo. Nunca hay flechas.
-- **⋮** en cada tarjeta: duplicar, copiar a otro dashboard, borrar.
-- **+ Tarjeta**: el catálogo con buscador. **+ Agregar tarjeta** al final de cada columna.
+- **⋮** en cada tarjeta: agregar una tarjeta arriba o abajo de esa, duplicar, copiar a otro dashboard, borrar (también en las tarjetas de adentro de un ambiente).
+- **+ Tarjeta**: el catálogo con buscador, ordenado por La casa, Seguridad, Información, Multimedia y Otras, con un dibujito de cómo se ve cada tarjeta. **+ Agregar tarjeta** al final de cada columna.
+- **Barra de abajo**: arrastrá sus botones en la pantalla del medio para ordenarlos.
+- **Sin listas desplegables**: cada opción se elige tocando botones; los íconos, en una grilla con su dibujo.
 - **Celular / Tablet** y, en la tablet, **Horizontal / Vertical**.
-- **🎨 Estilo**: estilo (MatterAI, tipo Apple, Cristal, Vision, Control4 o Savant), fondo (degradés, un color o una foto de la casa) y modo claro, oscuro o automático. Cada diseño tiene el suyo.
+- **🎨 Diseño**: todo el aspecto en un lugar: 1 · **Plantilla** (MatterAI, Vision, Control4 o Savant, sólo a este equipo o al celular y la tablet juntos; Ctrl+Z la deshace), 2 · **Estilo** (MatterAI, tipo Apple, Cristal, Vision, Control4 o Savant), 3 · **Fondo** (degradés, un color o una foto de la casa), 4 · **Modo** (oscuro, claro o automático) y el nombre. Cada diseño (celular y tablet) tiene el suyo. Abajo dice qué puede cambiar el cliente desde su app.
 - **Tamaño del plano**: tocá el plano → Tamaño: chico, mediano, normal o grande.
 - **Cómo se ve cada tarjeta**: Ambientes (lista, grilla o tarjetas grandes), Escenas (botones o portadas de colores), Botones (grilla, lista, mosaicos con interruptor o fila de accesos) y el termostato grande con los modos del aire.
 - **Ambientes por dentro**: abrí un ambiente y arrastrá cada equipo a su lugar directo en la pantalla del medio.
@@ -85,7 +87,7 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **Plano e imágenes**: el render de la casa (de noche, con luces y de día) y sus ambientes: puntos para paredes de más de 4 lados, mover la zona, doble clic para borrar un punto, Ctrl+Z.
 - **▶ Probar**: usás la pantalla como en el celular (prender luces, entrar a un ambiente).
 - **Simular**: ver cómo queda de noche, con la alarma armada, con música, etc., sin tocar la casa.
-- **⋯**: **aplicar una plantilla** (MatterAI, Vision, Control4 o Savant) a este dashboard, sólo a este diseño o al celular y la tablet juntos (se puede deshacer); historial de versiones; probar en un equipo real por 15 minutos; exportar o importar plantilla.
+- **⋯**: historial de versiones; probar en un equipo real por 15 minutos; exportar o importar plantilla.
 - **Guardar** se lo manda a los equipos al instante (sin actualizar la app).
 
 ## Las tarjetas

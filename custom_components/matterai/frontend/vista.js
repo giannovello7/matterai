@@ -911,11 +911,12 @@
     function dockHTML(m, p) {
       const L = (X.layout && X.layout.dock && X.layout.dock.length ? X.layout.dock : DOCK_DEF[kind()]);
       const has = { camaras: m.f.cameras, musica: m.f.music, agenda: m.f.agenda, voice: voiceOn(), clima: !!m.weather };
+      // en el editor cada botón se arrastra para ordenarlos (data-dkk)
       return L.filter((k, i, a) => DOCK[k] && has[k] !== false && a.indexOf(k) === i).map((k, j) => {
-        const [i, t2] = DOCK[k];
-        if (k === 'voice') return `<button class="v-mic" data-scr="voice" aria-label="Hablar">${ic('mic')}</button>`;
-        if (k === 'musica') return `<button data-k="music">${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`;
-        return `<button class="${j === 0 && k === 'top' ? 'on' : ''}" data-scr="${k}">${ic(i)}${t2}</button>`;
+        const [i, t2] = DOCK[k], dk = editing() ? ` data-dkk="${k}"` : '';
+        if (k === 'voice') return `<button class="v-mic" data-scr="voice"${dk} aria-label="Hablar">${ic('mic')}</button>`;
+        if (k === 'musica') return `<button data-k="music"${dk}>${p && X.hidePlayer && p.state === 'playing' ? '<span class="v-eq"><i></i><i></i><i></i></span>' : ''}${ic(i)}${t2}</button>`;
+        return `<button class="${j === 0 && k === 'top' ? 'on' : ''}" data-scr="${k}"${dk}>${ic(i)}${t2}</button>`;
       }).join('');
     }
     function wrapBlock(b, m) {
@@ -1493,10 +1494,10 @@
       const t = e.target;
       if (t.closest && t.closest('input,select,textarea,.v-ecard,.v-etool,.v-eltool,.v-eadd,[data-eact],[data-radd],[data-rme],.v-pin')) return;
       let kind0 = null, node = null;
-      const it = t.closest && t.closest('[data-el]'), ri = t.closest && t.closest('[data-ri]'), blk = t.closest && t.closest('[data-block]');
-      if (it && it.dataset.el !== 'cam' && blk) { kind0 = 'el'; node = it; } else if (ri) { kind0 = 'ri'; node = ri; } else if (blk) { kind0 = 'card'; node = blk; }
+      const it = t.closest && t.closest('[data-el]'), ri = t.closest && t.closest('[data-ri]'), blk = t.closest && t.closest('[data-block]'), dk = t.closest && t.closest('[data-dkk]');
+      if (dk && ctx.edit.onDock) { kind0 = 'dock'; node = dk; } else if (it && it.dataset.el !== 'cam' && blk) { kind0 = 'el'; node = it; } else if (ri) { kind0 = 'ri'; node = ri; } else if (blk) { kind0 = 'card'; node = blk; }
       if (!node) return;
-      dnd = { kind: kind0, node, sel: kind0 === 'el' ? '[data-el]' : kind0 === 'ri' ? '[data-ri]' : '[data-block]', x0: e.clientX, y0: e.clientY, on: false, block: blk && blk.dataset.block };
+      dnd = { kind: kind0, node, sel: kind0 === 'el' ? '[data-el]' : kind0 === 'ri' ? '[data-ri]' : kind0 === 'dock' ? '[data-dkk]' : '[data-block]', x0: e.clientX, y0: e.clientY, on: false, block: blk && blk.dataset.block };
     }, true);
     el.addEventListener('pointermove', (e) => {
       if (!dnd) return;
@@ -1528,6 +1529,13 @@
           else { const r = area.getBoundingClientRect(); showLine({ left: r.left, top: r.top + 6, width: r.width, height: 0 }, 'top'); }
           return;
         }
+      } else if (dnd.kind === 'dock') {
+        const tgt = n.closest('[data-dkk]');
+        if (tgt && tgt !== dnd.node) {
+          const r = tgt.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
+          dnd.drop = { from: dnd.node.dataset.dkk, to: tgt.dataset.dkk, after };
+          showLine(r, after ? 'right' : 'left'); return;
+        }
       } else {
         const tgt = n.closest(dnd.sel);
         const same = tgt && tgt !== dnd.node && (dnd.kind === 'ri' || (tgt.closest('[data-block]') || {}).dataset.block === dnd.block);
@@ -1553,6 +1561,7 @@
       if (d.kind === 'card' && ctx.edit.onMove) ctx.edit.onMove(d.node.dataset.block, d.drop);
       else if (d.kind === 'el' && ctx.edit.onElem && d.drop.from !== d.drop.to) ctx.edit.onElem(d.block, 'move', d.drop);
       else if (d.kind === 'ri' && ctx.edit.onRoom && d.drop.from !== d.drop.to) ctx.edit.onRoom('move', d.drop);
+      else if (d.kind === 'dock' && ctx.edit.onDock) ctx.edit.onDock(d.drop.from, d.drop.to, d.drop.after);
       else render();
     };
     el.addEventListener('pointerup', () => endDnd(true));
