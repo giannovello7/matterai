@@ -1000,7 +1000,10 @@
     /** ¿Se puede mostrar video en vivo? (la tarjeta MatterAI sabe armar el visor de Frigate) */
     // en vivo también en iPhone / iPad: la app le saca al visor el modo MJPEG (el que llenaba la memoria y hacía que iOS
     // cerrara la página) y usa WebRTC o MSE. Mientras carga el visor, o si no está, fotos seguidas.
-    function liveOk() { const c = card(); return !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
+    // la caja negra (diag.js) lo apaga si la vez anterior la app se cerró sola con una cámara en vivo
+    const camSafe = () => { const d = typeof globalThis !== 'undefined' && globalThis.MaeDiag; return !!(d && d.camSafe()); };
+    const diag = (t) => { const d = typeof globalThis !== 'undefined' && globalThis.MaeDiag; if (d) d.add(t); };
+    function liveOk() { const c = card(); return !camSafe() && !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
     /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
     function mountLive() {
       if (!X.el.querySelectorAll || editing()) return;
@@ -1009,8 +1012,10 @@
         const id = slot.dataset.live, key = slot.dataset.key; seen.add(id);
         let L = X.live[id];
         if (!L || L.key !== key) {
-          const elx = card().liveCam([key].concat((X.camList[id] || []).filter((x) => x !== key)));
-          if (!elx) { waitLive(); return; }
+          const ids = [key].concat((X.camList[id] || []).filter((x) => x !== key));
+          const elx = card().liveCam(ids);
+          if (!elx) { diag('visor: esperando que cargue el visor de cámaras'); waitLive(); return; }
+          diag(`visor: armado en el inicio con ${ids.length} cámara${ids.length > 1 ? 's' : ''}`);
           L = X.live[id] = { el: elx, key };
         }
         L.el.hass = hass();
