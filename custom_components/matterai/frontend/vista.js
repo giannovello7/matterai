@@ -1587,6 +1587,7 @@
     }
     // cámaras: la tarjeta de Frigate (grabaciones, todas las cámaras) si está configurada; si no, la ventana del equipo
     function openCam(id, list) {
+      try { window.__maeCamStart = id; } catch (_) { /* fuera del navegador */ }
 
       const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
     }
