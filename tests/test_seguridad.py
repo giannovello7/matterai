@@ -468,3 +468,35 @@ async def test_setup_checklist(hass, hass_ws_client, hass_client_no_auth) -> Non
     assert not msg["success"]
     msg = await _ws(hass_ws_client, hass, ana["token"], 1, {"type": "matterai/setup/mark", "key": "m_push", "done": True})
     assert not msg["success"]
+
+
+async def test_web_app_names_itself_and_gets_its_dashboard(hass, hass_ws_client, hass_client_no_auth) -> None:
+    """La app web (sin registro de mobile_app): dice qué equipo es, recibe su dashboard por su usuario y el aviso de cambios."""
+    from custom_components.matterai.app_devices import _targets_me
+    from custom_components.matterai.views import _targets
+
+    house = await _setup(hass)
+    ws = await hass_ws_client(hass)
+    client = await hass_client_no_auth()
+    _, web = await _pair(client, decode((await _link(ws, 1))["code"])["c"], "Celular")
+    _, ana = await _pair(client, decode((await _link(ws, 2))["code"])["c"], "Celular de Ana")
+    msg = await _ws(hass_ws_client, hass, web["token"], 1, {"type": "matterai/app/name", "name": "iPhone (web)"})
+    assert msg["success"] and msg["result"]["name"] == "iPhone (web)"
+    assert house.devices[web["user_id"]]["name"] == "iPhone (web)"
+    assert (await hass.auth.async_get_user(web["user_id"])).name == "App · iPhone (web)"
+    # un nombre que ya no es el genérico no se pisa
+    msg = await _ws(hass_ws_client, hass, web["token"], 1, {"type": "matterai/app/name", "name": "Otro"})
+    assert msg["success"] and msg["result"]["name"] is None and house.devices[web["user_id"]]["name"] == "iPhone (web)"
+    msg = await _ws(hass_ws_client, hass, ana["token"], 1, {"type": "matterai/app/name", "name": "iPhone (web)"})
+    assert msg["result"]["name"] is None and house.devices[ana["user_id"]]["name"] == "Celular de Ana"
+    # su dashboard, aunque no mande device_id
+    views = hass.data[DOMAIN]["views"]
+    vid = views.put({"name": "Mío", "kind": "phone"})["id"]
+    views.set_user(web["user_id"], vid)
+    msg = await _ws(hass_ws_client, hass, web["token"], 1, {"type": "matterai/app/view", "device_id": "", "kind": "phone"})
+    assert msg["success"] and msg["result"]["view"]["id"] == vid and msg["result"]["personal"]
+    # al cambiar el dashboard le llega el aviso por su usuario
+    assert web["user_id"] in _targets(hass, views, vid)
+    assert _targets_me([web["user_id"]], "", "iPhone (web)", web["user_id"])
+    assert not _targets_me([web["user_id"]], "", "", ana["user_id"]), "NEGATIVO: a otro equipo no"
+    assert not _targets_me(["abc"], "", "", ""), "NEGATIVO: sin datos no coincide con nada"

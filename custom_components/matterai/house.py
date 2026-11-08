@@ -140,6 +140,20 @@ class House:
         _LOGGER.info("Vinculado el equipo «%s» (%s)", name, via)
         return user.id, token
 
+    async def async_auto_name(self, user_id: str, name: str) -> str | None:
+        """El equipo dice qué es («iPhone (web)», «Samsung SM-A515F»): sólo si todavía se llama «Celular» (el nombre genérico).
+        Un nombre que puso alguien no se toca. Devuelve el nombre nuevo, o None si no cambió."""
+        dev = self.devices.get(user_id)
+        name = _clean_name(name)
+        if dev is None or dev.get("name") != "Celular" or name == "Celular":
+            return None
+        dev["name"] = name
+        user = await self.hass.auth.async_get_user(user_id)
+        if user is not None and not user.is_owner and not user.is_admin:
+            await self.hass.auth.async_update_user(user, name=f"{DEVICE_PREFIX}{name}")
+        await self._save()
+        return name
+
     async def async_revoke(self, user_id: str) -> bool:
         """Desvincula un equipo: borra su usuario (y con él su acceso). Sus otros datos los limpia quien llama."""
         if user_id not in self.devices:

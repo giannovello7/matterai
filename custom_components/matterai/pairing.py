@@ -194,6 +194,19 @@ async def ws_app_upgrade(hass: HomeAssistant, connection: websocket_api.ActiveCo
     connection.send_result(msg["id"], {"token": got[1], "user_id": got[0]})
 
 
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/name", vol.Required("name"): vol.All(str, vol.Length(min=1, max=40))})
+@websocket_api.async_response
+async def ws_app_name(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """La app dice qué equipo es: así en el panel no aparece «Celular» sin saber cuál es. Sólo cambia el nombre genérico."""
+    rt = _rt(hass)
+    house = rt and rt.get("house")
+    if house is None or not house.is_device_user(connection.user.id):
+        connection.send_error(msg["id"], "unauthorized", "Este usuario no es un equipo de la casa")
+        return
+    got = await house.async_auto_name(connection.user.id, msg["name"])
+    connection.send_result(msg["id"], {"name": got})
+
+
 @websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/app/invite", vol.Optional("device_id", default=""): str})
 @websocket_api.async_response
 async def ws_app_invite(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
@@ -282,4 +295,4 @@ async def ws_app_shared_off(hass: HomeAssistant, connection: websocket_api.Activ
     connection.send_result(msg["id"], {"ok": True})
 
 
-WS_COMMANDS = (ws_app_upgrade, ws_app_invite, ws_app_net, ws_app_forget_me, ws_app_access, ws_app_revoke, ws_app_shared_off)
+WS_COMMANDS = (ws_app_upgrade, ws_app_name, ws_app_invite, ws_app_net, ws_app_forget_me, ws_app_access, ws_app_revoke, ws_app_shared_off)

@@ -199,11 +199,12 @@ def ws_app_device_set(hass: HomeAssistant, connection: websocket_api.ActiveConne
     connection.send_result(msg["id"], {"ok": True})
 
 
-def _targets_me(target: Any, device_id: str, name: str) -> bool:
+def _targets_me(target: Any, device_id: str, name: str, user_id: str = "") -> bool:
     if target in (None, "", "all"):
         return True
     names = {str(t).strip().lower() for t in (target if isinstance(target, list) else [target])}
-    return "all" in names or device_id.lower() in names or (name or "").strip().lower() in names or slugify(name or "") in names
+    return ("all" in names or (bool(device_id) and device_id.lower() in names) or (bool(user_id) and user_id.lower() in names)
+            or (bool(name) and (name.strip().lower() in names or slugify(name) in names)))
 
 
 @websocket_api.websocket_command({
@@ -218,7 +219,7 @@ def ws_app_subscribe(hass: HomeAssistant, connection: websocket_api.ActiveConnec
     @callback
     def _fwd(event: Event) -> None:
         d = event.data or {}
-        if _targets_me(d.get("target"), msg["device_id"], msg["name"]):
+        if _targets_me(d.get("target"), msg["device_id"], msg["name"], connection.user.id if connection.user else ""):
             connection.send_message(websocket_api.event_message(msg["id"], dict(d)))
 
     unsub = hass.bus.async_listen(EVENT_COMMAND, _fwd)

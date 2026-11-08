@@ -191,7 +191,9 @@ def _targets(hass: HomeAssistant, v: Views, vid: str) -> list[str]:
     """Los equipos que muestran ese dashboard (por equipo o por su usuario)."""
     if v.default == vid:
         return ["all"]
-    out = set(v.devices_of(vid)) | set(_user_devices(hass, {u for u, x in v.users.items() if x == vid}))
+    users = {u for u, x in v.users.items() if x == vid}
+    # por el usuario también: la app web no tiene registro de mobile_app (no tiene device_id)
+    out = set(v.devices_of(vid)) | set(_user_devices(hass, users)) | users
     return sorted(out)
 
 

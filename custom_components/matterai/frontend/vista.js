@@ -518,6 +518,9 @@
     }
     // video continuo (MJPEG) de la cámara: lo que se ve mientras carga el visor de Frigate y en la vista previa del editor
     const camStream = (id) => { const s = st(id), p = s && s.attributes.entity_picture; return p ? url(p.replace('/api/camera_proxy/', '/api/camera_proxy_stream/')) : ''; };
+    // iPhone / iPad: el video continuo (MJPEG) en una imagen llena la memoria hasta que iOS cierra la página
+    // («Ocurrió un problema varias veces»). Ahí el «video» son fotos seguidas, cada una cuando terminó la anterior.
+    const IOS = typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1));
     const camSrc = (id) => { const s = st(id); return s && s.attributes.entity_picture ? url(s.attributes.entity_picture) + (s.attributes.entity_picture.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 10000) : ''; };
     /** Equipos de una tarjeta: los elegidos, o los de los ambientes elegidos, o los de la casa (hasta 8). */
     function entsOf(c, m, dom, roomKey) {
@@ -611,7 +614,8 @@
           // video en vivo con el visor de Frigate (se arma aparte y no se corta cuando cambia otra cosa) o foto cada 10 s
           const video = !!cam && c.video !== 'photo', live = video && liveOk() && !editing();
           // en video: el visor de Frigate en el equipo; mientras carga (y en el editor) el video continuo de la cámara
-          const photo = !cam ? '<div class="v-feed none"></div>' : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
+          const photo = !cam ? '<div class="v-feed none"></div>' : video && IOS ? `<img class="v-feed" data-cam="${esc(cam)}" data-fast="1"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`
+            : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
           const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>` : photo;
           // en video no va ningún cartel encima (como el visor de Frigate original); en modo foto se avisa que es foto
@@ -1597,6 +1601,14 @@
         if (im.closest && im.closest('[data-live]') && im.closest('[data-live]').querySelector('advanced-camera-card')) return; const s = camSrc(im.dataset.cam); if (s && im.getAttribute('src') !== s) im.src = s; });
     };
     X.camT = setInterval(refreshCam, 10000);
+    // las fotos seguidas de iOS: cada 2 s, sólo si la anterior ya cargó (no se apilan pedidos)
+    if (IOS) X.fastT = setInterval(() => {
+      if (!X.el || X.el.hidden || (typeof document !== 'undefined' && document.hidden)) return;
+      X.el.querySelectorAll('img[data-fast]').forEach((im) => {
+        if (!im.complete) return;
+        const s = camSrc(im.dataset.cam); if (s) im.src = s.replace(/([?&])t=\d+/, `$1t=${Date.now()}`);
+      });
+    }, 2000);
     const onResize = () => { if (kind() === 'tablet') { X.shell = null; render(); } };
     if (typeof addEventListener === 'function') addEventListener('resize', onResize);
     X.clockT = setInterval(() => { if (!X.el.hidden) render(); }, 20000);
@@ -1608,7 +1620,7 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
-      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
+      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };
   }

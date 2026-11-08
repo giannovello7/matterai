@@ -3,7 +3,7 @@
 MatterAI son cuatro piezas que trabajan juntas:
 
 - **La integración MatterAI** (esta): se instala por HACS en el Home Assistant de cada casa. Tiene este panel, guarda los dashboards, crea los accesos de cada celular, corre las automatizaciones MatterAI y vigila que todo ande.
-- **La app MatterAI** (Android, iPhone / iPad, y la app web en app.matterai.com.ar): es lo único que usa la familia. **El cliente nunca ve Home Assistant.**
+- **La app MatterAI** (Android, iPhone / iPad, y la app web en app.matterai.com.ar): es lo único que usa la familia. **El cliente nunca ve Home Assistant.** En la app web cada equipo aparece con lo que es (por ejemplo «iPhone (web)»), recibe su dashboard y los cambios al instante, igual que la app instalada. En iPhone y iPad las cámaras se ven como fotos que se renuevan cada 2 segundos (el video continuo hace que iOS cierre la página).
 - **El panel central** (panel.matterai.com.ar): tu panel de instalador. Ves todas las casas, sabés cuál se cayó, guardás copias y plantillas, y reenvía los avisos a los celulares.
 - **Firebase** (Google): entrega los avisos al celular aunque la app esté cerrada. Es un solo proyecto («MatterAI») para todos los clientes.
 
