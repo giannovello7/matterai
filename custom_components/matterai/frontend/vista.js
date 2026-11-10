@@ -521,6 +521,9 @@
     // iPhone / iPad: el video continuo (MJPEG) en una imagen llena la memoria hasta que iOS cierra la página
     // («Ocurrió un problema varias veces»). Ahí el «video» son fotos seguidas, cada una cuando terminó la anterior.
     const IOS = typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1));
+    /* iPhone / iPad (hasta probarlo con una Mac): el visor de Frigate con las 6 cámaras juntas queda cargando o iOS cierra
+       la página; con una cámara anda. Una cámara por visor, ‹ nombre › arriba para cambiar y un freno entre cambios. */
+    const CAM_ONE = IOS, CAM_GAP = 1500;
     const camSrc = (id) => { const s = st(id); return s && s.attributes.entity_picture ? url(s.attributes.entity_picture) + (s.attributes.entity_picture.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 10000) : ''; };
     /** Equipos de una tarjeta: los elegidos, o los de los ambientes elegidos, o los de la casa (hasta 8). */
     function entsOf(c, m, dom, roomKey) {
@@ -625,7 +628,9 @@
             // en video, nada encima de la imagen (como la tarjeta de Frigate original): el visor trae sus flechas y su menú.
             // La tarjeta «Cámaras en vivo (Frigate)» es sólo el visor; la del portero lleva sus botones debajo del video.
             const bar = b.type === 'frigate' ? '' : `${extra}${gateBtn}`;
-            return `${t}<div class="v-cam clean ${live ? 'is-live' : ''}">${feed}${badge}</div>${bar ? `<div class="v-cbar">${bar}</div>` : ''}`;
+            // iPhone / iPad: una cámara por visor y, arriba, ‹ nombre › para pasar a otra (ver CAM_ONE)
+            const nav = live && CAM_ONE && list.length > 1 ? `<div class="v-camnav"><button data-camnext="-1" aria-label="Cámara anterior">${ic('chev')}</button><b>${esc(fname(cam))}</b><button data-camnext="1" aria-label="Cámara siguiente">${ic('chev')}</button></div>` : '';
+            return `${t}${nav}<div class="v-cam clean ${live ? 'is-live' : ''}">${feed}${badge}</div>${bar ? `<div class="v-cbar">${bar}</div>` : ''}`;
           }
           return `${t}<div class="v-cam">${feed}${badge}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
             <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${b.type === 'frigate' ? '' : extra + gateBtn}</span></div>`;
@@ -1011,7 +1016,7 @@
         const id = slot.dataset.live, key = slot.dataset.key; seen.add(id);
         let L = X.live[id];
         if (!L || L.key !== key) {
-          const ids = [key].concat((X.camList[id] || []).filter((x) => x !== key));
+          const ids = CAM_ONE ? [key] : [key].concat((X.camList[id] || []).filter((x) => x !== key));
           const elx = card().liveCam(ids);
           if (!elx) { waitLive(); return; }
           L = X.live[id] = { el: elx, key };
@@ -1415,6 +1420,7 @@
       const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
     }
     function nextCam(elx, d) {
+      if (CAM_ONE) { const t = Date.now(); if (t - (X.camAt || 0) < CAM_GAP) return; X.camAt = t; } // freno: un cambio a la vez
       const b = blockOf(elx), list = b && X.camList && X.camList[b.id]; if (!list || list.length < 2) return;
       X.camIdx[b.id] = ((X.camIdx[b.id] || 0) + d + list.length) % list.length; vib(); render();
     }
