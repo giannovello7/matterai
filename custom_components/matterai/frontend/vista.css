@@ -329,39 +329,6 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.has-bg{background:transparent;isolation:isolate}
 .vista.has-bg::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--v-bgx);pointer-events:none}
 .vista.has-bg .v-card,.vista.has-bg .v-kpi,.vista.has-bg .v-room,.vista.has-bg .v-chip,.vista.has-bg .v-sq{box-shadow:0 6px 24px rgba(0,0,0,.18)}
-/* ───── estilo «tipo Apple»: letra del sistema, tarjetas muy redondeadas sin borde, títulos grandes ───── */
-.vista.st-apple{--f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",Roboto,system-ui,sans-serif;--f-mono:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter",Roboto,system-ui,sans-serif;
-  --bg:#000;--card:#1c1c1e;--card2:#2c2c2e;--line:rgba(255,255,255,.04);--fg:#fff;--muted:#8e8e93;--off:#3a3a3c;
-  --warm:#ff9f0a;--warm-s:rgba(255,159,10,.16);--cool:#0a84ff;--cool-s:rgba(10,132,255,.16);--green:#30d158;--red:#ff453a;--red-s:rgba(255,69,58,.16);letter-spacing:-.01em}
-.vista.st-apple.light{--bg:#f2f2f7;--card:#fff;--card2:#e9e9ee;--line:rgba(0,0,0,.04);--fg:#000;--muted:#6e6e73;--off:#d1d1d6;
-  --warm:#ff9500;--warm-s:rgba(255,149,0,.14);--cool:#007aff;--cool-s:rgba(0,122,255,.12);--green:#34c759;--red:#ff3b30;--red-s:rgba(255,59,48,.12)}
-.vista.st-apple h3{text-transform:none;letter-spacing:-.02em;font-size:21px;font-weight:700;color:var(--fg);margin:26px 4px 10px}
-.vista.st-apple .v-card h3{font-size:17px;margin:0 0 10px}
-.vista.st-apple .v-when b{font-weight:700;letter-spacing:-.03em;font-size:34px}
-.vista.st-apple :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-min){border-radius:22px!important;border-color:transparent!important}
-.vista.st-apple :is(.v-chip,.v-sq){border-radius:16px!important;border-color:transparent!important}
-.vista.st-apple.light :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-scene,.v-chip,.v-sq){box-shadow:0 1px 3px rgba(0,0,0,.05)}
-.vista.st-apple .v-kpi .v{font-size:18px;font-weight:700}
-.vista.st-apple :is(.v-dock,.v-nav){border-radius:26px!important}
-/* ───── estilo «cristal» (burbujas): tarjetas translúcidas y bien redondas sobre un fondo de color ───── */
-.vista.st-cristal{--f-display:ui-rounded,"SF Pro Rounded","Nunito","Varela Round",system-ui,sans-serif;
-  --bg:#0f1419;--card:rgba(255,255,255,.09);--card2:rgba(255,255,255,.14);--line:rgba(255,255,255,.16);--fg:#fff;--muted:rgba(255,255,255,.66);--off:rgba(255,255,255,.22);
-  --warm:#ffc777;--warm-s:rgba(255,199,119,.2);--cool:#8fd3ff;--cool-s:rgba(143,211,255,.2);--green:#8cf0b6;--red:#ff9a8a;--red-s:rgba(255,154,138,.2)}
-.vista.st-cristal:not(.has-bg){background:radial-gradient(90% 70% at 15% 10%,#2b5876 0,transparent 60%),radial-gradient(80% 70% at 90% 30%,#4e4376 0,transparent 60%),radial-gradient(90% 80% at 50% 100%,#1d6b5f 0,transparent 60%),#0f1419;background-attachment:fixed}
-.vista.st-cristal.light{--card:rgba(255,255,255,.55);--card2:rgba(255,255,255,.7);--line:rgba(255,255,255,.75);--fg:#14202e;--muted:rgba(20,32,46,.62);--off:rgba(20,32,46,.18);
-  --warm:#c9781a;--warm-s:rgba(201,120,26,.16);--cool:#1f7fc0;--cool-s:rgba(31,127,192,.14);--green:#23915a;--red:#d24b40;--red-s:rgba(210,75,64,.14)}
-.vista.st-cristal.light:not(.has-bg){background:linear-gradient(170deg,#eef3fa 0%,#dbe6f4 55%,#c9d8ee 100%)}
-.vista.st-cristal :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-chip,.v-sq,.v-dock,.v-nav){border-radius:26px!important;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.22),0 8px 30px rgba(0,0,0,.18)}
-.vista.st-cristal :is(.v-chip,.v-sq){border-radius:18px!important}
-.vista.st-cristal h3{letter-spacing:.06em;color:var(--muted)}
-.vista.st-cristal .v-sin,.vista.st-cristal .v-min{background:rgba(24,30,40,.92)}
-.vista.st-cristal.light .v-sin,.vista.st-cristal.light .v-min{background:rgba(245,248,252,.95)}
-/* el desenfoque real sólo en pantallas con mouse: en celulares y tablets traba el scroll */
-@media (hover:hover) and (pointer:fine){
-  .vista.st-cristal :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-dock,.v-nav){-webkit-backdrop-filter:blur(14px) saturate(140%);backdrop-filter:blur(14px) saturate(140%)}
-}
-
 /* ───── tarjetas nuevas (2.23): termostato grande, aberturas, agenda, riego y pilas ───── */
 .v-dial{text-align:center}
 .v-dring{position:relative;width:min(220px,80%);margin:4px auto 0;aspect-ratio:1}
@@ -392,30 +359,6 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-c0 .v-plan.sz-s{height:62%}.v-c0 .v-plan.sz-m{height:80%}
 .v-c0:has(.v-plan.sz-xl){max-width:60%}.vert .v-c0:has(.v-plan.sz-xl){max-width:64vw}
 .k-phone .v-plan.sz-s{width:64%;margin:0 auto}.k-phone .v-plan.sz-m{width:82%;margin:0 auto}
-
-/* ───── estilo «Control4»: oscuro con color de fondo, tarjetas sólidas, acento azul ───── */
-.vista.st-control4{--f-display:"Roboto","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
-  --bg:#141522;--card:rgba(32,34,46,.88);--card2:rgba(48,51,66,.92);--line:rgba(255,255,255,.07);--fg:#f2f3f7;--muted:#9aa0b4;--off:#3b3f52;
-  --warm:#4c9bff;--warm-s:rgba(76,155,255,.18);--cool:#4c9bff;--cool-s:rgba(76,155,255,.18);--green:#3ddc84;--red:#ff5d6c;--red-s:rgba(255,93,108,.18)}
-.vista.st-control4:not(.has-bg){background:radial-gradient(90% 70% at 85% 10%,#6b2c4f 0,transparent 60%),radial-gradient(80% 70% at 10% 90%,#2b2e6b 0,transparent 60%),#141522;background-attachment:fixed}
-.vista.st-control4.light{--bg:#eef0f6;--card:#fff;--card2:#e8ebf3;--line:rgba(0,0,0,.06);--fg:#14161f;--muted:#5f6577;--off:#cfd4e0}
-.vista.st-control4.light:not(.has-bg){background:linear-gradient(170deg,#eef0f6,#dfe3ee)}
-.vista.st-control4 :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-min){border-radius:14px!important}
-.vista.st-control4 :is(.v-chip,.v-sq){border-radius:999px!important}
-.vista.st-control4 .v-kpi{border-left:3px solid var(--warm)!important}
-.vista.st-control4 h3{text-transform:none;letter-spacing:0;font-size:14px;font-weight:500;color:var(--fg)}
-.vista.st-control4 .v-art{border-radius:10px!important}
-/* ───── estilo «Savant»: negro, minimalista, títulos finos en mayúsculas y acento dorado ───── */
-.vista.st-savant{--f-display:"Helvetica Neue","Segoe UI Light","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
-  --bg:#050505;--card:#111111;--card2:#1b1b1b;--line:rgba(255,255,255,.06);--fg:#f4f1ea;--muted:#8b877e;--off:#2a2a2a;
-  --warm:#c9a96e;--warm-s:rgba(201,169,110,.16);--cool:#c9a96e;--cool-s:rgba(201,169,110,.14);--green:#c9a96e;--red:#e0796a;--red-s:rgba(224,121,106,.16)}
-.vista.st-savant.light{--bg:#f6f4ef;--card:#fff;--card2:#efece5;--line:rgba(0,0,0,.06);--fg:#141310;--muted:#7a756b;--off:#dcd7cc;--warm:#a7843f;--warm-s:rgba(167,132,63,.14)}
-.vista.st-savant :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-min){border-radius:6px!important}
-.vista.st-savant :is(.v-chip,.v-sq){border-radius:6px!important}
-.vista.st-savant h3{font-weight:300;letter-spacing:.28em;font-size:10.5px;color:var(--muted)}
-.vista.st-savant .v-when b,.vista.st-savant .v-dmid b,.vista.st-savant .v-kpi .v,.vista.st-savant .v-tile b,.vista.st-savant .v-room b{font-weight:300}
-.vista.st-savant .v-tile{min-height:120px;justify-content:flex-end}
-.vista.st-savant .v-pw.on{background:var(--warm)!important}
 
 /* ═════════ piezas nuevas (2.23.3): fila de accesos, mosaicos, portadas, ambientes grandes y modos del aire ═════════ */
 .v-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
@@ -530,48 +473,159 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.st-vision.light :is(.v-room.on,.v-tile.on,.v-tile.lit,.v-btn.on,.v-mtile.on){background:#1d1d1f!important;color:#fff!important}
 .vista.st-vision.light :is(.v-nav,.v-dock) .v-mic{background:#1d1d1f!important;color:#fff!important}
 
-/* ═════════ CONTROL4: oscuro con color, barra de temas arriba, portadas, controles en grilla y música abajo ═════════ */
+/* ═════════ CONTROL4 — como un panel táctil de la marca (sin logos) ═════════
+   Carbón oscuro, tarjetas planas, ícono grande arriba y nombre abajo, acento celeste; lo activo en celeste con una raya
+   abajo; barra de abajo oscura de lado a lado; la música como barra «Now Playing». */
 .vista.st-control4{--f-display:"Roboto","Helvetica Neue","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
-  --bg:#17141f;--card:rgba(38,36,48,.82);--card2:rgba(56,53,70,.9);--line:rgba(255,255,255,.06);--fg:#f3f2f7;--muted:#a3a0b2;--off:#45424f;
-  --warm:#5aa2ff;--warm-s:rgba(90,162,255,.18);--cool:#5aa2ff;--cool-s:rgba(90,162,255,.18);--green:#43d17a;--red:#ff5d6c;--red-s:rgba(255,93,108,.18)}
-.vista.st-control4:not(.has-bg){background:radial-gradient(70% 60% at 100% 100%,#7a2e3f 0,transparent 60%),radial-gradient(70% 70% at 0% 100%,#2c2a5c 0,transparent 60%),radial-gradient(60% 50% at 50% 0%,#2a2433 0,transparent 70%),#15121c;background-attachment:fixed}
-.vista.st-control4.light{--bg:#f1f1f5;--card:#fff;--card2:#ececf2;--line:rgba(0,0,0,.06);--fg:#16151c;--muted:#666377;--off:#d4d3dc}
-.vista.st-control4.light:not(.has-bg){background:linear-gradient(170deg,#f3f2f7,#e2e1ea)}
-.vista.st-control4 :is(.v-card,.v-kpi,.v-room,.v-tile,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-min,.v-mtile){border-radius:12px!important;border-color:transparent!important}
-.vista.st-control4 h3{text-transform:none;letter-spacing:0;font-size:15px;font-weight:500;color:var(--fg)}
-.vista.st-control4 .v-when b{font-size:24px!important;font-weight:500;letter-spacing:0}.vista.st-control4 .v-when span{font-size:12px}
-.vista.st-control4 .v-chp{border-radius:999px!important;background:rgba(40,38,52,.9)!important;border:1px solid rgba(255,255,255,.12)!important;font-weight:500;font-size:13.5px}
-.vista.st-control4 .v-chp svg.i{color:var(--fg)}
-.vista.st-control4 .v-btns{gap:10px}.vista.st-control4 .v-btn{padding:16px 14px!important;background:rgba(42,40,54,.86)!important;min-height:76px}
-.vista.st-control4 .v-btn .v-bic{background:transparent;color:var(--muted);width:30px}.vista.st-control4 .v-btn.on .v-bic{background:transparent;color:var(--fg)}
-.vista.st-control4 .v-btn .v-tx b{font-size:14.5px;font-weight:500}.vista.st-control4 .v-btn .v-tx span{font-size:13px;color:var(--fg);opacity:.8}
-.vista.st-control4 .v-clim .v-cset b{font-size:40px;font-weight:300}
-.vista.st-control4 .v-kpi{border-left:3px solid var(--warm)!important}
-.vista.st-control4 .v-player{border-radius:16px!important;background:rgba(36,34,46,.92)!important;padding:12px 16px!important}
-.vista.st-control4 .v-art{border-radius:8px!important}
-.vista.st-control4.k-tablet .v-dock{background:transparent!important;border-color:transparent!important;justify-content:center}
-.vista.st-control4.k-tablet .v-dock button{flex:none;width:72px}
+  --bg:#121519;--card:#22262d;--card2:#2c313a;--line:rgba(255,255,255,.06);--fg:#f1f3f6;--muted:#9097a3;--off:#3a404a;
+  --warm:#1f9bf0;--warm-s:rgba(31,155,240,.16);--cool:#1f9bf0;--cool-s:rgba(31,155,240,.16);--green:#36c37a;--red:#ef5350;--red-s:rgba(239,83,80,.16);letter-spacing:0}
+.vista.st-control4:not(.has-bg){background:linear-gradient(180deg,#1a1e24 0%,#121519 55%,#0d0f12 100%)}
+.vista.st-control4.has-bg::before{filter:brightness(.42) saturate(.9)}
+.vista.st-control4 :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile){background:var(--card)!important;border:0!important;border-radius:10px!important;box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 6px 18px rgba(0,0,0,.28)!important}
+.vista.st-control4 :is(.v-chip,.v-sq){background:var(--card)!important;border:0!important;border-radius:999px!important}
+.vista.st-control4 h3{margin:22px 4px 10px;text-transform:none;letter-spacing:.01em;font-size:16px;font-weight:500;color:var(--fg)}
+.vista.st-control4 .v-when b{font-size:26px!important;font-weight:400;letter-spacing:0}.vista.st-control4 .v-when span{font-size:12.5px;color:var(--muted)}
+/* botones del panel: ícono grande arriba, nombre abajo, centrados */
+.vista.st-control4 .v-btns{gap:10px}
+.vista.st-control4 .v-btns .v-btn{flex-direction:column!important;align-items:center!important;justify-content:center;text-align:center!important;gap:8px!important;min-height:104px;padding:16px 10px!important}
+.vista.st-control4 .v-btns .v-btn .v-bic{width:auto!important;height:auto!important;background:transparent!important;color:var(--fg)}
+.vista.st-control4 .v-btns .v-btn .v-bic svg.i{width:34px;height:34px;stroke-width:1.5}
+.vista.st-control4 .v-btns .v-btn .v-tx b{font-size:14px;font-weight:500}.vista.st-control4 .v-btns .v-btn .v-tx span{font-size:12px;color:var(--muted)}
+.vista.st-control4 .v-bic{background:var(--card2)!important;color:var(--fg)!important;border-radius:8px!important}
+/* activo: celeste con una raya abajo */
+.vista.st-control4 :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on){background:var(--card2)!important;box-shadow:inset 0 -3px 0 var(--warm),0 6px 18px rgba(0,0,0,.28)!important}
+.vista.st-control4 :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on) :is(.v-bic,.v-tic,.v-mbot>svg.i){color:var(--warm)!important}
+.vista.st-control4 :is(.v-msw.on,.v-pw.on){background:var(--warm)!important}
+.vista.st-control4 .v-kpi{border-left:3px solid var(--warm)!important;border-radius:6px!important}
+.vista.st-control4 .v-kpi .v{font-weight:400;font-size:22px}
+/* barra de temas (Seguridad, Luces, Clima…) */
+.vista.st-control4 .v-chp{border-radius:999px!important;background:var(--card)!important;border:1px solid rgba(255,255,255,.08)!important;font-weight:500;color:var(--fg);padding:10px 16px!important}
+.vista.st-control4 .v-chp svg.i{color:var(--warm)}
+.vista.st-control4 .v-tiles.photo .v-tile{background:linear-gradient(180deg,#2a2f37,#1c2026)!important}
+.vista.st-control4 .v-clim .v-cset b{font-size:44px;font-weight:300}
+.vista.st-control4 .v-dring .d1{stroke:var(--warm)!important}
+.vista.st-control4 .v-modes button{background:var(--card2)!important;border-radius:8px!important}.vista.st-control4 .v-modes button.on{background:var(--warm)!important;color:#fff!important}
+.vista.st-control4 .v-sart{border-radius:8px}
+/* «Now Playing» */
+.vista.st-control4 .v-player{border-radius:10px!important;background:linear-gradient(90deg,#262b33,#1e2229)!important;padding:12px 16px!important}
+.vista.st-control4 .v-art{border-radius:6px!important}
+/* barra de abajo: oscura de lado a lado, la elegida en celeste con una raya arriba */
+.vista.st-control4 .v-nav{background:#0f1215!important;border-top:1px solid rgba(255,255,255,.06)!important}
+.vista.st-control4 :is(.v-nav,.v-dock) button{color:#8a919c}
+.vista.st-control4 :is(.v-nav,.v-dock) button.on{color:var(--warm)!important;background:transparent!important;box-shadow:inset 0 3px 0 var(--warm)}
+.vista.st-control4 :is(.v-nav,.v-dock) .v-mic{background:var(--warm)!important;color:#fff!important;box-shadow:0 6px 18px rgba(31,155,240,.35)}
+.vista.st-control4.k-tablet .v-dock{background:#0f1215!important;border:0!important;border-radius:0!important;border-top:1px solid rgba(255,255,255,.06)!important;justify-content:center}
+.vista.st-control4 :is(.v-sin,.v-min){background:#1b1f25!important;border:1px solid rgba(255,255,255,.06)!important;border-radius:12px!important}
+.vista.st-control4.light{--bg:#eef0f3;--card:#fff;--card2:#f3f5f8;--line:rgba(0,0,0,.06);--fg:#15181d;--muted:#5e6672;--off:#d3d8df}
+.vista.st-control4.light:not(.has-bg){background:linear-gradient(180deg,#f3f5f8,#e3e7ec)}
+.vista.st-control4.light .v-nav,.vista.st-control4.light.k-tablet .v-dock{background:#fff!important}
 
-/* ═════════ SAVANT / LUTRON: negro, minimalista, ambientes grandes, títulos finos espaciados, acento dorado ═════════ */
-.vista.st-savant{--f-display:"Helvetica Neue","Avenir Next","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
-  --bg:#000;--card:#0e0e0e;--card2:#171717;--line:rgba(255,255,255,.07);--fg:#f2efe8;--muted:#8a857b;--off:#262626;
-  --warm:#c8a86a;--warm-s:rgba(200,168,106,.18);--cool:#c8a86a;--cool-s:rgba(200,168,106,.14);--green:#c8a86a;--red:#de7b6b;--red-s:rgba(222,123,107,.16)}
+/* ═════════ SAVANT — como un panel de la marca (sin logos) ═════════
+   Negro, bordes finísimos, letra liviana con mayúsculas espaciadas, acento champagne usado poco; pestañas de texto con
+   subrayado; ambientes grandes. */
+.vista.st-savant{--f-display:"Avenir Next","Helvetica Neue","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
+  --bg:#000;--card:#0c0c0c;--card2:#151515;--line:rgba(255,255,255,.08);--fg:#f1eee7;--muted:#8a857b;--off:#262626;
+  --warm:#c8a86a;--warm-s:rgba(200,168,106,.16);--cool:#c8a86a;--cool-s:rgba(200,168,106,.12);--green:#c8a86a;--red:#d9796a;--red-s:rgba(217,121,106,.14);letter-spacing:.01em}
 .vista.st-savant:not(.has-bg){background:#000}
-.vista.st-savant.light{--bg:#f5f3ee;--card:#fff;--card2:#efece4;--line:rgba(0,0,0,.07);--fg:#151410;--muted:#7b766b;--off:#dad4c7;--warm:#a5843f;--warm-s:rgba(165,132,63,.16)}
-.vista.st-savant :is(.v-card,.v-kpi,.v-room,.v-tile,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-min,.v-chip,.v-sq,.v-player,.v-dock,.v-nav,.v-mtile){border-radius:4px!important}
-.vista.st-savant h3{font-weight:400;letter-spacing:.32em;font-size:10px;color:var(--muted);text-transform:uppercase}
-.vista.st-savant :is(.v-when b,.v-dmid b,.v-kpi .v,.v-clock b){font-weight:200!important;letter-spacing:.02em}
-.vista.st-savant :is(.v-tile b,.v-room b,.v-scene,.v-btn .v-tx b){font-weight:300;letter-spacing:.06em}
-.vista.st-savant .v-tiles.photo .v-tile b{text-transform:uppercase;letter-spacing:.22em;font-size:13px}
-.vista.st-savant .v-tiles.photo .v-tile{min-height:150px;background:linear-gradient(180deg,#1a1a1a,#0b0b0b)!important}
-.vista.st-savant .v-tiles.photo .v-tile.lit{background:radial-gradient(90% 80% at 50% 0%,rgba(200,168,106,.22),transparent 70%),linear-gradient(180deg,#1a1a1a,#0b0b0b)!important;border-color:rgba(200,168,106,.35)!important}
-.vista.st-savant .v-tiles.photo .v-tic svg.i{stroke-width:1.1;color:var(--warm)}
-.vista.st-savant .v-pw.on{background:var(--warm)!important}
-.vista.st-savant .v-dring .d1{stroke:var(--warm)!important}
-.vista.st-savant .v-dock{background:transparent!important;border-color:transparent!important;border-top:1px solid var(--line)!important;border-radius:0!important}
-.vista.st-savant .v-dock button,.vista.st-savant .v-nav button{text-transform:uppercase;letter-spacing:.18em;font-size:9.5px!important}
-.vista.st-savant .v-dock button.on{background:transparent!important;color:var(--warm)}
+.vista.st-savant.has-bg::before{filter:brightness(.35) saturate(.7)}
+.vista.st-savant :is(.v-card,.v-kpi,.v-room,.v-tile,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-player,.v-mtile){background:var(--card)!important;border:1px solid var(--line)!important;border-radius:4px!important;box-shadow:none!important}
+.vista.st-savant :is(.v-chip,.v-sq){background:transparent!important;border:1px solid var(--line)!important;border-radius:999px!important}
+.vista.st-savant h3{margin:28px 4px 12px;font-weight:400;letter-spacing:.34em;font-size:10px;color:var(--muted);text-transform:uppercase}
+.vista.st-savant :is(.v-when b,.v-dmid b,.v-kpi .v,.v-clock b,.v-clim .v-cset b){font-weight:200!important;letter-spacing:.02em}
+.vista.st-savant .v-when b{font-size:40px!important}
+.vista.st-savant :is(.v-tile b,.v-room b,.v-scene,.v-btn .v-tx b,.v-mbot .v-tx b){font-weight:300;letter-spacing:.08em}
+.vista.st-savant .v-tx span{letter-spacing:.06em;color:var(--muted)}
+.vista.st-savant .v-bic{background:transparent!important;border:1px solid var(--line);border-radius:50%!important;color:var(--fg)!important}
+.vista.st-savant svg.i{stroke-width:1.3}
+/* activo: champagne, sin rellenos */
+.vista.st-savant :is(.v-btn.on,.v-tile.on,.v-room.on,.v-mtile.on,.v-scene.on){border-color:rgba(200,168,106,.55)!important}
+.vista.st-savant :is(.v-btn.on,.v-tile.on,.v-room.on,.v-mtile.on) :is(.v-bic,.v-tic,.v-mbot>svg.i){color:var(--warm)!important;border-color:rgba(200,168,106,.55)}
+.vista.st-savant :is(.v-msw.on,.v-pw.on){background:var(--warm)!important}
+.vista.st-savant .v-dring .d1{stroke:var(--warm)!important}.vista.st-savant .v-dring .d0{stroke:#1d1d1d}
+/* ambientes grandes, con el nombre en mayúsculas */
+.vista.st-savant .v-tiles.photo .v-tile{min-height:160px;background:linear-gradient(180deg,#181818,#090909)!important}
+.vista.st-savant .v-tiles.photo .v-tile b{text-transform:uppercase;letter-spacing:.24em;font-size:12.5px;font-weight:400}
+.vista.st-savant .v-tiles.photo .v-tile.lit{background:radial-gradient(90% 80% at 50% 0%,rgba(200,168,106,.2),transparent 70%),linear-gradient(180deg,#181818,#090909)!important;border-color:rgba(200,168,106,.4)!important}
+.vista.st-savant .v-tiles.photo .v-tic svg.i{stroke-width:1;color:var(--warm)}
+.vista.st-savant .v-chp{background:transparent!important;border:1px solid var(--line)!important;border-radius:999px!important;text-transform:uppercase;letter-spacing:.18em;font-size:10.5px;font-weight:400}
+.vista.st-savant .v-modes button{background:transparent!important;border:1px solid var(--line);border-radius:999px!important;letter-spacing:.1em}
+.vista.st-savant .v-modes button.on{border-color:var(--warm);color:var(--warm)!important;background:transparent!important}
+.vista.st-savant .v-sart{border-radius:2px;filter:saturate(.6)}
+/* pestañas de texto, la elegida con subrayado champagne */
+.vista.st-savant .v-nav{background:#000!important;border-top:1px solid var(--line)!important}
+.vista.st-savant :is(.v-nav,.v-dock) button{text-transform:uppercase;letter-spacing:.2em;font-size:9px!important;color:#7a766d}
+.vista.st-savant :is(.v-nav,.v-dock) button.on{color:var(--warm)!important;background:transparent!important;box-shadow:inset 0 -1px 0 var(--warm)}
+.vista.st-savant :is(.v-nav,.v-dock) .v-mic{background:transparent!important;color:var(--warm)!important;border:1px solid var(--warm);box-shadow:none}
+.vista.st-savant .v-dock{background:transparent!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important}
+.vista.st-savant :is(.v-sin,.v-min){background:#0b0b0b!important;border:1px solid var(--line)!important;border-radius:4px!important}
 .vista.st-savant.k-tablet .v-c0{max-width:52%}
+.vista.st-savant.light{--bg:#f6f4ef;--card:#fff;--card2:#f0ede5;--line:rgba(0,0,0,.08);--fg:#151410;--muted:#7b766b;--off:#dad4c7;--warm:#a5843f;--warm-s:rgba(165,132,63,.14)}
+.vista.st-savant.light:not(.has-bg){background:#f6f4ef}
+.vista.st-savant.light .v-nav{background:#f6f4ef!important}
+
+/* ═════════ TIPO APPLE — como la app Inicio del iPhone ═════════
+   El fondo de pantalla desenfocado (una sola vez), mosaicos translúcidos; los encendidos en blanco con el ícono en color;
+   títulos grandes en negrita, botones de estado arriba, acento naranja y la barra de pestañas de iOS. */
+.vista.st-apple{--f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue",system-ui,sans-serif;--f-mono:var(--f-display);
+  --bg:#1b1d22;--card:rgba(30,30,32,.55);--card2:rgba(60,60,64,.6);--line:rgba(255,255,255,.06);--fg:#fff;--muted:rgba(235,235,245,.6);--off:rgba(120,120,128,.36);
+  --warm:#ff9f0a;--warm-s:rgba(255,159,10,.18);--cool:#64d2ff;--cool-s:rgba(100,210,255,.16);--green:#30d158;--red:#ff453a;--red-s:rgba(255,69,58,.16);
+  --v-env:radial-gradient(90% 70% at 20% 10%,#c96f4a 0,transparent 60%),radial-gradient(90% 70% at 90% 40%,#4a6fa5 0,transparent 60%),radial-gradient(90% 80% at 40% 100%,#2f5d50 0,transparent 60%),#1b1d22;
+  background:transparent!important;isolation:isolate;letter-spacing:-.012em;-webkit-font-smoothing:antialiased}
+.vista.st-apple::before{content:"";position:fixed;inset:-56px;z-index:-1;pointer-events:none;background:var(--v-env);filter:blur(30px) saturate(1.3) brightness(.62)}
+.vista.st-apple.has-bg::before{background:var(--v-bgx);background-size:cover;background-position:center}
+.vista.st-apple :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile){background:var(--card)!important;border:0!important;border-radius:20px!important;box-shadow:none!important}
+.vista.st-apple :is(.v-chip,.v-sq){background:var(--card)!important;border:0!important;border-radius:999px!important}
+.vista.st-apple h3{margin:26px 4px 10px;text-transform:none;letter-spacing:-.02em;font-size:22px;font-weight:700;color:var(--fg)}
+.vista.st-apple .v-card h3{font-size:17px;margin:0 0 10px}
+.vista.st-apple .v-when b{font-weight:700;letter-spacing:-.03em;font-size:34px}
+.vista.st-apple .v-tx span{color:var(--muted)}
+.vista.st-apple .v-bic{background:rgba(120,120,128,.32)!important;color:#fff!important;border-radius:50%!important}
+/* encendido: mosaico blanco, el ícono en color (amarillo las luces) */
+.vista.st-apple :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on){background:rgba(255,255,255,.94)!important;color:#000!important}
+.vista.st-apple :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on) .v-tx span{color:rgba(60,60,67,.6)!important}
+.vista.st-apple :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on) :is(.v-bic,.v-tic,.v-mbot>svg.i){background:#ffd60a!important;color:#000!important}
+.vista.st-apple :is(.v-msw.on,.v-pw.on){background:var(--green)!important}
+/* botones de estado arriba (Clima, Luces, Seguridad…) */
+.vista.st-apple .v-kpi{border-radius:16px!important;padding:12px 14px!important}
+.vista.st-apple .v-kpi .l{font-size:13px;font-weight:600;color:var(--fg)}.vista.st-apple .v-kpi .v{font-size:15px;font-weight:500;color:var(--muted);margin-top:2px}
+.vista.st-apple .v-chp{background:var(--card)!important;border:0!important;font-weight:600}
+.vista.st-apple .v-modes button{background:var(--card2)!important;border-radius:12px!important}.vista.st-apple .v-modes button.on{background:#fff!important;color:#000!important}
+.vista.st-apple .v-dring .d1{stroke:var(--warm)!important}
+/* barra de pestañas de iOS */
+.vista.st-apple .v-nav{background:rgba(22,22,24,.82)!important;border-top:.5px solid rgba(255,255,255,.12)!important}
+.vista.st-apple :is(.v-nav,.v-dock) button{color:rgba(235,235,245,.55)}
+.vista.st-apple :is(.v-nav,.v-dock) button.on{color:var(--warm)!important;background:transparent!important}
+.vista.st-apple :is(.v-nav,.v-dock) .v-mic{background:var(--warm)!important;color:#fff!important}
+.vista.st-apple .v-dock{background:rgba(22,22,24,.7)!important;border:0!important;border-radius:24px!important}
+.vista.st-apple :is(.v-sin,.v-min){background:rgba(30,30,32,.94)!important;border:0!important;border-radius:14px!important}
+.vista.st-apple.embed{background:transparent!important}.vista.st-apple.embed::before{display:none}
+.vista.st-apple.light{--card:rgba(255,255,255,.62);--card2:rgba(255,255,255,.8);--fg:#000;--muted:rgba(60,60,67,.6);--off:rgba(120,120,128,.2)}
+.vista.st-apple.light::before{filter:blur(30px) saturate(1.2) brightness(1.15)}
+.vista.st-apple.light .v-nav{background:rgba(249,249,249,.88)!important}.vista.st-apple.light .v-bic{color:#000!important;background:rgba(120,120,128,.16)!important}
+
+/* ═════════ CRISTAL — vidrio de colores (estilo propio) ═════════
+   Fondo de color desenfocado (una sola vez), burbujas de vidrio con brillo arriba, letra redondeada. */
+.vista.st-cristal{--f-display:ui-rounded,"SF Pro Rounded","Nunito","Varela Round",system-ui,sans-serif;
+  --bg:#0f1419;--card:rgba(255,255,255,.11);--card2:rgba(255,255,255,.17);--line:rgba(255,255,255,.16);--fg:#fff;--muted:rgba(255,255,255,.68);--off:rgba(255,255,255,.22);
+  --warm:#ffc777;--warm-s:rgba(255,199,119,.22);--cool:#8fd3ff;--cool-s:rgba(143,211,255,.2);--green:#8cf0b6;--red:#ff9a8a;--red-s:rgba(255,154,138,.2);
+  --v-env:radial-gradient(90% 70% at 15% 10%,#2f6d96 0,transparent 60%),radial-gradient(80% 70% at 90% 30%,#6a4fa0 0,transparent 60%),radial-gradient(90% 80% at 50% 100%,#1f8573 0,transparent 60%),#0f1419;
+  background:transparent!important;isolation:isolate}
+.vista.st-cristal::before{content:"";position:fixed;inset:-56px;z-index:-1;pointer-events:none;background:var(--v-env);filter:blur(26px) saturate(1.3)}
+.vista.st-cristal.has-bg::before{background:var(--v-bgx);background-size:cover;background-position:center}
+.vista.st-cristal :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dock,.v-nav){background:var(--card)!important;border:0!important;border-radius:28px!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.28),inset 0 0 0 1px rgba(255,255,255,.08),0 10px 30px rgba(0,0,0,.2)!important}
+.vista.st-cristal :is(.v-chip,.v-sq){background:var(--card)!important;border:0!important;border-radius:999px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.28)!important}
+.vista.st-cristal h3{margin:24px 6px 10px;letter-spacing:.04em;font-size:13px;font-weight:700;color:var(--muted)}
+.vista.st-cristal .v-bic{background:rgba(255,255,255,.16)!important;border-radius:50%!important}
+.vista.st-cristal :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on){background:linear-gradient(160deg,rgba(255,214,150,.5),rgba(255,170,90,.32))!important}
+.vista.st-cristal :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on) :is(.v-bic,.v-tic){color:#fff!important;background:rgba(255,255,255,.28)!important}
+.vista.st-cristal :is(.v-msw.on,.v-pw.on){background:var(--warm)!important}
+.vista.st-cristal .v-nav{margin:0 14px calc(max(env(safe-area-inset-bottom,0px),var(--sb,0px)) + 10px);border-radius:999px!important}
+.vista.st-cristal :is(.v-sin,.v-min){background:rgba(24,34,48,.9)!important;border-radius:24px!important}
+.vista.st-cristal.embed{background:transparent!important}.vista.st-cristal.embed::before{display:none}
+.vista.st-cristal.light{--card:rgba(255,255,255,.55);--card2:rgba(255,255,255,.72);--line:rgba(255,255,255,.75);--fg:#14202e;--muted:rgba(20,32,46,.62);--off:rgba(20,32,46,.18);
+  --warm:#c9781a;--warm-s:rgba(201,120,26,.16);--cool:#1f7fc0;--cool-s:rgba(31,127,192,.14);--green:#23915a;--red:#d24b40;--red-s:rgba(210,75,64,.14)}
+.vista.st-cristal.light::before{filter:blur(26px) saturate(1.1) brightness(1.4)}
 
 /* ═════════ diseño v2 (editor 2026-11): columnas con ancho, bandas de lado a lado y tarjetas por cuartos ═════════ */
 .v-row4{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;align-items:start}

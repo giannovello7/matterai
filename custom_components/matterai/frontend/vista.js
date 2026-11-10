@@ -173,11 +173,11 @@
   /* estilos prearmados del diseño y degradés de fondo (el editor los ofrece; el servidor valida las mismas claves) */
   const STYLE_LIST = [
     ['matterai', 'MatterAI', 'Grafito y acento cálido, letra Red Hat'],
-    ['apple', 'Tipo Apple', 'Tarjetas redondeadas sin bordes, letra del sistema, títulos grandes'],
+    ['apple', 'Hogar', 'Fondo desenfocado, mosaicos translúcidos y lo encendido en blanco'],
     ['cristal', 'Cristal', 'Burbujas translúcidas sobre un fondo de color'],
-    ['vision', 'Vision', 'Vidrio esmerilado sobre la casa, números grandes y finos (como Apple Vision Pro)'],
-    ['control4', 'Control4', 'Oscuro con color: tarjetas sólidas, música con tapas y acentos azules'],
-    ['savant', 'Savant', 'Negro elegante y minimalista, títulos finos y acento dorado'],
+    ['vision', 'Vidrio', 'Ventanas de vidrio esmerilado sobre el entorno y la barra flotando'],
+    ['control4', 'Panel', 'Panel táctil oscuro: íconos grandes, acento celeste y barra de lado a lado'],
+    ['savant', 'Elegante', 'Negro y champagne, minimalista, letra fina espaciada'],
   ];
   const STYLES = STYLE_LIST.map((x) => x[0]);
   const GRAD_LIST = [
@@ -195,9 +195,9 @@
      (las tarjetas en automático eligen los equipos, ambientes, escenas y cámaras que haya). */
   const TEMPLATE_LIST = [
     ['matterai', 'MatterAI', 'La de siempre: plano, resumen, escenas, cámara y ambientes'],
-    ['vision', 'Vision', 'Vidrio sobre la casa: termostato grande, clima, luces y ambientes'],
-    ['control4', 'Control4', 'Oscuro con color: accesos por tema, música con tapas, cámaras y aire'],
-    ['savant', 'Savant', 'Negro y dorado, minimalista: ambientes grandes, escenas, aire y seguridad'],
+    ['vision', 'Vidrio', 'Ventanas de vidrio: termostato grande, clima, luces y ambientes'],
+    ['control4', 'Panel', 'Panel táctil oscuro: accesos por tema, música, cámaras y aire'],
+    ['savant', 'Elegante', 'Negro y champagne, minimalista: ambientes grandes, escenas, aire y seguridad'],
   ];
   function template(k, kind, m, legacy, S, floorplan) {
     const base = defaults(kind, m, legacy, S, floorplan);
