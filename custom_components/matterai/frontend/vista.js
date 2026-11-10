@@ -612,13 +612,12 @@
           const extra = (c.items || []).map((it, i) => `<button class="v-cbtn" data-it="${i}"${EL(i)}>${ic(it.icon || defIcon(it.entity))}${esc(it.name || fname(it.entity))}</button>`).join('');
           X.shown[b.id] = c.items || [];
           // video en vivo con el visor de Frigate (se arma aparte y no se corta cuando cambia otra cosa) o foto cada 10 s
-          const video = !!cam && c.video !== 'photo', live = video && !editing() && liveOk(), hls = false; // sin reproductor de reserva: el de Frigate
+          const video = !!cam && c.video !== 'photo', live = video && !editing() && liveOk();
           // en video: el visor de Frigate en el equipo; mientras carga (y en el editor) el video continuo de la cámara
           const photo = !cam ? '<div class="v-feed none"></div>' : video && IOS ? `<img class="v-feed" data-cam="${esc(cam)}" data-fast="1"${EL('cam')} alt="" onerror="this.style.visibility='hidden'" onload="this.style.visibility=''" src="${esc(camSrc(cam))}">`
             : video ? `<img class="v-feed" data-cam="${esc(cam)}" data-stream="1"${EL('cam')} alt="" src="${esc(camStream(cam))}">`
             : `<img class="v-feed" data-cam="${esc(cam)}"${EL('cam')} alt="" src="${esc(camSrc(cam))}">`;
-          const feed = hls ? `<div class="v-feed v-lslot" data-hls="${esc(b.id)}" data-key="${esc(cam)}" data-cam="${esc(cam)}"></div>${list.length > 1 ? `<button class="v-hnav prev" data-camnext="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-camnext="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}<span class="v-hname">${esc(fname(cam))}</span>`
-            : live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>${IOS && list.length > 1 ? `<button class="v-hnav prev" data-camnext="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-camnext="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}` : photo;
+          const feed = live ? `<div class="v-feed v-lslot" data-live="${esc(b.id)}" data-key="${esc(cam)}"></div>` : photo;
           // en video no va ningún cartel encima (como el visor de Frigate original); en modo foto se avisa que es foto
           const badge = !cam || video ? '' : '<span class="v-live photo">FOTO · cada 10 s</span>';
           const gateBtn = g ? `<button class="v-gate ${g.open ? 'open' : ''} ${g.moving ? 'mv' : ''}" data-gate="${esc(gate)}">${ic(g.lock ? 'lock' : 'gate')}${g.btn}</button>` : '';
@@ -626,7 +625,7 @@
             // en video, nada encima de la imagen (como la tarjeta de Frigate original): el visor trae sus flechas y su menú.
             // La tarjeta «Cámaras en vivo (Frigate)» es sólo el visor; la del portero lleva sus botones debajo del video.
             const bar = b.type === 'frigate' ? '' : `${extra}${gateBtn}`;
-            return `${t}<div class="v-cam clean ${live || hls ? 'is-live' : ''}">${feed}${badge}</div>${bar ? `<div class="v-cbar">${bar}</div>` : ''}`;
+            return `${t}<div class="v-cam clean ${live ? 'is-live' : ''}">${feed}${badge}</div>${bar ? `<div class="v-cbar">${bar}</div>` : ''}`;
           }
           return `${t}<div class="v-cam">${feed}${badge}${list.length > 1 ? `<span class="v-dots">${list.map((x, i) => `<b class="${i === ci ? 'on' : ''}"></b>`).join('')}</span>` : ''}
             <span class="v-lbl">${esc(cam ? fname(cam) : (b.title || ''))}</span><span class="v-cact">${list.length > 1 ? `<button class="v-cbtn" data-camnext="1">Otra cámara</button>` : ''}${b.type === 'frigate' ? '' : extra + gateBtn}</span></div>`;
@@ -1001,196 +1000,20 @@
     /** ¿Se puede mostrar video en vivo? (la tarjeta MatterAI sabe armar el visor de Frigate) */
     // en vivo también en iPhone / iPad: la app le saca al visor el modo MJPEG (el que llenaba la memoria y hacía que iOS
     // cerrara la página) y usa WebRTC o MSE. Mientras carga el visor, o si no está, fotos seguidas.
-    // la caja negra (diag.js) lo apaga si la vez anterior la app se cerró sola con una cámara en vivo
-    const camSafe = () => { const d = typeof globalThis !== 'undefined' && globalThis.MaeDiag; return !!(d && d.camSafe()); };
-    const diag = (t) => { const d = typeof globalThis !== 'undefined' && globalThis.MaeDiag; if (d) d.add(t); };
-    function liveOk() { const c = card(); return !camSafe() && !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
-    /* iPhone / iPad: el video en vivo como lo hace la app de Home Assistant cuando no hay WebRTC: Home Assistant arma el
-       video HLS de la cámara (camera/stream) y lo pasa el reproductor de Apple, en un <video> común. Un solo video a la vez.
-       (El reproductor de go2rtc del visor de cámaras hace que iOS cierre la página: ver ios-video.js y diag.js.) */
-    function hlsOk() { const h = hass(); return IOS && !camSafe() && !!(h && h.callWS); }
-    X.camNo = {}; // cámaras sin video en vivo (ni WebRTC ni HLS): sólo esas muestran foto
-    X.hls = {};
-    /* Igual que la versión web de Home Assistant (ha-camera-stream + ha-web-rtc-player):
-       1. camera/capabilities → qué da la cámara (web_rtc, hls).
-       2. WebRTC: camera/webrtc/get_client_config → RTCPeerConnection(configuration), canal de datos si lo pide,
-          audio y video «recvonly»; al negociar, la oferta va por camera/webrtc/offer (suscripción): llegan session,
-          answer, candidate y error; los candidatos propios van por camera/webrtc/candidate con el session_id.
-       3. Si no hay WebRTC: HLS (camera/stream) con el reproductor de Apple. 4. Si no hay ninguno: foto.
-       Siempre adentro de un <video> común, en silencio y adentro de la app (playsinline). */
-    function startHls(key) {
-      const v = document.createElement('video');
-      v.className = 'v-feed v-hls'; v.muted = true; v.autoplay = true; v.playsInline = true;
-      v.setAttribute('playsinline', ''); v.setAttribute('muted', ''); v.setAttribute('autoplay', '');
-      v.dataset.camv = key;
-      const pic = camSrc(key); if (pic) v.poster = pic;
-      const box = document.createElement('div'); box.className = 'v-hbox'; box.appendChild(v);
-      const msg = document.createElement('span'); msg.className = 'v-hmsg'; msg.textContent = 'Conectando…'; box.appendChild(msg);
-      const Hh = { el: box, video: v, key, dead: false, pc: null, unsub: null, sid: null, queue: [], stream: null };
-      const h = hass(), conn = h && h.connection;
-      // cómo se acomoda: lo que diga la config de esa cámara (como en Android: dimensions.layout.fit); si no dice,
-      // las imágenes «comprimidas a lo ancho» (1080P Lite, 960x1080) se estiran a 16:9 y las normales llenan el recuadro
-      const camCfg = (((card() || {})._config || {}).camera_card || {}).cameras || [];
-      const cc = camCfg.find((x) => x && x.camera_entity === key) || {};
-      const fitCfg = ((cc.dimensions || {}).layout || {}).fit;
-      const applyFit = () => {
-        const w = v.videoWidth, hh = v.videoHeight;
-        const fill = fitCfg ? fitCfg === 'fill' : !!(w && hh && w / hh < 1.3);
-        box.classList.toggle('stretch', fill);
-      };
-      if (fitCfg) applyFit();
-      v.addEventListener('loadedmetadata', applyFit);
-      v.addEventListener('resize', applyFit);
-      const done = (how) => { if (Hh.dead || Hh.ok) return; Hh.ok = true; clearTimeout(Hh.t); msg.textContent = ''; box.classList.add('ok'); applyFit(); diag(`video ${how}: ${fname(key)} ${v.videoWidth}x${v.videoHeight}`); };
-      const nothing = (why) => {
-        if (Hh.dead || Hh.ok) return;
-        clearTimeout(Hh.t);
-        X.camNo[key] = true;
-        msg.textContent = 'No se pudo conectar con esta cámara';
-        box.classList.add('fail');
-        diag(`sin video en vivo para ${fname(key)} (${why})`);
-      };
-      // como Home Assistant: si una forma no da imagen, la otra. WebRTC 10 s → HLS 15 s → aviso (nunca «Conectando…» para siempre)
-      const watch = (secs, next) => { clearTimeout(Hh.t); Hh.t = setTimeout(() => { if (!Hh.dead && !Hh.ok) next(); }, secs * 1000); };
-      v.addEventListener('loadeddata', () => done(Hh.pc ? 'WebRTC' : 'HLS'));
-      const hls = () => {
-        if (Hh.dead || Hh.triedHls) return Promise.reject(new Error('ya probado'));
-        Hh.triedHls = true;
-        watch(15, () => nothing('HLS sin imagen en 15 s'));
-        return Promise.resolve(h.callWS({ type: 'camera/stream', entity_id: key, format: 'hls' })).then((r) => {
-          if (Hh.dead || !r || !r.url) { if (!Hh.dead) nothing('sin dirección HLS'); return; }
-          v.src = url(r.url); const p = v.play(); if (p && p.catch) p.catch(() => {});
-        });
-      };
-      const webrtc = () => Promise.resolve(h.callWS({ type: 'camera/webrtc/get_client_config', entity_id: key })).then((cfg) => {
-        if (Hh.dead) return;
-        watch(10, () => { diag(`WebRTC sin imagen en 10 s para ${fname(key)} → probando HLS`); stopRtc(Hh); try { v.srcObject = null; } catch (_) { /* ya */ } hls().catch((e) => nothing(e && (e.message || e.code))); });
-        const pc = Hh.pc = new RTCPeerConnection((cfg && cfg.configuration) || {});
-        if (cfg && cfg.dataChannel) pc.createDataChannel(cfg.dataChannel);
-        Hh.stream = new MediaStream();
-        pc.ontrack = (e) => { if (Hh.dead || e.track.kind === 'audio') return; Hh.stream.addTrack(e.track); v.srcObject = Hh.stream; const p = v.play(); if (p && p.catch) p.catch(() => {}); };
-        pc.onicecandidate = (e) => {
-          if (Hh.dead || !e.candidate || !e.candidate.candidate) return;
-          if (Hh.sid) h.callWS({ type: 'camera/webrtc/candidate', entity_id: key, session_id: Hh.sid, candidate: e.candidate.toJSON() }).catch(() => {});
-          else Hh.queue.push(e.candidate);
-        };
-        pc.oniceconnectionstatechange = () => { if (!Hh.dead && pc.iceConnectionState === 'failed' && pc.restartIce) pc.restartIce(); };
-        pc.addTransceiver('audio', { direction: 'recvonly' });
-        pc.addTransceiver('video', { direction: 'recvonly' });
-        pc.onnegotiationneeded = async () => {
-          try {
-            const offer = await pc.createOffer({ offerToReceiveAudio: true, offerToReceiveVideo: true });
-            if (Hh.dead || Hh.pc !== pc) return;
-            await pc.setLocalDescription(offer);
-            if (Hh.dead || Hh.pc !== pc) return;
-            let sdp = offer.sdp; while (Hh.queue.length) { const c = Hh.queue.pop(); if (c) sdp += `a=${c.candidate}\r\n`; }
-            Hh.unsub = conn.subscribeMessage(async (ev) => {
-              if (Hh.dead || Hh.pc !== pc || !ev) return;
-              if (ev.type === 'session') {
-                Hh.sid = ev.session_id;
-                Hh.queue.splice(0).forEach((c) => h.callWS({ type: 'camera/webrtc/candidate', entity_id: key, session_id: Hh.sid, candidate: c.toJSON() }).catch(() => {}));
-              } else if (ev.type === 'answer') {
-                if (['stable', 'closed'].includes(pc.signalingState)) return;
-                try { await pc.setRemoteDescription({ type: 'answer', sdp: ev.answer }); } catch (e) { diag(`WebRTC: no aceptó la respuesta (${e && e.message})`); }
-              } else if (ev.type === 'candidate') {
-                const c = ev.candidate || {};
-                try { await pc.addIceCandidate(c.sdpMid || c.sdpMLineIndex != null ? c : { candidate: c.candidate, sdpMid: '0' }); } catch (_) { /* como HA: se ignora */ }
-              } else if (ev.type === 'error') {
-                diag(`WebRTC: ${ev.message || ev.code || 'error'} → probando HLS`);
-                stopRtc(Hh); hls().catch((e) => nothing(e && (e.message || e.code)));
-              }
-            }, { type: 'camera/webrtc/offer', entity_id: key, offer: sdp });
-            Hh.unsub.catch((e) => { if (!Hh.dead) { diag(`WebRTC no arrancó (${e && (e.message || e.code)}) → probando HLS`); stopRtc(Hh); hls().catch((e2) => nothing(e2 && (e2.message || e2.code))); } });
-          } catch (e) { if (!Hh.dead) { stopRtc(Hh); hls().catch((e2) => nothing(e2 && (e2.message || e2.code))); } }
-        };
-      });
-      Promise.resolve(h.callWS({ type: 'camera/capabilities', entity_id: key })).then((cap) => {
-        if (Hh.dead) return null;
-        const t = (cap && cap.frontend_stream_types) || [];
-        diag(`cámara ${fname(key)}: ${t.join(', ') || 'sin video en vivo'}`);
-        if (t.includes('web_rtc') && typeof RTCPeerConnection !== 'undefined' && conn && conn.subscribeMessage) {
-          return webrtc().catch((e) => { diag(`WebRTC no arrancó (${e && (e.message || e.code)})`); stopRtc(Hh); return t.includes('hls') ? hls() : nothing('sin WebRTC'); });
-        }
-        if (t.includes('hls')) return hls();
-        nothing('Home Assistant no le da video');
-        return null;
-      }).catch((e) => nothing(e && (e.message || e.code)));
-      return Hh;
-    }
-    function stopRtc(Hh) {
-      if (Hh.stream) { Hh.stream.getTracks().forEach((t) => { try { t.stop(); } catch (_) { /* ya */ } }); Hh.stream = null; }
-      const pc = Hh.pc; Hh.pc = null;
-      if (pc) { try { pc.close(); } catch (_) { /* ya */ } pc.ontrack = pc.onicecandidate = pc.oniceconnectionstatechange = pc.onnegotiationneeded = null; }
-      if (Hh.unsub) { Hh.unsub.then((u) => u(), () => undefined); Hh.unsub = null; }
-      Hh.sid = null; Hh.queue = [];
-    }
-    function stopHls(Hh) {
-      if (!Hh) return;
-      Hh.dead = true;
-      clearTimeout(Hh.t);
-      stopRtc(Hh);
-      try { Hh.video.pause(); Hh.video.srcObject = null; Hh.video.removeAttribute('src'); Hh.video.load(); } catch (_) { /* ya estaba parado */ }
-      if (Hh.el.parentNode) Hh.el.parentNode.removeChild(Hh.el);
-    }
-    function stopAllHls() { Object.keys(X.hls).forEach((k) => { stopHls(X.hls[k]); delete X.hls[k]; }); }
-    function mountHls() {
-      if (!X.el.querySelectorAll) return;
-      if (X.hlsPause || X.el.hidden) { stopAllHls(); return; }
-      const seen = new Set();
-      X.el.querySelectorAll('[data-hls]').forEach((slot) => {
-        const id = slot.dataset.hls, key = slot.dataset.key; seen.add(id);
-        let Hh = X.hls[id];
-        if (!Hh || Hh.key !== key) { stopHls(Hh); Hh = X.hls[id] = startHls(key); }
-        if (Hh.el.parentNode !== slot) { slot.innerHTML = ''; slot.appendChild(Hh.el); }
-      });
-      Object.keys(X.hls).forEach((id) => { if (!seen.has(id)) { stopHls(X.hls[id]); delete X.hls[id]; } });
-    }
-    /* Pantalla completa (al tocar la cámara o «Cámaras» abajo): un video, flechas para cambiar y ✕. */
-    function openHlsFull(id, list) {
-      closeHlsFull(true);
-      const cams = (list && list.length ? list : (M() || {}).cams || []).filter((x) => st(x));
-      if (!cams.length) return;
-      let i = Math.max(0, cams.indexOf(id));
-      X.hlsPause = true; stopAllHls(); // la de la tarjeta se para mientras tanto: siempre un solo video
-      const box = document.createElement('div');
-      box.className = 'v-hfull';
-      box.innerHTML = `<div class="v-hfv"></div><div class="v-hft"><b></b><button data-hx aria-label="Cerrar">${ic('x')}</button></div>`
-        + `${cams.length > 1 ? `<button class="v-hnav prev" data-hp="-1" aria-label="Cámara anterior">${ic('chev')}</button><button class="v-hnav next" data-hp="1" aria-label="Cámara siguiente">${ic('chev')}</button>` : ''}`;
-      const show = () => {
-        stopHls(X.hfull);
-        const Hh = X.hfull = startHls(cams[i]); Hh.full = true;
-        box.querySelector('.v-hfv').appendChild(Hh.el);
-        box.querySelector('.v-hft b').textContent = fname(cams[i]);
-      };
-      box.addEventListener('click', (e) => {
-        const t = e.target;
-        if (t.closest && t.closest('[data-hx]')) { closeHlsFull(); return; }
-        const p = t.closest && t.closest('[data-hp]');
-        if (p) { i = (i + Number(p.dataset.hp) + cams.length) % cams.length; vib(); show(); }
-      });
-      (document.body || X.el).appendChild(box);
-      X.hfullBox = box;
-      show();
-    }
-    function closeHlsFull(quiet) {
-      stopHls(X.hfull); X.hfull = null;
-      if (X.hfullBox) { X.hfullBox.remove(); X.hfullBox = null; }
-      if (X.hlsPause) { X.hlsPause = false; if (!quiet) render(); }
-    }
+    // el visor de Frigate (como en Home Assistant); se pausa mientras está abierta la ventana de cámaras (un solo visor)
+    function liveOk() { const c = card(); return !X.livePaused && !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
     /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
     function mountLive() {
       if (!X.el.querySelectorAll || editing()) return;
+      if (X.livePaused) { Object.keys(X.live).forEach((id) => { const e = X.live[id].el; if (e && e.parentNode) e.parentNode.removeChild(e); }); X.live = {}; return; }
       const seen = new Set();
       X.el.querySelectorAll('[data-live]').forEach((slot) => {
         const id = slot.dataset.live, key = slot.dataset.key; seen.add(id);
         let L = X.live[id];
         if (!L || L.key !== key) {
-          // iPhone / iPad: el visor con una sola cámara (con todas, arranca las 6 de golpe y iOS cierra la página);
-          // se cambia con las flechas de la tarjeta, y la anterior se corta al salir (un solo video a la vez)
-          const ids = IOS ? [key] : [key].concat((X.camList[id] || []).filter((x) => x !== key));
+          const ids = [key].concat((X.camList[id] || []).filter((x) => x !== key));
           const elx = card().liveCam(ids);
-          if (!elx) { diag('visor: esperando que cargue el visor de cámaras'); waitLive(); return; }
-          diag(`visor: armado en el inicio con ${ids.length} cámara${ids.length > 1 ? 's' : ''}`);
+          if (!elx) { waitLive(); return; }
           L = X.live[id] = { el: elx, key };
         }
         L.el.hass = hass();
@@ -1229,7 +1052,7 @@
         const sigE = `embed|${editing()}|${light}|${st}`;
         if (X.shell !== sigE) { X.shell = sigE; X.cache = {}; X.colSig = {}; X.partCache = {}; X.el.className = `vista embed k-phone${editing() ? ' editing' : ''}${light ? ' light' : ''} st-${st}`; X.el.innerHTML = `<div class="v-col v-embed" id="v-c1" data-zone="room-${ctx.embed}"></div>`; }
         setCol('#v-c1', L.blocks || [], m, editing() ? addSlot(0, `room-${ctx.embed}`) : '');
-        mountLive(); mountHls();
+        mountLive();
         return;
       }
       const cols = K === 'tablet' ? (Array.isArray(L.cols) && L.cols.length ? L.cols.slice(0, 4) : [0, 1, 1]) : [1];
@@ -1275,7 +1098,7 @@
       if (editing() && ctx.edit.room) { if (X.sheet !== 'roomedit') openSheet('roomedit'); }
       else if (X.sheet === 'roomedit') closeSheet();
       if (X.sheet) renderSheet();
-      mountLive(); mountHls();
+      mountLive();
       editMarks();
       spreadPins();
       refreshXtra();
@@ -1789,7 +1612,6 @@
     X.camT = setInterval(refreshCam, 10000);
     // las fotos seguidas de iOS: cada 2 s, sólo si la anterior ya cargó (no se apilan pedidos)
     if (IOS) X.fastT = setInterval(() => {
-      if (X.el && X.el.hidden && Object.keys(X.hls).length) stopAllHls();
       if (!X.el || X.el.hidden || (typeof document !== 'undefined' && document.hidden)) return;
       X.el.querySelectorAll('img[data-fast]').forEach((im) => {
         if (!im.complete) return;
@@ -1807,9 +1629,9 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
-      /** Sin reproductor de reserva: las cámaras siempre en el visor de Frigate (la app no abre otro). */
-      openCams() { return false; },
-      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); stopAllHls(); closeHlsFull(true); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
+      /** Un solo visor a la vez: mientras la app muestra el visor grande, el del inicio se saca (y vuelve al cerrarlo). */
+      pauseLive(on) { if (!!X.livePaused === !!on) return; X.livePaused = !!on; X.cache = {}; X.partCache = {}; render(); },
+      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };
   }
