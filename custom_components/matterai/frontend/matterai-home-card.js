@@ -2800,6 +2800,12 @@
       if (!SR || MatterAIHomeCard.iosNoSpeech((window.navigator || {}).userAgent || '', (window.navigator || {}).maxTouchPoints || 0)) return null;
       return SR;
     }
+    static iosWeb() {
+      if (typeof window === 'undefined' || !window.navigator) return false;
+      const ua = window.navigator.userAgent || '', ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && window.navigator.maxTouchPoints > 1);
+      const native = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+      return ios && !native;
+    }
     /** En iPhone/iPad sólo Safari escucha de verdad: Chrome, Firefox, Edge y las apps (la de HA) lo muestran pero no devuelven nada. */
     static iosNoSpeech(ua, touch) {
       const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && touch > 1);
@@ -2844,7 +2850,7 @@
           return;
         }
         // el reconocimiento del celular falló por algo que no es el permiso: se graba y lo transcribe la casa
-        if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed' && e.error !== 'no-speech' && e.error !== 'aborted' && this._canRecord()) {
+        if (e.error !== 'not-allowed' && e.error !== 'service-not-allowed' && e.error !== 'no-speech' && e.error !== 'aborted' && this._canRecord() && !this._isNative()) {
           clearTimeout(this._voWD); this._vo = null; this._recStart(); return;
         }
         vo.state = 'error'; vo.why = e.message ? `(${e.error}: ${e.message})` : '';
@@ -2859,8 +2865,8 @@
       this._voWD = setTimeout(() => { // escucha "muda" (pasa en algunos navegadores): se graba y transcribe la casa
         if (this._vo === vo && vo.state === 'listening' && !vo.text) {
           try { rec.abort(); } catch (_) { /* ya terminó */ }
-          if (this._canRecord()) { this._vo = null; this._recStart(); return; }
-          this._voiceFail('No te pude escuchar desde acá.', this._micBlockedWhy());
+          if (this._canRecord() && !this._isNative()) { this._vo = null; this._recStart(); return; }
+          this._voiceFail('No te pude escuchar desde acá.', this._isNative() ? 'Probá de nuevo en un momento.' : this._micBlockedWhy());
         }
       }, 7000);
       try { rec.start(); } catch (_) { vo.state = 'error'; vo.say = 'No pude usar el micrófono.'; this._voiceRender(); }
@@ -3000,6 +3006,9 @@
     _voiceSpeak(text, done) {
       const synth = typeof window !== 'undefined' && window.speechSynthesis;
       if (!synth || !text || this._config.voice_reply === false) { done && done(); return; }
+      // iPhone / iPad en el navegador: después de hablar en voz alta, el micrófono de la vez siguiente queda mudo
+      // («no escuché nada» hasta cerrar la app). Ahí la respuesta queda en pantalla. (La app nativa de iPhone usará la voz de Apple.)
+      if (MatterAIHomeCard.iosWeb() && this._config.voice_reply !== true) { done && done(); return; }
       try {
         const u = new SpeechSynthesisUtterance(text);
         const voices = synth.getVoices() || [];
