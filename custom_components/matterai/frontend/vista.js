@@ -1052,7 +1052,14 @@
       const light = th === 'light' || (th === 'auto' && typeof matchMedia === 'function' && matchMedia('(prefers-color-scheme: light)').matches);
       if (typeof document !== 'undefined' && document.documentElement && document.documentElement.classList) document.documentElement.classList.toggle('mae-light', light);
       // estilo prearmado (MatterAI, tipo Apple, cristal) y fondo propio del diseño
-      const st = STYLES.includes(L.style) ? L.style : 'matterai', bgx = bgCSS(L.bg, light);
+      // las tarjetas de adentro de un ambiente usan el estilo del dashboard (el que avisó la pantalla principal)
+      const parentLook = ctx.embed && typeof document !== 'undefined' && document.documentElement && document.documentElement.dataset ? document.documentElement.dataset.look : '';
+      const st = ctx.embed && STYLES.includes(parentLook) ? parentLook : STYLES.includes(L.style) ? L.style : 'matterai', bgx = bgCSS(L.bg, light);
+      // el estilo llega a todo: ventanas de la tarjeta (ambientes, paneles, música, actividad) y de la app (equipos, cámaras)
+      if (!ctx.embed && !editing()) {
+        try { if (document.documentElement && document.documentElement.dataset) document.documentElement.dataset.look = st; } catch (_) { /* fuera del navegador */ }
+        const cd = card(); if (cd && cd.setAttribute && (!cd.getAttribute || cd.getAttribute('look') !== st)) cd.setAttribute('look', st);
+      }
       if (ctx.embed) { // las tarjetas de adentro de un ambiente: una columna, sin hora ni barras
         const sigE = `embed|${editing()}|${light}|${st}`;
         if (X.shell !== sigE) { X.shell = sigE; X.cache = {}; X.colSig = {}; X.partCache = {}; X.el.className = `vista embed k-phone${editing() ? ' editing' : ''}${light ? ' light' : ''} st-${st}`; X.el.innerHTML = `<div class="v-col v-embed" id="v-c1" data-zone="room-${ctx.embed}"></div>`; }

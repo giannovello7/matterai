@@ -393,19 +393,6 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-c0:has(.v-plan.sz-xl){max-width:60%}.vert .v-c0:has(.v-plan.sz-xl){max-width:64vw}
 .k-phone .v-plan.sz-s{width:64%;margin:0 auto}.k-phone .v-plan.sz-m{width:82%;margin:0 auto}
 
-/* ───── estilo «Vision» (como Apple Vision Pro): vidrio esmerilado cálido, números grandes y finos, acento lima ───── */
-.vista.st-vision{--f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","Inter","Segoe UI",Roboto,system-ui,sans-serif;--f-mono:var(--f-display);
-  --bg:#6f5847;--card:rgba(255,255,255,.16);--card2:rgba(255,255,255,.24);--line:rgba(255,255,255,.22);--fg:#fff;--muted:rgba(255,255,255,.72);--off:rgba(255,255,255,.28);
-  --warm:#d4f05a;--warm-s:rgba(212,240,90,.22);--cool:#cfe8ff;--cool-s:rgba(207,232,255,.2);--green:#d4f05a;--red:#ffb4a6;--red-s:rgba(255,180,166,.22);letter-spacing:-.01em}
-.vista.st-vision:not(.has-bg){background:radial-gradient(80% 60% at 20% 20%,#a8876a 0,transparent 60%),radial-gradient(70% 60% at 85% 80%,#6f5643 0,transparent 60%),linear-gradient(160deg,#8d735d,#5a4636);background-attachment:fixed}
-.vista.st-vision.light{--card:rgba(255,255,255,.55);--card2:rgba(255,255,255,.7);--line:rgba(255,255,255,.8);--fg:#2a2420;--muted:rgba(42,36,32,.62);--off:rgba(42,36,32,.18);--warm:#7aa316;--warm-s:rgba(122,163,22,.18);--green:#5f8a0e}
-.vista.st-vision.light:not(.has-bg){background:linear-gradient(170deg,#efe7dd,#d9cbbb)}
-.vista.st-vision :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-chip,.v-sq,.v-dock,.v-nav){border-radius:28px!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.28),0 10px 30px rgba(0,0,0,.14)}
-.vista.st-vision :is(.v-chip,.v-sq){border-radius:20px!important}
-.vista.st-vision h3{text-transform:none;letter-spacing:0;font-size:15px;font-weight:600;color:var(--fg)}
-.vista.st-vision .v-when b,.vista.st-vision .v-dmid b,.vista.st-vision .v-kpi .v{font-weight:300}
-.vista.st-vision .v-pw.on{background:var(--warm)!important}
-.vista.st-vision .v-sin,.vista.st-vision .v-min{background:rgba(70,56,46,.94)}.vista.st-vision.light .v-sin,.vista.st-vision.light .v-min{background:rgba(245,240,234,.96)}
 /* ───── estilo «Control4»: oscuro con color de fondo, tarjetas sólidas, acento azul ───── */
 .vista.st-control4{--f-display:"Roboto","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
   --bg:#141522;--card:rgba(32,34,46,.88);--card2:rgba(48,51,66,.92);--line:rgba(255,255,255,.07);--fg:#f2f3f7;--muted:#9aa0b4;--off:#3b3f52;
@@ -429,10 +416,6 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.st-savant .v-when b,.vista.st-savant .v-dmid b,.vista.st-savant .v-kpi .v,.vista.st-savant .v-tile b,.vista.st-savant .v-room b{font-weight:300}
 .vista.st-savant .v-tile{min-height:120px;justify-content:flex-end}
 .vista.st-savant .v-pw.on{background:var(--warm)!important}
-/* el desenfoque real sólo en pantallas con mouse (en celulares y tablets traba el scroll) */
-@media (hover:hover) and (pointer:fine){
-  .vista.st-vision :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-dock,.v-nav){-webkit-backdrop-filter:blur(18px) saturate(130%);backdrop-filter:blur(18px) saturate(130%)}
-}
 
 /* ═════════ piezas nuevas (2.23.3): fila de accesos, mosaicos, portadas, ambientes grandes y modos del aire ═════════ */
 .v-chips{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0}
@@ -467,36 +450,85 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-modes button{display:flex!important;flex-direction:column;align-items:center;gap:5px;padding:10px 4px!important;border-radius:14px;background:var(--card2)!important;font-size:11.5px;color:var(--muted);text-align:center!important}
 .v-modes button svg.i{width:19px;height:19px}.v-modes button.on{background:var(--fg)!important;color:var(--bg)!important}
 
-/* ═════════ VISION (Apple Vision Pro): vidrio claro sobre la casa, barra lateral, columna derecha más clara ═════════ */
-.vista.st-vision{--f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Inter","Segoe UI",Roboto,system-ui,sans-serif;--f-mono:var(--f-display);
-  --bg:#5b5f66;--card:rgba(255,255,255,.17);--card2:rgba(255,255,255,.28);--line:rgba(255,255,255,.26);--fg:#fff;--muted:rgba(255,255,255,.74);--off:rgba(255,255,255,.3);
-  --warm:#ffffff;--warm-s:rgba(255,255,255,.3);--cool:#ffffff;--cool-s:rgba(255,255,255,.2);--green:#e9f5c9;--red:#ffc1b7;--red-s:rgba(255,193,183,.25);letter-spacing:-.005em}
-.vista.st-vision:not(.has-bg){background:radial-gradient(70% 55% at 25% 15%,#c9c7c2 0,transparent 60%),radial-gradient(80% 60% at 80% 85%,#6f6a64 0,transparent 60%),linear-gradient(165deg,#a7a39c,#5f5b56);background-attachment:fixed}
-.vista.st-vision.light{--card:rgba(255,255,255,.5);--card2:rgba(255,255,255,.72);--line:rgba(255,255,255,.85);--fg:#1d1d1f;--muted:rgba(29,29,31,.6);--off:rgba(29,29,31,.2);--warm:#1d1d1f;--warm-s:rgba(29,29,31,.12)}
-.vista.st-vision.light:not(.has-bg){background:linear-gradient(170deg,#ecebe8,#c9c6c0)}
-.vista.st-vision :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-chip,.v-sq,.v-mtile){border-radius:30px!important;border-color:rgba(255,255,255,.22)!important;box-shadow:inset 0 1px 0 rgba(255,255,255,.35),0 12px 34px rgba(0,0,0,.12)!important}
-.vista.st-vision h3{text-transform:none;letter-spacing:0;font-size:15px;font-weight:600;color:var(--fg);margin-left:6px}
-.vista.st-vision .v-kpi{padding:18px!important}.vista.st-vision .v-kpi .l{font-size:13px;color:var(--muted)}.vista.st-vision .v-kpi .v{font-size:26px;font-weight:600;margin-top:8px}
-.vista.st-vision .v-kpi .v.g,.vista.st-vision .v-kpi .v.w,.vista.st-vision .v-kpi .v.c{color:var(--fg)}
-.vista.st-vision .v-when b{font-weight:300;letter-spacing:-.02em}.vista.st-vision .v-dmid b{font-weight:300;font-size:64px}
-.vista.st-vision .v-dring .d1{stroke:#fff!important}.vista.st-vision .v-dring .d0{stroke:rgba(255,255,255,.25)}
-.vista.st-vision .v-chp{background:transparent!important;border-color:transparent!important;font-size:17px;font-weight:500;color:var(--muted);padding:8px 12px!important}
-.vista.st-vision .v-chp:first-child{color:var(--fg);font-weight:600}
-.vista.st-vision .v-mtile{min-height:150px;background:rgba(255,255,255,.2)!important}
-.vista.st-vision .v-mtile.on{background:rgba(255,255,255,.78)!important;color:#1d1d1f}.vista.st-vision .v-mtile.on .v-tx span,.vista.st-vision .v-mtile.on .v-mbot>svg.i{color:rgba(29,29,31,.6)}
-.vista.st-vision .v-mtile.on .v-mdot{background:rgba(29,29,31,.08)}.vista.st-vision .v-msw.on{background:#1d1d1f}
-.vista.st-vision .v-pw.on{background:#fff!important}
-.vista.st-vision .v-modes button{background:rgba(255,255,255,.22)!important;color:var(--fg)}.vista.st-vision .v-modes button.on{background:#fff!important;color:#1d1d1f!important}
-.vista.st-vision .v-sin,.vista.st-vision .v-min{background:rgba(70,70,74,.95)}.vista.st-vision.light .v-sin,.vista.st-vision.light .v-min{background:rgba(246,245,243,.97)}
-/* tablet: barra lateral vertical (como la de visionOS) y la columna derecha en un panel más claro */
-.vista.st-vision.k-tablet .v-tab{padding-left:86px}
-.vista.st-vision.k-tablet .v-dock{position:absolute;left:18px;top:50%;transform:translateY(-50%);flex-direction:column;justify-content:center;width:62px;padding:10px 6px;gap:8px;border-radius:31px;background:rgba(40,40,44,.38)!important;border-color:rgba(255,255,255,.18)!important;z-index:3}
-.vista.st-vision.k-tablet .v-dock button{flex:none;width:48px;height:48px;padding:0!important;border-radius:50%;font-size:0;justify-content:center}
-.vista.st-vision.k-tablet .v-dock button.on{background:rgba(255,255,255,.85)!important;color:#1d1d1f}
-.vista.st-vision.k-tablet .v-dock .v-mic{width:48px!important;height:48px;margin:6px 0 0}
-.vista.st-vision.k-tablet .v-c2{background:rgba(255,255,255,.14);border:1px solid rgba(255,255,255,.2);border-radius:34px;padding:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.3)}
-.vista.st-vision.k-tablet .v-c2 .v-clock{flex-direction:column;align-items:center;text-align:center;gap:4px}.vista.st-vision.k-tablet .v-c2 .v-clock b{font-weight:300}
-.vista.st-vision.k-tablet .v-c2 .v-card{background:rgba(255,255,255,.12)!important}
+/* ═════════ VISION — como Apple Vision Pro (visionOS) ═════════
+   Ventanas de vidrio esmerilado sobre el entorno, letra San Francisco, texto secundario apagado, lo encendido en blanco,
+   interruptores verdes de Apple y la barra de pestañas como «ornamento» flotante (al costado en la tablet, cápsula abajo
+   en el celular). El entorno se desenfoca UNA vez (capa fija): el efecto de vidrio sin desenfocar tarjeta por tarjeta,
+   que traba el scroll en Android. */
+.vista.st-vision{
+  --f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Helvetica Neue","Inter",system-ui,sans-serif;--f-mono:var(--f-display);
+  --bg:#3d4b52;--card:rgba(255,255,255,.10);--card2:rgba(255,255,255,.17);--line:rgba(255,255,255,.14);
+  --fg:#fff;--muted:rgba(255,255,255,.58);--off:rgba(255,255,255,.24);
+  --warm:#fff;--warm-s:rgba(255,255,255,.2);--cool:#fff;--cool-s:rgba(255,255,255,.16);--green:#30d158;--red:#ff6961;--red-s:rgba(255,105,97,.22);
+  --vg:rgba(128,134,146,.30);                                                     /* vidrio de ventana */
+  --vg-hi:inset 0 1px 0 rgba(255,255,255,.30),inset 0 0 0 1px rgba(255,255,255,.09); /* borde de luz */
+  --vg-sh:0 22px 54px rgba(0,0,0,.26);
+  --v-env:linear-gradient(180deg,#9cbcd2 0%,#b6cdd3 26%,#86a39a 52%,#4d6a5b 74%,#2e3f37 100%); /* entorno: cielo, lago y montaña */
+  background:transparent!important;isolation:isolate;letter-spacing:-.012em;-webkit-font-smoothing:antialiased}
+.vista.st-vision::before{content:"";position:fixed;inset:-56px;z-index:-1;pointer-events:none;background:var(--v-env);
+  filter:blur(24px) saturate(1.25) brightness(.9)}
+.vista.st-vision.has-bg::before{background:var(--v-bgx);background-size:cover;background-position:center}
+/* ventanas (cada tarjeta es una ventanita de vidrio) */
+.vista.st-vision :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile){
+  background:var(--vg)!important;border:0!important;border-radius:32px!important;box-shadow:var(--vg-hi),var(--vg-sh)!important}
+.vista.st-vision :is(.v-chip,.v-sq){background:var(--vg)!important;border:0!important;border-radius:999px!important;box-shadow:var(--vg-hi)!important}
+.vista.st-vision :is(.v-room,.v-tile,.v-btn,.v-mtile,.v-scene){transition:transform .18s,background .2s}
+.vista.st-vision :is(.v-room,.v-tile,.v-btn,.v-mtile,.v-scene):active{transform:scale(.97)}
+/* letras: títulos como visionOS, secundarios apagados */
+.vista.st-vision h3{margin:24px 6px 12px;text-transform:none;letter-spacing:-.01em;font-size:20px;font-weight:700;color:var(--fg)}
+.vista.st-vision :is(.v-tx span,.v-kpi .l,.v-when span){color:var(--muted)}
+.vista.st-vision .v-when b{font-weight:300;letter-spacing:-.03em}
+.vista.st-vision .v-kpi{padding:18px 20px!important}.vista.st-vision .v-kpi .l{font-size:14px}
+.vista.st-vision .v-kpi .v{font-size:28px;font-weight:600;margin-top:8px;letter-spacing:-.02em}
+.vista.st-vision .v-kpi .v:is(.g,.w,.c){color:var(--fg)}
+/* íconos dentro de un círculo de vidrio */
+.vista.st-vision .v-bic{background:rgba(255,255,255,.14)!important;color:#fff!important;border-radius:50%!important}
+/* encendido: blanco con letra oscura (como el Inicio de Apple) */
+.vista.st-vision :is(.v-room.on,.v-tile.on,.v-tile.lit,.v-btn.on,.v-mtile.on){background:rgba(255,255,255,.92)!important;color:#1d1d1f!important}
+.vista.st-vision :is(.v-room.on,.v-tile.on,.v-tile.lit,.v-btn.on,.v-mtile.on) :is(.v-tx span,.v-mbot>svg.i,.v-tic svg.i){color:rgba(29,29,31,.6)!important}
+.vista.st-vision :is(.v-room.on,.v-tile.on,.v-tile.lit,.v-btn.on,.v-mtile.on) .v-bic{background:rgba(29,29,31,.08)!important;color:#1d1d1f!important}
+.vista.st-vision .v-mtile{min-height:150px}.vista.st-vision .v-mtile .v-mdot{background:rgba(255,255,255,.14)}
+.vista.st-vision .v-mtile.on .v-mdot{background:rgba(29,29,31,.08)}
+/* interruptores verdes de Apple */
+.vista.st-vision :is(.v-msw.on,.v-pw.on){background:#30d158!important}
+.vista.st-vision .v-pw{background:rgba(255,255,255,.22)}
+/* modos del aire y botones de opción: cápsulas de vidrio, la elegida en blanco */
+.vista.st-vision .v-modes button{background:rgba(255,255,255,.14)!important;color:var(--fg);border-radius:999px!important}
+.vista.st-vision .v-modes button.on{background:#fff!important;color:#1d1d1f!important}
+.vista.st-vision .v-dring .d1{stroke:#fff!important}.vista.st-vision .v-dring .d0{stroke:rgba(255,255,255,.22)}
+.vista.st-vision .v-dmid b{font-weight:200;font-size:64px;letter-spacing:-.04em}
+/* pestañas de ambientes: un segmentado de vidrio */
+.vista.st-vision .v-chips{background:var(--vg);border-radius:999px;padding:6px;box-shadow:var(--vg-hi);gap:2px}
+.vista.st-vision .v-chp{background:transparent!important;border:0!important;font-size:16px;font-weight:500;color:var(--muted);padding:9px 16px!important}
+.vista.st-vision .v-chp:first-child{background:rgba(255,255,255,.2)!important;color:#fff;font-weight:600}
+.vista.st-vision .v-chp svg.i{color:currentColor}
+/* menús y hojas de la vista */
+.vista.st-vision :is(.v-sin,.v-min){background:rgba(58,62,72,.86)!important;border:0!important;border-radius:32px!important;box-shadow:var(--vg-hi),0 30px 70px rgba(0,0,0,.4)!important;
+  -webkit-backdrop-filter:blur(36px) saturate(1.6);backdrop-filter:blur(36px) saturate(1.6)}
+/* celular: barra de pestañas como cápsula flotante (ornamento) */
+.vista.st-vision .v-nav{margin:0 18px calc(max(env(safe-area-inset-bottom,0px),var(--sb,0px)) + 10px);padding:7px 8px;border:0!important;border-radius:999px;
+  background:var(--vg)!important;box-shadow:var(--vg-hi),var(--vg-sh)}
+.vista.st-vision .v-nav button{width:50px;height:44px;border-radius:999px;justify-content:center;font-size:0;gap:0;color:rgba(255,255,255,.7)}
+.vista.st-vision .v-nav button.on{background:rgba(255,255,255,.2);color:#fff}
+.vista.st-vision :is(.v-nav,.v-dock) .v-mic{background:#fff!important;color:#1d1d1f!important;box-shadow:none!important;margin-top:0;width:46px!important;height:46px}
+/* tablet: la barra al costado (ornamento vertical) y la columna derecha como otra ventana */
+.vista.st-vision.k-tablet .v-tab{padding-left:88px}
+.vista.st-vision.k-tablet .v-dock{position:absolute;left:18px;top:50%;transform:translateY(-50%);flex-direction:column;justify-content:center;width:64px;padding:10px 7px;gap:8px;
+  border-radius:32px;background:var(--vg)!important;border:0!important;box-shadow:var(--vg-hi),var(--vg-sh);z-index:3}
+.vista.st-vision.k-tablet .v-dock button{flex:none;width:50px;height:50px;padding:0!important;border-radius:50%;font-size:0;justify-content:center;color:rgba(255,255,255,.72)}
+.vista.st-vision.k-tablet .v-dock button.on{background:rgba(255,255,255,.22)!important;color:#fff}
+.vista.st-vision.k-tablet .v-c2{background:var(--vg);border-radius:40px;padding:18px;box-shadow:var(--vg-hi),var(--vg-sh)}
+.vista.st-vision.k-tablet .v-c2 :is(.v-card,.v-kpi,.v-player,.v-cam,.v-imgc){background:rgba(255,255,255,.08)!important;box-shadow:none!important}
+.vista.st-vision.k-tablet .v-c2 .v-clock{flex-direction:column;align-items:center;text-align:center;gap:4px}.vista.st-vision.k-tablet .v-c2 .v-clock b{font-weight:200}
+.vista.embed.st-vision{background:transparent!important}.vista.embed.st-vision::before{display:none}
+/* claro: el mismo vidrio, más blanco */
+.vista.st-vision.light{--vg:rgba(255,255,255,.55);--card:rgba(255,255,255,.5);--card2:rgba(255,255,255,.7);--line:rgba(0,0,0,.08);--fg:#1d1d1f;--muted:rgba(29,29,31,.55);--off:rgba(29,29,31,.18);
+  --warm:#1d1d1f;--warm-s:rgba(29,29,31,.1);--cool:#1d1d1f;--cool-s:rgba(29,29,31,.08);--vg-hi:inset 0 1px 0 rgba(255,255,255,.9),inset 0 0 0 1px rgba(255,255,255,.5);--vg-sh:0 22px 54px rgba(0,0,0,.14)}
+.vista.st-vision.light::before{filter:blur(24px) saturate(1.1) brightness(1.12)}
+.vista.st-vision.light :is(.v-bic,.v-nav button,.v-dock button){color:#1d1d1f!important}
+.vista.st-vision.light .v-bic{background:rgba(29,29,31,.07)!important}
+.vista.st-vision.light :is(.v-room.on,.v-tile.on,.v-tile.lit,.v-btn.on,.v-mtile.on){background:#1d1d1f!important;color:#fff!important}
+.vista.st-vision.light :is(.v-nav,.v-dock) .v-mic{background:#1d1d1f!important;color:#fff!important}
 
 /* ═════════ CONTROL4: oscuro con color, barra de temas arriba, portadas, controles en grilla y música abajo ═════════ */
 .vista.st-control4{--f-display:"Roboto","Helvetica Neue","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
