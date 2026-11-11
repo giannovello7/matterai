@@ -224,6 +224,10 @@
   .ok{color:#3ecf8e}.bad{color:var(--error-color,#db4437)}.wn{color:#ffb547}
   .al{display:flex;gap:10px;align-items:flex-start;padding:10px 12px;border-radius:10px;margin:6px 0;font-size:14px;background:rgba(127,127,127,.1)}
   .al ha-icon{--mdc-icon-size:18px;flex:none;margin-top:1px}
+  .al-tx{flex:1;min-width:0}.al-go{flex:none;margin:-3px 0;padding:4px 12px;border-radius:999px;border:1px solid currentColor;background:none;color:inherit;font:inherit;font-size:12.5px;text-decoration:none;cursor:pointer;opacity:.85}.al-go:hover{opacity:1}
+  .al-items{margin-top:6px}.al-items summary{cursor:pointer;font-size:13px;opacity:.8}
+  .al-it{display:flex;align-items:center;gap:10px;padding:7px 8px;border-radius:8px;color:inherit;text-decoration:none}.al-it:hover{background:rgba(127,127,127,.12)}
+  .al-it b{font-weight:500;flex:1;min-width:0}.al-it small{opacity:.65;font-size:12.5px}
   .al.critical{background:rgba(219,68,55,.16)}.al.warning{background:rgba(255,181,71,.14)}
   .tiles{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:16px}
   .tile{background:var(--card-background-color,#1c1c1e);border:1px solid var(--divider-color,rgba(255,255,255,.08));border-radius:16px;padding:14px 16px;cursor:pointer;text-align:left;color:inherit;font:inherit}
@@ -298,6 +302,15 @@
       $('mt').onclick = (e) => { const b = e.target.closest('[data-mt]'); if (b) setMt(b.dataset.mt); };
       // atajos dentro de las páginas: cualquier botón con data-go
       $('main').addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) this._go(b.dataset.go); });
+      $('main').addEventListener('click', (e) => {
+        const b = e.target.closest('[data-algo]'); if (!b) return;
+        const [page, anchor] = b.dataset.algo.slice(6).split('#');
+        this._go(page);
+        if (!anchor) return;
+        let n = 0;
+        const find = () => { const el = this.shadowRoot.getElementById(anchor); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); else if (++n < 30) setTimeout(find, 100); };
+        find();
+      });
       try {
         const cardUrl = (this._panel && this._panel.config && this._panel.config.card_url) || `${BASE}/matterai-home-card.js`;
         if (!customElements.get('matterai-home-card')) await import(/* webpackIgnore: true */ cardUrl);
@@ -386,7 +399,14 @@
     }
     _alerts(al, max = 0) {
       const list = max ? al.slice(0, max) : al;
-      return list.length ? list.map((a) => `<div class="al ${esc(a.level)}"><ha-icon icon="${AL_ICON[a.level] || AL_ICON.info}"></ha-icon><span>${esc(a.text)}</span></div>`).join('')
+      const since = (iso) => { const m = Math.round((Date.now() - new Date(iso).getTime()) / 60000); return !(m >= 0) ? '' : m < 60 ? `hace ${m} min` : m < 1440 ? `hace ${Math.round(m / 60)} h` : `hace ${Math.round(m / 1440)} días`; };
+      const link = (go, label) => (!go ? '' : go.startsWith('panel:') ? `<button class="al-go" data-algo="${esc(go)}">${label}</button>` : `<a class="al-go" href="${esc(go)}">${label}</a>`);
+      const one = (a) => {
+        const items = a.items && a.items.length && !max ? `<details class="al-items"><summary>Ver cuáles (${a.items.length})</summary>${a.items.map((x) => `<a class="al-it" href="${esc(x.url)}"><b>${esc(x.name)}</b><small>${esc([x.area, since(x.since)].filter(Boolean).join(' · '))}</small><ha-icon icon="mdi:chevron-right"></ha-icon></a>`).join('')}</details>` : '';
+        const go = a.go || (a.items && a.items.length && max ? 'panel:health' : '');
+        return `<div class="al ${esc(a.level)}"><ha-icon icon="${AL_ICON[a.level] || AL_ICON.info}"></ha-icon><span class="al-tx">${esc(a.text)}${items}</span>${link(go, go === 'panel:health' ? 'Ver' : 'Ir')}</div>`;
+      };
+      return list.length ? list.map(one).join('')
         + (max && al.length > max ? `<p class="mut">y ${al.length - max} más…</p>` : '')
         : '<div class="al"><ha-icon icon="mdi:check-circle-outline" class="ok"></ha-icon><span class="ok">Todo en orden</span></div>';
     }
@@ -1287,7 +1307,7 @@ ${eqBox}
           <p class="mut" id="smh" ${sp.mode === 'owner' ? '' : 'hidden'}>Creá un administrador aparte para el soporte (por ejemplo «MatterAI Soporte», con verificación en 2 pasos). La cuenta <b>dueña</b> de Home Assistant nunca se desactiva: guardala fuera de línea como llave de emergencia.</p>
           <div class="row"><label><input type="checkbox" id="sn" ${sp.notify ? 'checked' : ''}> Avisar a la app del cliente cada vez que entro</label></div>
           <div class="row"><button class="b pri" id="ss">Guardar</button>${sp.mode === 'owner' ? `<span class="mut">${sp.open ? `Habilitado hasta ${esc(when(sp.until))}` : 'Ahora: cortado (el cliente lo habilita desde Opciones de la app)'}</span>` : ''}</div></div>
-        <div class="box"><h2>Pedidos de datos personales (ARCO)</h2>
+        <div class="box" id="arco"><h2>Pedidos de datos personales (ARCO)</h2>
           <p class="mut">Lo que piden los clientes desde la app (Opciones → Privacidad): ver sus datos, corregirlos, darse de baja. La ley da <b>10 días corridos</b> para el acceso y <b>5 días hábiles</b> para corregir o borrar. Al resolverlo, anotá qué hiciste: queda como constancia.</p>
           ${arco.requests.length ? `<table class="tb"><thead><tr><th>Cuándo</th><th>Pedido</th><th>Estado</th><th></th></tr></thead><tbody>
             ${arco.requests.map((q) => `<tr><td>${esc(when(q.at))}</td><td><b>${esc(arco.kinds[q.kind] || q.kind)}</b> · ${esc(q.device)}${q.detail ? `<br><small class="mut">${esc(q.detail)}</small>` : ''}</td>

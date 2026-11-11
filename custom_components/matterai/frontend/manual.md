@@ -65,7 +65,7 @@ Qué dispositivos de Home Assistant usa la app. Se elige por **dispositivo** (tr
 Escenas y automatizaciones MatterAI, pensadas para que las entienda cualquiera: escenas de un toque, «si pasa esto, hacé aquello», horarios, simulación de presencia, riego por zonas, luz que sigue el ritmo del día, luz por presencia, avisos si algo quedó abierto, me voy / llego, buenas noches, clima inteligente, despertador con luz, recordatorios, portero, cámaras con Frigate, tele inteligente e invitados con link para el portón. Las escenas y automatizaciones aparecen solas en las tarjetas **Escenas** y **Rutinas** de los dashboards.
 
 ## Estado de la casa, Mantenimiento y Copias
-- **Estado**: avisos de la casa (equipos sin responder, pilas bajas, actualizaciones, seguridad).
+- **Estado**: avisos de la casa (equipos sin responder, pilas bajas, actualizaciones, seguridad). Cada aviso tiene **Ir**, que lleva a donde se arregla (el dispositivo en Home Assistant, Mantenimiento, el pedido de datos, Reparaciones…). Si son muchos equipos, «Ver cuáles» los lista con su ambiente y desde cuándo. Un equipo cuenta «sin responder» sólo si no contesta en nada (si una parte anda, no avisa).
 - **Mantenimiento**: vigila los servicios (Frigate, Music Assistant, el túnel, etc.) y los reinicia solos si se caen. «Modo mantenimiento» pausa la vigilancia mientras trabajás. Si desinstalaste un Zigbee2MQTT, su último «offline» que queda guardado en MQTT ya no cuenta: no se muestra ni hace reiniciar al que anda.
 - **Copias**: copia de seguridad en el panel central (se hacen solas; podés hacer una ahora o restaurar una parte).
 - **Plantillas**: guardás automatizaciones y diseños para usarlos en otras casas.

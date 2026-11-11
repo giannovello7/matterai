@@ -161,3 +161,25 @@ async def test_solo_el_instalador(hass, hass_ws_client, hass_client_no_auth) -> 
     assert not msg["success"], "NEGATIVO: un celular no ve la lista de dispositivos"
     msg = await _ws(hass_ws_client, hass, p["token"], 1, {"type": "matterai/entities/save", "devices": [], "entities": []})
     assert not msg["success"], "NEGATIVO: ni la cambia"
+
+
+async def test_avisos_llevan_a_donde_se_arregla(hass) -> None:
+    """Un equipo «sin responder» es el que no contesta en nada; cada aviso trae su link."""
+    await _setup(hass)
+    tele, _ = _device(hass, "Tele", "tv", "Living", ["media_player.tele", "switch.tele_power"])
+    luz, _ = _device(hass, "Luz pasillo", "lp", "Pasillo", ["light.pasillo"])
+    old = dt_util.utcnow() - timedelta(hours=3)
+    for eid in ("media_player.tele", "light.pasillo"):
+        hass.states.async_set(eid, "unavailable")
+        hass.states.get(eid).last_changed = old  # noqa: SLF001
+    al = {a["key"]: a for a in collect(hass)["alerts"]}
+    assert f"unavailable:{tele}" not in al, "NEGATIVO: si una parte anda (el enchufe), el equipo no está «sin responder»"
+    a = al[f"unavailable:{luz}"]
+    assert a["text"] == "Sin responder: Luz pasillo" and a["go"] == f"/config/devices/device/{luz}", "lleva al dispositivo"
+    for i in range(10):  # muchos: un aviso con la lista, cada uno con su link
+        d, _ = _device(hass, f"Sensor {i}", f"s{i}", "Patio", [f"sensor.patio_{i}"])
+        hass.states.async_set(f"sensor.patio_{i}", "unavailable")
+        hass.states.get(f"sensor.patio_{i}").last_changed = old  # noqa: SLF001
+    many = next(a for a in collect(hass)["alerts"] if a["key"] == "unavailable:many")
+    assert len(many["items"]) == 11 and all(x["url"].startswith("/config/devices/device/") for x in many["items"])
+    assert many["items"][0]["area"] and many["items"][0]["since"]

@@ -649,7 +649,7 @@ class Watchdog:
                 text += ". Necesita atención manual."
             text += self.update_note(t)
             level = "critical" if t.status == MANUAL else "warning"
-            out.append({"level": level, "key": f"watchdog:{t.key}", "text": text[:300]})
+            out.append({"level": level, "key": f"watchdog:{t.key}", "text": text[:300], "go": "panel:wd"})
             if now - since >= REPAIR_AFTER:
                 self._repair(t, text)
         return out

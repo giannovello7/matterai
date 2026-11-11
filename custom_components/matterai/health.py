@@ -30,6 +30,7 @@ import aiohttp
 from homeassistant.config_entries import ConfigEntryState
 from homeassistant.const import __version__ as HA_VERSION
 from homeassistant.core import HomeAssistant, callback
+from homeassistant.helpers import area_registry as ar
 from homeassistant.helpers import device_registry as dr
 from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers import issue_registry as ir
@@ -49,8 +50,15 @@ BACKUP_OLD_DAYS = 7
 FAILED_ENTRY_STATES = {ConfigEntryState.SETUP_ERROR, ConfigEntryState.SETUP_RETRY, ConfigEntryState.MIGRATION_ERROR, ConfigEntryState.FAILED_UNLOAD}
 
 
-def _alert(level: str, key: str, text: str) -> dict[str, str]:
-    return {"level": level, "key": key[:120], "text": text[:300]}
+def _alert(level: str, key: str, text: str, go: str | None = None, items: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+    """Un aviso. «go» lleva a donde se arregla: una página del panel («panel:sec») o de Home Assistant («/config/…»).
+    «items» es la lista de lo que falla (cada uno con su link) cuando el aviso junta varios."""
+    out: dict[str, Any] = {"level": level, "key": key[:120], "text": text[:300]}
+    if go:
+        out["go"] = go
+    if items:
+        out["items"] = items[:100]
+    return out
 
 
 @callback
@@ -59,9 +67,12 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
     ent_reg = er.async_get(hass)
     dev_reg = dr.async_get(hass)
     now = dt_util.utcnow()
-    alerts: list[dict[str, str]] = []
-    unavailable: dict[str, str] = {}
+    alerts: list[dict[str, Any]] = []
+    unavailable: dict[str, dict[str, Any]] = {}
     unavailable_recent = 0
+    # por dispositivo: cuántas entidades tiene y cuántas no responden (un equipo «sin responder» es el que no contesta
+    # en NADA; si una sola parte falla pero el resto anda, el equipo funciona)
+    per_dev: dict[str, dict[str, Any]] = {}
     low_batt: list[tuple[str, str]] = []
     lights_on = 0
     total = 0
@@ -80,13 +91,19 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
         total += 1
         if domain == "light" and state.state == "on":
             lights_on += 1
-        if state.state == "unavailable":
+        if entry is not None and entry.device_id:
+            d = per_dev.setdefault(entry.device_id, {"n": 0, "down": 0, "recent": False, "since": now, "entity": state.entity_id})
+            d["n"] += 1
+            if state.state == "unavailable":
+                d["down"] += 1
+                d["recent"] = d["recent"] or now - state.last_changed < UNAVAILABLE_FOR
+                d["since"] = min(d["since"], state.last_changed)
+        elif state.state == "unavailable":
             if now - state.last_changed < UNAVAILABLE_FOR:
                 unavailable_recent += 1
-                continue
-            dev = dev_reg.async_get(entry.device_id) if entry and entry.device_id else None
-            key = dev.id if dev else state.entity_id
-            unavailable[key] = (dev.name_by_user or dev.name) if dev else (state.name or state.entity_id)
+            else:
+                unavailable[state.entity_id] = {"id": state.entity_id, "name": state.name or state.entity_id, "area": "",
+                                                "since": state.last_changed.isoformat(), "url": f"/history?entity_id={state.entity_id}"}
         if state.attributes.get("device_class") == "battery" and domain == "sensor":
             try:
                 if float(state.state) <= 15:
@@ -96,21 +113,36 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
         if domain == "alarm_control_panel" and state.state == "triggered":
             alerts.append(_alert("critical", f"alarm:{state.entity_id}", f"Alarma disparada: {state.name}"))
 
+    area_reg = ar.async_get(hass)
+    for dev_id, d in per_dev.items():
+        if not d["n"] or d["down"] < d["n"]:
+            continue
+        if d["recent"]:
+            unavailable_recent += 1
+            continue
+        dev = dev_reg.async_get(dev_id)
+        if dev is None:
+            continue
+        area = area_reg.async_get_area(dev.area_id) if dev.area_id else None
+        unavailable[dev_id] = {"id": dev_id, "name": dev.name_by_user or dev.name or d["entity"], "area": area.name if area else "",
+                               "since": d["since"].isoformat(), "url": f"/config/devices/device/{dev_id}"}
+
     # dispositivos nuevos que todavía no se revisaron para la app
     new = sel.unreviewed() if sel else []
     if new:
         names = ", ".join(x["name"] for x in new[:4]) + ("…" if len(new) > 4 else "")
-        alerts.append(_alert("info", "selection:new", f"{len(new)} dispositivo{'s' if len(new) > 1 else ''} nuevo{'s' if len(new) > 1 else ''} sin revisar para la app: {names}"))
+        alerts.append(_alert("info", "selection:new", f"{len(new)} dispositivo{'s' if len(new) > 1 else ''} nuevo{'s' if len(new) > 1 else ''} sin revisar para la app: {names}", "panel:ents"))
 
     # equipos sin responder: uno por equipo (así se sabe cuál volvió), o agrupados si son muchos
+    items = sorted(unavailable.values(), key=lambda x: (x["area"] or "~", x["name"].lower()))
     if len(unavailable) > MAX_ITEMS:
-        names = sorted(unavailable.values())
-        alerts.append(_alert("warning", "unavailable:many", f"{len(names)} equipos sin responder: {', '.join(names[:6])}…"))
+        names = [x["name"] for x in items]
+        alerts.append(_alert("warning", "unavailable:many", f"{len(names)} equipos sin responder: {', '.join(names[:6])}…", None, items))
     else:
-        for key, name in sorted(unavailable.items(), key=lambda kv: kv[1]):
-            alerts.append(_alert("warning", f"unavailable:{key}", f"Sin responder: {name}"))
+        for x in items:
+            alerts.append(_alert("warning", f"unavailable:{x['id']}", f"Sin responder: {x['name']}", x["url"]))
     for entity_id, text in low_batt[:MAX_ITEMS]:
-        alerts.append(_alert("info", f"battery:{entity_id}", f"Pila baja: {text}"))
+        alerts.append(_alert("info", f"battery:{entity_id}", f"Pila baja: {text}", f"/history?entity_id={entity_id}"))
 
     # integraciones que no arrancan
     for entry in hass.config_entries.async_entries():
@@ -122,7 +154,8 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
             continue
         reason = getattr(entry, "reason", None)
         what = "no puede conectarse (reintentando)" if entry.state == ConfigEntryState.SETUP_RETRY else "no está cargada" if not_loaded else "no arranca"
-        alerts.append(_alert("warning", f"integration:{entry.entry_id}", f"La integración «{entry.title or entry.domain}» {what}{f': {reason}' if reason else ''}"))
+        alerts.append(_alert("warning", f"integration:{entry.entry_id}", f"La integración «{entry.title or entry.domain}» {what}{f': {reason}' if reason else ''}",
+                             f"/config/integrations/integration/{entry.domain}"))
 
     # reparaciones de Home Assistant (errores y críticas; las advertencias no avisan)
     for issue in ir.async_get(hass).issues.values():
@@ -132,26 +165,27 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
         if sev not in ("error", "critical"):
             continue
         alerts.append(_alert("critical" if sev == "critical" else "warning", f"repair:{issue.domain}:{issue.issue_id}",
-                             f"Home Assistant pide revisar: {issue.domain} · {issue.translation_key or issue.issue_id}"))
+                             f"Home Assistant pide revisar: {issue.domain} · {issue.translation_key or issue.issue_id}", "/config/repairs"))
 
     # copias de seguridad de Home Assistant (sensor de la integración backup, HA 2025.1+)
     last = hass.states.get("sensor.backup_last_successful_automatic_backup")
     if last is not None and last.state not in ("unknown", "unavailable"):
         when = dt_util.parse_datetime(last.state)
         if when and now - when > timedelta(days=BACKUP_OLD_DAYS):
-            alerts.append(_alert("warning", "ha_backup", f"La última copia automática de Home Assistant es de hace {(now - when).days} días"))
+            alerts.append(_alert("warning", "ha_backup", f"La última copia automática de Home Assistant es de hace {(now - when).days} días", "/config/backup"))
 
     updates = [s for s in hass.states.async_all("update") if s.state == "on"]
     if updates:
-        alerts.append(_alert("info", "updates", f"{len(updates)} actualización(es) disponibles en Home Assistant"))
+        alerts.append(_alert("info", "updates", f"{len(updates)} actualización(es) disponibles en Home Assistant", "/config/updates"))
     disk = hass.states.get("sensor.disk_use_percent") or hass.states.get("sensor.system_monitor_disk_usage")
     try:
         if disk is not None and float(disk.state) >= 90:
-            alerts.append(_alert("warning", "disk", f"Disco casi lleno ({disk.state}%)"))
+            alerts.append(_alert("warning", "disk", f"Disco casi lleno ({disk.state}%)", "/config/storage"))
     except ValueError:
         pass
     if hass.config_entries.async_entries("matterai_escenas"):
-        alerts.append(_alert("warning", "escenas_aparte", "Falta eliminar la integración vieja «MatterAI Escenas» (las automatizaciones ya vienen en MatterAI)"))
+        alerts.append(_alert("warning", "escenas_aparte", "Falta eliminar la integración vieja «MatterAI Escenas» (las automatizaciones ya vienen en MatterAI)",
+                             "/config/integrations/integration/matterai_escenas"))
     manager = hass.data.get("matterai_escenas")
     return {
         "version": VERSION,
@@ -211,7 +245,7 @@ async def async_security_alerts(hass: HomeAssistant) -> list[dict[str, str]]:
 
         # HA trae ip_ban_enabled prendido pero login_attempts_threshold en -1: nunca bloquea a nadie
         if http.app.get(KEY_BAN_MANAGER) is None or (http.app.get(KEY_LOGIN_THRESHOLD) or -1) <= 0:
-            out.append(_alert("warning", "security:ip_ban", "Home Assistant está en internet sin bloqueo tras intentos fallidos de entrar (http: login_attempts_threshold). Ver «Seguridad de cada casa» en APP.md"))
+            out.append(_alert("warning", "security:ip_ban", "Home Assistant está en internet sin bloqueo tras intentos fallidos de entrar (http: login_attempts_threshold). Ver «Seguridad de cada casa» en APP.md", "panel:sec"))
     admins_sin_2fa = []
     for user in await hass.auth.async_get_users():
         if user.system_generated or not user.is_active or not user.is_admin:
@@ -219,20 +253,20 @@ async def async_security_alerts(hass: HomeAssistant) -> list[dict[str, str]]:
         if not await hass.auth.async_get_enabled_mfa(user):
             admins_sin_2fa.append(user.name or "sin nombre")
     if admins_sin_2fa:
-        out.append(_alert("warning", "security:mfa", f"Administrador(es) sin verificación en 2 pasos: {', '.join(sorted(admins_sin_2fa)[:4])} (Perfil → Seguridad → Módulos de autenticación)"))
+        out.append(_alert("warning", "security:mfa", f"Administrador(es) sin verificación en 2 pasos: {', '.join(sorted(admins_sin_2fa)[:4])} (Perfil → Seguridad → Módulos de autenticación)", "/profile/security"))
     pv = rt.get("privacy")
     if pv is not None:
         from .privacy import ARCO_KINDS  # noqa: PLC0415
 
         for r in pv.open_requests():
             days = int((time.time() - r["at"]) // 86400)
-            out.append(_alert("warning", f"arco:{r['id']}", f"Pedido de datos personales sin resolver ({days} día(s)): {ARCO_KINDS.get(r['kind'], r['kind'])} · {r['device']}"))
+            out.append(_alert("warning", f"arco:{r['id']}", f"Pedido de datos personales sin resolver ({days} día(s)): {ARCO_KINDS.get(r['kind'], r['kind'])} · {r['device']}", "panel:sec#arco"))
     house = rt.get("house")
     if house is not None and house.shared_status().get("active"):
         from .app_devices import app_entries  # noqa: PLC0415
 
         if not any(house.is_shared_user(e.data.get("user_id")) for e in app_entries(hass)):
-            out.append(_alert("info", "security:shared", "Ningún celular usa ya el acceso compartido viejo de la app: se puede apagar (Vincular celulares → Accesos a la casa)"))
+            out.append(_alert("info", "security:shared", "Ningún celular usa ya el acceso compartido viejo de la app: se puede apagar (Vincular celulares → Accesos a la casa)", "panel:app#acc"))
     return out
 
 
@@ -250,7 +284,7 @@ async def _async_supervisor_alerts(hass: HomeAssistant) -> list[dict[str, str]]:
         if state in ("started", "startup"):
             continue
         if state == "error":
-            alerts.append(_alert("warning", f"addon:{addon.slug}", f"El complemento «{addon.name}» falló y no está andando"))
+            alerts.append(_alert("warning", f"addon:{addon.slug}", f"El complemento «{addon.name}» falló y no está andando", f"/hassio/addon/{addon.slug}/info"))
             continue
         # detenido: sólo importa si está configurado para arrancar solo
         try:
@@ -258,11 +292,11 @@ async def _async_supervisor_alerts(hass: HomeAssistant) -> list[dict[str, str]]:
         except Exception:  # noqa: BLE001
             continue
         if str(getattr(info, "boot", "")) == "auto":
-            alerts.append(_alert("warning", f"addon:{addon.slug}", f"El complemento «{addon.name}» está detenido (debería arrancar solo)"))
+            alerts.append(_alert("warning", f"addon:{addon.slug}", f"El complemento «{addon.name}» está detenido (debería arrancar solo)", f"/hassio/addon/{addon.slug}/info"))
     try:
         host = await client.host.info()
         if host.disk_total and host.disk_used / host.disk_total >= 0.9:
-            alerts.append(_alert("warning", "disk", f"Disco casi lleno ({round(host.disk_used / host.disk_total * 100)}%, quedan {host.disk_free:.1f} GB)"))
+            alerts.append(_alert("warning", "disk", f"Disco casi lleno ({round(host.disk_used / host.disk_total * 100)}%, quedan {host.disk_free:.1f} GB)", "/config/storage"))
     except Exception:  # noqa: BLE001
         pass
     return alerts
@@ -304,6 +338,8 @@ class Heartbeat:
         from .app_devices import push_hashes  # noqa: PLC0415
 
         payload = {"house_id": self.house_id, "name": self.name, "url": self.url, **await async_collect(self.hass), "push": push_hashes(self.hass)}
+        # al panel central, el aviso solo (los links y la lista de equipos son para el panel de la casa)
+        payload["alerts"] = [{k: a[k] for k in ("level", "key", "text") if k in a} for a in payload.get("alerts", [])]
         if self._result:
             payload["result"] = self._result
         session = async_get_clientsession(self.hass)
