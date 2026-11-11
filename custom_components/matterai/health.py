@@ -65,9 +65,14 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
     low_batt: list[tuple[str, str]] = []
     lights_on = 0
     total = 0
+    # sólo los dispositivos de la app (página «Dispositivos»): sin avisos de lo técnico o de prueba
+    from .selection import get as get_selection  # noqa: PLC0415
+
+    sel = get_selection(hass)
+    allowed = sel.allowed() if sel else None
     for state in hass.states.async_all():
         domain = state.domain
-        if domain in SKIP_DOMAINS:
+        if domain in SKIP_DOMAINS or (allowed is not None and state.entity_id not in allowed):
             continue
         entry = ent_reg.async_get(state.entity_id)
         if entry is not None and (entry.hidden or entry.disabled or entry.entity_category):
@@ -90,6 +95,12 @@ def collect(hass: HomeAssistant) -> dict[str, Any]:
                 pass
         if domain == "alarm_control_panel" and state.state == "triggered":
             alerts.append(_alert("critical", f"alarm:{state.entity_id}", f"Alarma disparada: {state.name}"))
+
+    # dispositivos nuevos que todavía no se revisaron para la app
+    new = sel.unreviewed() if sel else []
+    if new:
+        names = ", ".join(x["name"] for x in new[:4]) + ("…" if len(new) > 4 else "")
+        alerts.append(_alert("info", "selection:new", f"{len(new)} dispositivo{'s' if len(new) > 1 else ''} nuevo{'s' if len(new) > 1 else ''} sin revisar para la app: {names}"))
 
     # equipos sin responder: uno por equipo (así se sabe cuál volvió), o agrupados si son muchos
     if len(unavailable) > MAX_ITEMS:

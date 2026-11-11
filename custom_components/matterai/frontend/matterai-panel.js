@@ -44,6 +44,7 @@
     { g: 'App del cliente', d: 'Lo que configurás para la app MatterAI' },
     { k: 'views', l: 'Dashboards', i: 'mdi:view-dashboard-edit-outline' },
     { k: 'casa', l: 'La casa', i: 'mdi:home-edit-outline' },
+    { k: 'ents', l: 'Dispositivos', i: 'mdi:devices' },
     { k: 'app', l: 'Equipos', i: 'mdi:cellphone-link' },
     { k: 'auto', l: 'Automatizaciones', i: 'mdi:robot-outline' },
     { g: 'Sistema MatterAI', d: 'Control interno de la instalación' },
@@ -63,6 +64,7 @@
     casa: ['La casa', 'Los datos de la casa que usan todos los dashboards: tu marca y soporte, personas, ambientes con sus equipos, alarma, portones y cámaras, y qué secciones tiene la app.', 'client'],
     dash: ['Inicio clásico', 'La pantalla anterior a los dashboards (con el plano viejo). Sólo para equipos que todavía la usan (Opciones de la app → Diseño del inicio → Clásico).', 'client'],
     auto: ['Automatizaciones', 'Las del cliente y los equipos del instalador (portón inteligente, sensor de ocupación), que el cliente no ve.', 'client'],
+    ents: ['Dispositivos', 'Qué dispositivos de Home Assistant usa la app. Los avisos de fallas, la voz, la app y el editor de dashboards sólo usan los elegidos: nada de lo técnico o de prueba.', 'client'],
     views: ['Dashboards', 'Qué ve cada persona en su celular y en su tablet. Lo diseñás acá y les llega al instante; lo que fijen desde la app también queda acá.', 'client'],
     app: ['Equipos', 'Los celulares y tablets de la familia: vincular uno nuevo, qué dashboard ve cada uno, su perfil y su acceso.', 'client'],
     health: ['Salud y avisos', 'Todo lo que hay que atender en esta casa. Lo mismo le llega al panel central.', 'system'],
@@ -78,6 +80,17 @@
   const AUTO_REFRESH = new Set(['home', 'health', 'wd']);
 
   const CSS = `
+.en-top{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.en-top input{flex:1;min-width:200px;padding:9px 12px;border-radius:10px;border:1px solid var(--divider-color,rgba(255,255,255,.12));background:transparent;color:inherit;font:inherit}
+.en-f{display:inline-flex;gap:2px;padding:3px;border-radius:999px;border:1px solid var(--divider-color,rgba(255,255,255,.12))}
+.en-f button{border:0;background:none;color:inherit;font:inherit;font-size:13px;padding:6px 12px;border-radius:999px;cursor:pointer;opacity:.75}.en-f button.on{background:var(--primary-color,#03a9f4);color:#fff;opacity:1}
+.en-g{margin-top:18px}.en-g h3{display:flex;align-items:center;gap:10px;margin:0 0 6px;font-size:14px}.en-g h3 small{opacity:.6;font-weight:400}.en-g h3 .sp{flex:1}
+.en-g h3 button{border:0;background:none;color:var(--primary-color,#03a9f4);font:inherit;font-size:12.5px;cursor:pointer}
+.en-r{display:flex;align-items:center;gap:12px;padding:9px 10px;border-radius:10px;cursor:pointer}.en-r:hover{background:rgba(127,127,127,.08)}
+.en-r input{width:18px;height:18px;flex:none;accent-color:var(--primary-color,#03a9f4)}
+.en-r .t{flex:1;min-width:0}.en-r b{display:block;font-weight:500}.en-r small{display:block;opacity:.6;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.en-new{font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:rgba(255,176,77,.18);color:#ffb04d;flex:none}
+.en-bar{position:sticky;bottom:0;display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:16px;padding:12px 14px;border-radius:14px;background:var(--card-background-color,#1c1c1e);border:1px solid var(--divider-color,rgba(255,255,255,.12));box-shadow:0 -6px 20px rgba(0,0,0,.25)}
+.en-bar .sp{flex:1}.en-warn{padding:12px 14px;border-radius:12px;background:rgba(255,176,77,.12);border:1px solid rgba(255,176,77,.3);margin-bottom:12px}
   /* modo día / noche del panel (Auto = el tema de Home Assistant) */
   :host([data-mt="light"]){color-scheme:light;--primary-background-color:#f3f4f7;--secondary-background-color:#eceef2;--card-background-color:#fff;--primary-text-color:#1b1c1f;--secondary-text-color:#5c6066;--divider-color:rgba(0,0,0,.11);--app-header-background-color:#fff;--app-header-text-color:#1b1c1f;--ha-card-box-shadow:0 1px 3px rgba(0,0,0,.06);--input-fill-color:#f3f4f7;--mdc-text-field-fill-color:#f3f4f7}
   :host([data-mt="dark"]){color-scheme:dark;--primary-background-color:#111214;--secondary-background-color:#25262a;--card-background-color:#1c1d20;--primary-text-color:#ececee;--secondary-text-color:#a2a4aa;--divider-color:rgba(255,255,255,.1);--app-header-background-color:#1c1d20;--app-header-text-color:#fff;--ha-card-box-shadow:none;--input-fill-color:#25262a;--mdc-text-field-fill-color:#25262a}
@@ -303,6 +316,7 @@
     _go(tab) {
       if (!PAGES[tab]) tab = 'home';
       if ((this._tab === 'dash' || this._tab === 'casa') && tab !== this._tab && this._dirty() && !confirm('Hay cambios sin guardar en los datos de la casa. ¿Salir igual?')) return;
+      if (this._tab === 'ents' && tab !== 'ents' && this._en && this._en.dirty && !confirm('Hay cambios sin guardar en los dispositivos de la app. ¿Salir igual?')) return;
       this._tab = tab;
       try { localStorage.setItem(STORE_KEY, tab); } catch (_) { /* sin almacenamiento */ }
       this.shadowRoot.querySelectorAll('aside [data-tab]').forEach((b) => b.classList.toggle('on', b.dataset.tab === tab));
@@ -318,7 +332,7 @@
       this._timer = setInterval(() => { if (!document.hidden && AUTO_REFRESH.has(this._tab)) this._render(this._tab, true); }, 30000);
     }
     _render(tab, quiet = false) {
-      const R = { home: this._renderHome, setup: this._renderSetup, manual: this._renderManual, dash: this._renderDash, casa: this._renderCasa, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
+      const R = { ents: this._renderEnts, home: this._renderHome, setup: this._renderSetup, manual: this._renderManual, dash: this._renderDash, casa: this._renderCasa, auto: this._renderAuto, app: this._renderApp, health: this._renderHealth, wd: this._renderWd,
         backup: () => this._renderCopias('backup'), tpl: () => this._renderCopias('tpl'), conn: this._renderConn, voice: this._renderVoice, house: this._renderHouse, sec: this._renderSec, views: this._renderViews };
       const main = this.shadowRoot.getElementById('main');
       if (!quiet) main.innerHTML = `${this._head(tab)}<div class="box"><p class="mut">Cargando…</p></div>`;
@@ -1360,6 +1374,77 @@ ${eqBox}
       if (vc) vc.onclick = async () => { if (!confirm('¿Borrar la lista de frases?')) return; await this._hass.callWS({ type: 'matterai/voice_log', clear: true }); this._render('voice'); };
       const vy = main.querySelector('#vlcopy');
       if (vy) vy.onclick = async () => { try { await navigator.clipboard.writeText(vl.items.map((x) => `${x.why}: ${x.text}`).join(String.fromCharCode(10))); this._toast('Lista copiada'); } catch (_) { this._toast('No se pudo copiar'); } };
+    }
+
+    /* ---------- Dispositivos de la app ---------- */
+    async _renderEnts(quiet) {
+      if (quiet && this._en && this._en.dirty) return; // no pisar lo que se está eligiendo
+      const d = await this._hass.callWS({ type: 'matterai/entities/list' });
+      const st = this._en = {
+        d, dev: new Set(d.devices.filter((x) => x.selected).map((x) => x.id)), ent: new Set(d.loose.filter((x) => x.selected).map((x) => x.id)),
+        q: '', f: d.new ? 'new' : 'all', dirty: false,
+      };
+      const DOM = { light: 'luces', switch: 'interruptores', cover: 'cortinas', climate: 'clima', fan: 'ventiladores', lock: 'cerraduras', media_player: 'música',
+        camera: 'cámaras', sensor: 'sensores', binary_sensor: 'sensores', alarm_control_panel: 'alarma', vacuum: 'aspiradora', valve: 'válvulas', button: 'botones',
+        select: 'opciones', number: 'valores', humidifier: 'humidificador', water_heater: 'termotanque', siren: 'sirena', weather: 'clima', calendar: 'agenda' };
+      const kinds = (ids) => { const m = {}; ids.forEach((e) => { const k = DOM[e.split('.')[0]] || 'otros'; m[k] = (m[k] || 0) + 1; }); return Object.keys(m).slice(0, 4).join(', '); };
+      const main = this._page('ents', `<div class="box wide">
+          ${d.enabled ? '' : `<div class="en-warn"><b>Todavía sin revisar:</b> hoy la app usa <b>todos</b> los dispositivos de Home Assistant. Abajo está la propuesta (lo que ya usás en ambientes y dashboards, lo que tiene ambiente, las escenas, rutinas, clima y personas). Revisala y tocá <b>Guardar</b>.</div>`}
+          <div class="en-top"><input id="enq" type="search" placeholder="Buscar dispositivo, ambiente, marca…" autocomplete="off">
+            <span class="en-f" id="enf">${[['all', 'Todos'], ['on', 'Elegidos'], ['off', 'Sin elegir'], ['new', `Nuevos${d.new ? ` (${d.new})` : ''}`]].map(([k, l]) => `<button data-f="${k}" class="${st.f === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>
+          <div id="enl"></div>
+          <div class="en-bar"><span id="encount"></span><span class="sp"></span>
+            ${d.enabled ? '<button class="b" id="enall">Mostrar todo sin filtrar</button>' : ''}<button class="b pri" id="ensave">Guardar</button></div></div>`);
+      if (!main) return;
+      const $ = (id) => main.querySelector(`#${id}`);
+      const match = (x) => !st.q || `${x.name} ${x.area || ''} ${x.model || ''} ${x.integration || ''} ${x.group || ''} ${x.id}`.toLowerCase().includes(st.q);
+      const on = (x, set) => set.has(x.id);
+      const pass = (x, set) => match(x) && (st.f === 'all' || (st.f === 'on' && on(x, set)) || (st.f === 'off' && !on(x, set)) || (st.f === 'new' && x.new));
+      const row = (x, set, kind, sub) => `<label class="en-r"><input type="checkbox" data-${kind}="${esc(x.id)}" ${on(x, set) ? 'checked' : ''}><span class="t"><b>${esc(x.name)}</b><small>${esc(sub)}</small></span>${x.new ? '<span class="en-new">nuevo</span>' : ''}</label>`;
+      const draw = () => {
+        const groups = {};
+        d.devices.filter((x) => pass(x, st.dev)).forEach((x) => { (groups[x.area || 'Sin ambiente'] = groups[x.area || 'Sin ambiente'] || []).push(x); });
+        const loose = {};
+        d.loose.filter((x) => pass(x, st.ent)).forEach((x) => { (loose[x.group] = loose[x.group] || []).push(x); });
+        const gHtml = (title, list, set, kind, sub) => `<div class="en-g"><h3>${esc(title)} <small>${list.filter((x) => set.has(x.id)).length} de ${list.length}</small><span class="sp"></span>
+            <button data-gall="${kind}" data-g="${esc(title)}">Todos</button><button data-gnone="${kind}" data-g="${esc(title)}">Ninguno</button></h3>${list.map((x) => row(x, set, kind, sub(x))).join('')}</div>`;
+        const devSub = (x) => [x.model, x.integration, `${x.entities.length} ${x.entities.length === 1 ? 'entidad' : 'entidades'}${kinds(x.entities) ? ` (${kinds(x.entities)})` : ''}`].filter(Boolean).join(' · ');
+        const html = Object.keys(groups).map((g) => gHtml(g, groups[g], st.dev, 'd', devSub)).join('')
+          + (Object.keys(loose).length ? `<h2 style="margin:26px 0 0">Sin dispositivo</h2><p class="mut">Escenas, rutinas, ayudantes, personas y otras entidades sueltas.</p>${Object.keys(loose).map((g) => gHtml(g, loose[g], st.ent, 'e', (x) => x.id)).join('')}` : '');
+        $('enl').innerHTML = html || '<p class="mut" style="margin-top:16px">Nada con ese filtro.</p>';
+        $('encount').textContent = `${st.dev.size} dispositivos y ${st.ent.size} sueltas elegidas${st.dirty || !d.enabled ? ' · sin guardar' : ''}`;
+        st.groups = groups; st.loose = loose;
+      };
+      draw();
+      $('enq').oninput = (e) => { st.q = e.target.value.trim().toLowerCase(); draw(); };
+      $('enf').onclick = (e) => { const b = e.target.closest('[data-f]'); if (!b) return; st.f = b.dataset.f; $('enf').querySelectorAll('button').forEach((x) => x.classList.toggle('on', x === b)); draw(); };
+      $('enl').onchange = (e) => {
+        const t = e.target; const set = t.dataset.d ? st.dev : t.dataset.e ? st.ent : null; if (!set) return;
+        const id = t.dataset.d || t.dataset.e; if (t.checked) set.add(id); else set.delete(id);
+        st.dirty = true; draw();
+      };
+      $('enl').onclick = (e) => {
+        const b = e.target.closest('[data-gall],[data-gnone]'); if (!b) return;
+        const kind = b.dataset.gall || b.dataset.gnone, add = !!b.dataset.gall;
+        const list = (kind === 'd' ? st.groups : st.loose)[b.dataset.g] || [], set = kind === 'd' ? st.dev : st.ent;
+        list.forEach((x) => (add ? set.add(x.id) : set.delete(x.id)));
+        st.dirty = true; draw();
+      };
+      $('ensave').onclick = async () => {
+        $('ensave').disabled = true;
+        try {
+          const r = await this._hass.callWS({ type: 'matterai/entities/save', devices: [...st.dev], entities: [...st.ent] });
+          st.dirty = false;
+          this._toast(`Guardado: la app, la voz, el editor y los avisos usan ${r.count} entidades`);
+          this._render('ents');
+        } catch (err) { this._toast(`No se pudo guardar: ${err.message || err}`); $('ensave').disabled = false; }
+      };
+      const all = $('enall');
+      if (all) all.onclick = async () => {
+        if (!confirm('¿Volver a mostrar todo? La app, la voz, el editor y los avisos van a usar todos los dispositivos de Home Assistant.')) return;
+        await this._hass.callWS({ type: 'matterai/entities/save', devices: [...st.dev], entities: [...st.ent], enabled: false });
+        st.dirty = false; this._toast('Listo: todo habilitado, sin filtrar'); this._render('ents');
+      };
     }
 
     /* ---------- Ficha de la casa ---------- */

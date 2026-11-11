@@ -99,6 +99,14 @@ def collect(hass: HomeAssistant, cors: dict[str, Any] | None = None) -> dict[str
     add("backup", "central", "Primera copia de seguridad", "Copias → «Hacer una copia ahora». Después se hacen solas.", bool(last_backup), "backup")
 
     # 3 · app del cliente
+    sel = rt.get("selection")
+    if sel is not None:
+        new = sel.unreviewed()
+        n_sel = len(sel.devices) if sel.enabled else 0
+        add("app_entities", "app", "Dispositivos de la app elegidos",
+            "Dispositivos → los de esta casa que usa la app. Los avisos de fallas, la voz, la app y el editor sólo usan ésos.",
+            sel.enabled and not new, "ents",
+            detail=("Todavía sin revisar: la app usa todos" if not sel.enabled else f"{len(new)} nuevos sin revisar" if new else f"{n_sel} dispositivos"))
     n_views = len(views.views) if views is not None else 0
     add("dashboard", "app", "Un dashboard armado", "Dashboards → «Armar con el asistente».", n_views > 0, "views", detail=f"{n_views} dashboards" if n_views else "")
     add("default", "app", "Un dashboard por defecto (★)", "Lo ven los equipos que no tienen uno elegido.", bool(views is not None and views.default), "views", optional=True)

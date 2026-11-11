@@ -34,6 +34,12 @@ def _public(rt) -> dict[str, Any]:
     if support and not cfg.get("support_phone"):
         cfg["support_phone"] = support
     cfg["voice"] = bool(rt.get("voice"))  # la app muestra el micrófono sólo si hay "cerebro"
+    # dispositivos de la app: la app y el editor sólo muestran éstos (sin selección guardada, todos, como siempre)
+    sel = rt.get("selection")
+    allowed = sel.allowed() if sel else None
+    cfg.pop("app_entities", None)
+    if allowed is not None:
+        cfg["app_entities"] = sorted(allowed)
     return {"config": cfg, "name": entry.options.get(CONF_NAME, entry.data.get(CONF_NAME, "")), "version": VERSION}
 
 
@@ -79,6 +85,49 @@ async def ws_config_save(hass: HomeAssistant, connection: websocket_api.ActiveCo
         return
     await rt["dashboard"].async_save(config)
     connection.send_result(msg["id"], {"ok": True})
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/entities/list"})
+@websocket_api.require_admin
+@callback
+def ws_entities_list(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Página «Dispositivos»: todo lo que hay en la casa, qué está elegido (o la propuesta, si todavía no se guardó) y qué es nuevo."""
+    from .selection import candidate_devices, candidate_loose, proposal  # noqa: PLC0415
+
+    rt = _rt(hass)
+    sel = rt["selection"]
+    if sel.enabled:
+        devs, ents = sel.devices, sel.entities
+    else:
+        views = getattr(rt.get("views"), "views", {}) if rt.get("views") else {}
+        devs, ents = proposal(hass, rt["dashboard"].config, views)
+    new_ids = {x["id"] for x in sel.unreviewed()}
+    devices = [{**d, "selected": d["id"] in devs, "new": d["id"] in new_ids} for d in candidate_devices(hass)]
+    loose = [{**x, "selected": x["id"] in ents, "new": x["id"] in new_ids} for x in candidate_loose(hass)]
+    connection.send_result(msg["id"], {"enabled": sel.enabled, "devices": devices, "loose": loose, "new": len(new_ids)})
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/entities/save",
+    vol.Required("devices"): [str],
+    vol.Required("entities"): [str],
+    vol.Optional("enabled", default=True): bool,
+})
+@websocket_api.require_admin
+@websocket_api.async_response
+async def ws_entities_save(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Guarda los dispositivos de la app; «enabled: false» vuelve a mostrar todo (sin filtrar)."""
+    from homeassistant.helpers.dispatcher import async_dispatcher_send  # noqa: PLC0415
+
+    from .audit import log as audit_log  # noqa: PLC0415
+
+    rt = _rt(hass)
+    sel = rt["selection"]
+    await sel.async_save(msg["devices"][:5000], msg["entities"][:5000], msg["enabled"])
+    audit_log(hass, "config", "dispositivos de la app", "", "instalador",
+              f"{len(msg['devices'])} dispositivos y {len(msg['entities'])} entidades" if msg["enabled"] else "todo habilitado (sin filtrar)")
+    async_dispatcher_send(hass, SIGNAL_CONFIG, rt["dashboard"].config)  # la app y el editor se actualizan al momento
+    connection.send_result(msg["id"], {"ok": True, "count": len(sel.allowed() or [])})
 
 
 @websocket_api.websocket_command({
@@ -400,4 +449,4 @@ from .views import WS_COMMANDS as VIEWS_WS  # noqa: E402
 from .media import WS_COMMANDS as MEDIA_WS  # noqa: E402
 from .setup_steps import WS_COMMANDS as SETUP_WS  # noqa: E402
 
-COMMANDS = (*APP_WS, *PAIR_WS, *AUDIT_WS, *PRIVACY_WS, *VIEWS_WS, *MEDIA_WS, *SETUP_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
+COMMANDS = (ws_entities_list, ws_entities_save, *APP_WS, *PAIR_WS, *AUDIT_WS, *PRIVACY_WS, *VIEWS_WS, *MEDIA_WS, *SETUP_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)

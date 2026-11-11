@@ -487,6 +487,17 @@
     viewFor() { const l = this.lay(); return Object.assign({}, this.v, { kind: this.K, blocks: l.blocks, orientation: l.orientation || null, header: l.header || null, dock: l.dock || null, theme: l.theme || null, style: l.style || null, bg: l.bg || null, v: l.v, cols: l.cols, side: l.side, layouts: undefined }); }
     model() { return this.card && this.card.model ? this.card.model() : null; }
     states() { return this.hass.states; }
+    /** Para elegir equipos: sólo los dispositivos de la app (página «Dispositivos»). La vista previa usa todos (states()),
+     *  así un dashboard viejo con algo que ya no se eligió no muestra «no existe». */
+    pickStates() {
+      const all = this.hass.states, inc = this.cfg && this.cfg.app_entities;
+      if (!Array.isArray(inc) || !inc.length) return all;
+      if (this._pkFrom === all && this._pkInc === inc) return this._pk;
+      const set = new Set(inc), o = {};
+      for (const k in all) if (set.has(k)) o[k] = all[k];
+      this._pkFrom = all; this._pkInc = inc; this._pk = o;
+      return o;
+    }
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
     toast(t) { const e = this.$('#toastE'); e.textContent = t; e.style.display = 'block'; clearTimeout(this.tt); this.tt = setTimeout(() => { e.style.display = 'none'; }, 2200); }
     dirty() { return JSON.stringify(this.v) !== JSON.stringify(this.saved); }
@@ -837,7 +848,7 @@
 
     /* ───────── propiedades ───────── */
     entOptions(domains, val) {
-      const S = this.states();
+      const S = this.pickStates();
       const ids = Object.keys(S).filter((e) => !domains || domains.includes(e.split('.')[0]));
       if (val && !ids.includes(val)) ids.push(val);
       ids.sort((a, b) => this.fname(a).localeCompare(this.fname(b), 'es'));
@@ -870,7 +881,7 @@
     /** Buscador de equipos: escribís y filtra por nombre, ambiente, tipo o id; con flechas y Enter. */
     openCB(anchor, domains, onPick, allowNone = true) {
       this.closeCB();
-      const S = this.states(), doms = domains && domains.length ? domains : null;
+      const S = this.pickStates(), doms = domains && domains.length ? domains : null;
       const all = Object.keys(S).filter((e) => !doms || doms.includes(this.domOf(e))).map((e) => {
         const d = this.domOf(e), n = this.fname(e), a = this.areaOf(e);
         return { e, d, n, a, k: `${n} ${a} ${DOM_NAME[d] || ''} ${e}`.toLowerCase() };
@@ -984,7 +995,7 @@
       }
       b.cfg = b.cfg || {};
       const c = b.cfg, CAT = window.MaeVista.CATALOG, m = this.model();
-      const S = this.states(), opts = (doms) => Object.keys(S).filter((e) => doms.includes(e.split('.')[0])).sort().map((e) => [e, this.fname(e)]);
+      const S = this.pickStates(), opts = (doms) => Object.keys(S).filter((e) => doms.includes(e.split('.')[0])).sort().map((e) => [e, this.fname(e)]);
       if (this.el != null && b.type !== 'rooms') { r.innerHTML = this.elemEditor(b, this.el, opts); return; }
       let h = `<h4>${esc((CAT[b.type] || {}).name || b.type)}</h4><label class="fld"><span>Título (vacío: sin título)</span><input data-f="title" value="${esc(b.title || '')}"></label>`;
       let hs = ''; // el aspecto propio de la tarjeta (va en la pestaña Aspecto)
@@ -1026,7 +1037,7 @@
           h += `<p class="hint">Toma solos los sensores de puertas, ventanas y portones de la casa. Tocar la tarjeta abre «Puertas y ventanas».</p>`;
           break;
         case 'agenda': {
-          const cals = Object.keys(this.states()).filter((x) => x.startsWith('calendar.'));
+          const cals = Object.keys(this.pickStates()).filter((x) => x.startsWith('calendar.'));
           const sel = c.entities && c.entities.length ? c.entities : null;
           h += cals.length ? `<div class="fld"><span>Calendarios (ninguno marcado: todos)</span>${cals.map((id) => `<label class="chk"><input type="checkbox" data-cal="${esc(id)}" ${sel && sel.includes(id) ? 'checked' : ''}> ${esc(this.fname(id))}</label>`).join('')}</div>`
             : '<p class="hint">La casa no tiene calendarios todavía (Google Calendar, Local Calendar…).</p>';
@@ -1240,7 +1251,7 @@
       const P = this.v.plan || {}, z = (P.zones || [])[i];
       if (!z) { this.pz = null; return '<p class="hint">Esa zona ya no está.</p>'; }
       const m = this.model(), rooms = m ? m.rooms.map((x) => x.name) : [];
-      const lights = Object.keys(this.states()).filter((e) => /^(light|switch)\./.test(e)).sort((a, c) => this.fname(a).localeCompare(this.fname(c), 'es'));
+      const lights = Object.keys(this.pickStates()).filter((e) => /^(light|switch)\./.test(e)).sort((a, c) => this.fname(a).localeCompare(this.fname(c), 'es'));
       return `<div class="crumb"><button class="eb sm" data-pzback>‹ Plano</button><span>› ${esc(z.name)}</span></div><h4>Ambiente del plano</h4>
         <label class="fld"><span>Nombre del cartel</span><input data-pzf="name" value="${esc(z.name)}" maxlength="40"></label>
         <label class="fld"><span>Ambiente que abre al mantener apretado</span><select data-pzf="room"><option value="">—</option>${rooms.map((r) => `<option ${z.room === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>
@@ -1263,7 +1274,7 @@
     roomsCfg() {
       if (Array.isArray(this.cfg.rooms) && this.cfg.rooms.length) return this.cfg.rooms;
       // todavía se arman solos con las Áreas de HA: se pasan a manual con lo mismo que se ve hoy
-      const h = this.hass || {}, areas = h.areas || {}, ents = h.entities || {}, devs = h.devices || {}, S = this.states();
+      const h = this.hass || {}, areas = h.areas || {}, ents = h.entities || {}, devs = h.devices || {}, S = this.pickStates();
       const rooms = Object.values(areas).map((a) => ({ name: a.name || a.area_id, entities: [], _a: a.area_id }));
       const by = {}; rooms.forEach((x) => { by[x._a] = x; });
       Object.keys(S).sort().forEach((id) => {
@@ -1575,7 +1586,7 @@
     }
     /** «Automático» → manual: arranca con lo que la app está mostrando (así se puede cambiar lo que ya está). */
     fromAuto(b) {
-      const c = b.cfg = b.cfg || {}, m = this.model(), S = this.states();
+      const c = b.cfg = b.cfg || {}, m = this.model(), S = this.pickStates();
       if (b.type === 'kpis' && !(c.items && c.items.length)) {
         const shown = this.vista && this.vista._test && this.vista._test.X.kpiItems && this.vista._test.X.kpiItems[b.id];
         c.items = clone(shown && shown.length ? shown : [{ kind: 'lights' }, { kind: 'temp' }, { kind: 'alarm' }]);

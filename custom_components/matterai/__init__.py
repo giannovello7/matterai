@@ -115,7 +115,14 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     views = Views(hass)
     await views.async_load()
-    rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices, audit=audit, privacy=privacy, views=views)
+    # qué dispositivos y entidades de Home Assistant usa la app (avisos, voz, app y editor)
+    from .selection import Selection  # noqa: PLC0415
+
+    selection = Selection(hass)
+    await selection.async_load()
+    selection.start()
+    entry.async_on_unload(selection.stop)
+    rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices, audit=audit, privacy=privacy, views=views, selection=selection)
     async_register_service(hass)
     from datetime import timedelta  # noqa: PLC0415
 

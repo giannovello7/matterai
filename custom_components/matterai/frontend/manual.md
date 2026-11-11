@@ -16,6 +16,7 @@ MatterAI son cuatro piezas que trabajan juntas:
 3. **Dirección local y wifi**: en Ficha de la casa → «Cambiar datos». La dirección local es la de adentro de la casa (por ejemplo, `192.168.1.50:8123`) y el wifi, el nombre de la red tal como aparece en el celular (si hay varias, separadas por coma; es opcional). Con eso la app se conecta directo cuando el celular está en la casa.
 4. **Dar de alta la casa en el panel central**: corré `matterai-home\instalador\alta-cliente.ps1` (o «Agregar casa» en el panel central). Te da la **clave de la casa**: cargala en «Cambiar datos» → «Clave del panel central».
 5. **Ambientes**: cada equipo en su Área de Home Assistant. Lo que no está en un ambiente no aparece en la app. Los ajustes finos (nombres, qué equipos van, alarma, portones, cámaras) se hacen en **La casa**.
+   **Dispositivos**: elegí los dispositivos de Home Assistant que usa la app (viene una propuesta armada: revisala y guardá). Los avisos de fallas, la voz, la app y el editor sólo usan ésos.
 6. **Dashboards**: Dashboards → «Armar con el asistente». Elegís la estructura MatterAI, tu plantilla o un dashboard existente; se adapta solo y te dice qué revisar.
 7. **Vincular los celulares**: Equipos → el QR (uno por celular, vence en 24 horas). La familia baja la app y lo escanea.
 8. **Automatizaciones**: las básicas (buenas noches, me voy / llego, portero, avisos de aberturas, riego).
@@ -42,6 +43,15 @@ Lo que ve cada persona en su pantalla. Cada dashboard tiene **un diseño para el
 
 ## La casa
 Los datos que usan todos los dashboards: General (marca, soporte, personas), Ambientes (qué equipos hay en cada uno), Seguridad (alarma, portones, cerraduras, cámaras) y Secciones (qué partes tiene la app). Al final, «Inicio clásico» tiene el diseño de la pantalla anterior, sólo para equipos que todavía la usan.
+
+## Dispositivos
+Qué dispositivos de Home Assistant usa la app. Se elige por **dispositivo** (trae sus entidades útiles; las técnicas, de diagnóstico o configuración, quedan afuera solas) y aparte las **sueltas**: escenas, rutinas, scripts, ayudantes, personas, clima.
+- **Sirve para**: que los **avisos de fallas** sean sólo de lo que instalaste para el cliente, que **«Mate»** sólo controle eso, que la **app** no muestre cosas técnicas y que en el **editor** busques entre pocos equipos.
+- **La primera vez**: mientras no guardes, la app usa todo (como siempre). La página trae una **propuesta**: lo que ya está en ambientes y dashboards, lo que tiene ambiente y las escenas, rutinas, clima, personas, calendarios, cámaras y alarmas. Revisala y tocá **Guardar**.
+- **Buscador y filtros**: todos, elegidos, sin elegir y **nuevos**. Por ambiente, «Todos» o «Ninguno».
+- **Dispositivos nuevos**: los que aparecen después quedan **sin revisar** (no entran solos). Lo avisan **Salud y avisos** y la **Puesta en marcha**.
+- **Mostrar todo sin filtrar**: vuelve a como era antes.
+- Lo de la integración MatterAI (automatizaciones, mantenimiento) está siempre. Un dashboard viejo que use algo que sacaste lo sigue mostrando; en el editor ya no aparece para elegir.
 
 ## Equipos
 - **Vincular**: el QR y el link (por WhatsApp o impreso).

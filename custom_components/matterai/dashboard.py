@@ -44,6 +44,7 @@ def clean(config: dict[str, Any]) -> dict[str, Any]:
     out.pop("type", None)
     out.pop("base_url", None)  # lo pone la app
     out.pop("voice", None)  # lo calcula la integración (hay o no clave de IA)
+    out.pop("app_entities", None)  # lo calcula la integración (página «Dispositivos»)
     return out
 
 

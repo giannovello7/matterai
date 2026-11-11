@@ -1460,8 +1460,19 @@
       return r && !n.toLowerCase().includes(r.name.toLowerCase()) ? `${n} (${r.name})` : n;
     }
 
+    /** Dispositivos de la app (página «Dispositivos» del panel): los estados sólo de lo elegido; sin selección, todos. */
+    _appStates() {
+      const h = this._hass, inc = this._config && this._config.app_entities;
+      if (!Array.isArray(inc) || !inc.length) return h.states;
+      if (this._pickFrom === h.states && this._pickInc === inc) return this._picked;
+      if (this._pickInc !== inc) { this._pickInc = inc; this._pickSet = new Set(inc); }
+      const o = {}, all = h.states, set = this._pickSet;
+      for (const k in all) if (set.has(k)) o[k] = all[k];
+      this._pickFrom = all; this._picked = o;
+      return o;
+    }
     _model() {
-      const h = this._hass, c = this._config, S = h.states;
+      const h = this._hass, c = this._config, S = this._appStates();
       const reg = h.entities || {}, devs = h.devices || {}, areas = h.areas || {};
       const exA = new Set((c.exclude_areas || []).map((x) => String(x).toLowerCase()));
       const exE = new Set(c.exclude_entities || []);

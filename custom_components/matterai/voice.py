@@ -112,9 +112,11 @@ def house_catalog(hass: HomeAssistant, config: dict[str, Any]) -> list[dict[str,
     rooms: list[dict[str, Any]] = []
     seen: set[str] = set()
 
+    from .selection import is_allowed  # noqa: PLC0415
+
     def ok(eid: str) -> bool:
         st = hass.states.get(eid)
-        if st is None or st.domain not in ALLOWED or eid in seen:
+        if st is None or st.domain not in ALLOWED or eid in seen or not is_allowed(hass, eid):  # sólo los dispositivos de la app
             return False
         if st.domain == "cover" and st.attributes.get("device_class") in GARAGE:
             return False
