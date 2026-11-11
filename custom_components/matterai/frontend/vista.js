@@ -180,6 +180,16 @@
     ['savant', 'Elegante', 'Negro y champagne, minimalista, letra fina espaciada'],
   ];
   const STYLES = STYLE_LIST.map((x) => x[0]);
+  /** Anchos de las columnas de la tablet a partir de layout.cols (pesos relativos). Con columna al costado, W[0] es su
+   *  porcentaje del ancho total (un 0 de los diseños viejos = 34 %, lo justo para un plano) y el resto son los pesos de las
+   *  del medio (0 = 1). */
+  function colWidths(cols, side) {
+    const w = cols.map((x) => (+x > 0 ? +x : 0));
+    if (!side) return w.map((x) => x || 1);
+    const mids = w.slice(1).map((x) => x || 1), tot = w.slice(1).reduce((a, x) => a + x, 0);
+    const sidePct = w[0] ? Math.round((w[0] / (w[0] + (tot || mids.reduce((a, x) => a + x, 0)))) * 100) : 34;
+    return [Math.max(15, Math.min(70, sidePct)), ...mids];
+  }
   const GRAD_LIST = [
     ['aurora', 'Aurora', 'radial-gradient(90% 70% at 15% 10%,#2b5876 0,transparent 60%),radial-gradient(80% 70% at 90% 30%,#4e4376 0,transparent 60%),radial-gradient(90% 80% at 50% 100%,#1d6b5f 0,transparent 60%),#0f1419'],
     ['atardecer', 'Atardecer', 'linear-gradient(160deg,#3a1c4a 0%,#9c3d54 45%,#e2703a 80%,#eeb86d 100%)'],
@@ -253,25 +263,36 @@
         n('music', 0, { title: 'Música' }),
       ];
     } else if (k === 'control4') {
-      // Control4: arriba la barra de temas (Seguridad, Luces, Clima…), una fila de portadas (escenas),
-      // la grilla de controles oscuros (aire, portones, alarma), las cámaras como fotos y la música abajo de lado a lado
-      // tablet: el plano al costado (todo el alto), la barra de temas arriba y la música abajo, de lado a lado
-      G = plan ? { side: true, cols: [0, 1, 1] } : { side: false, cols: [1, 1, 1] };
+      // Como la pantalla de inicio de un panel táctil Control4 (sin logos): arriba los favoritos (escenas), abajo la
+      // grilla grande de «servicios» (Luces, Clima, Seguridad, Música, Cámaras…), cuadrados oscuros con el ícono de línea
+      // blanco y el nombre abajo. A la derecha lo que se mira de un vistazo: el aire, la alarma, una cámara y la música.
+      // tablet: dos columnas (la de los servicios más ancha); el ancho se ajusta en el editor
+      const services = [
+        { name: 'Ambientes', icon: 'home', tap: { type: 'screen', screen: 'casa' } },
+        { name: 'Luces', icon: 'bulb', tap: { type: 'screen', screen: 'luces' } },
+        clim ? { name: 'Clima', icon: 'temp', tap: { type: 'more_info', entity: clim } } : { name: 'Clima', icon: 'temp', tap: { type: 'screen', screen: 'clima' } },
+        { name: 'Seguridad', icon: 'shield', tap: { type: 'screen', screen: 'seguridad' } },
+        { name: 'Música', icon: 'music', tap: { type: 'screen', screen: 'musica' } },
+        cams.length ? { name: 'Cámaras', icon: 'cam', tap: { type: 'screen', screen: 'camaras' } } : null,
+        { name: 'Aberturas', icon: 'door', tap: { type: 'screen', screen: 'aberturas' } },
+        { name: 'Agenda', icon: 'cal', tap: { type: 'screen', screen: 'agenda' } },
+      ].filter(Boolean);
+      const svc = (col) => n('svc', col, { type: 'buttons', title: 'Servicios', cfg: { style: 'services', items: services } });
+      const fav = (col) => n('fav', col, { type: 'scenes', title: 'Favoritos', cfg: { auto: true } });
+      G = { side: false, cols: [62, 38] };
       B = T ? [
-        plan ? Object.assign({}, plan, { fill: true }) : n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('list') }),
-        n('chips', 1, Object.assign({ type: 'buttons', cfg: { style: 'chips', items: themeChips } }, top)),
-        n('scenes', 1, { title: 'Escenas', cfg: { auto: true, style: 'covers' } }),
-        clim ? n('climate', 1, { title: 'Aire', cfg: { entity: clim } }) : null,
-        n('grid', 1, { type: 'buttons', cfg: { cols: 2, items: tilesFor(4).concat(m && m.alarm ? [{ entity: m.alarm.entity_id, name: 'Alarma' }] : []).slice(0, 4) } }),
-        ...cams.slice(0, 2).map((id, i) => camHalf(id, i, 2)),
-        n('routines', 2, { title: 'Rutinas', cfg: { auto: true } }),
-        n('music', 1, Object.assign({ title: 'Música' }, bot)),
+        fav(0),
+        svc(0),
+        clim ? n('climate', 1, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : n('weather', 1, { title: 'Clima' }),
+        m && m.alarm ? n('alarm', 1, { title: 'Seguridad' }) : null,
+        cams.length ? n('cam', 1, { type: 'camera', title: 'Cámaras', cfg: { entity: cams[0], video: 'photo' } }) : null,
+        n('music', 1, { title: 'Escuchando' }),
       ] : [
-        n('chips', 0, { type: 'buttons', cfg: { style: 'chips', items: themeChips } }),
-        n('scenes', 0, { title: 'Escenas', cfg: { auto: true, style: 'covers' } }),
-        n('grid', 0, { type: 'buttons', cfg: { cols: 2, items: tilesFor(4) } }),
-        n('routines', 0, { title: 'Rutinas', cfg: { auto: true, style: 'list' } }),
-        ...cams.slice(0, 2).map((id, i) => camHalf(id, i, 0)),
+        fav(0),
+        svc(0),
+        clim ? n('climate', 0, { title: 'Clima', cfg: { entity: clim } }) : null,
+        m && m.alarm ? n('alarm', 0, { title: 'Seguridad' }) : null,
+        n('music', 0, { title: 'Escuchando' }),
       ];
     } else if (k === 'savant') {
       // Savant / Lutron: los ambientes son la pantalla (tarjetas grandes), negro y dorado, todo minimalista;
@@ -667,6 +688,10 @@
             return `${t}<div class="v-chips">${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false };
               return `<button class="v-chp ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}>${it.icon === '' ? '' : ic(icOf(it))}<span>${esc(it.name || fname(it.entity) || 'Botón')}</span></button>`; }).join('')}</div>${elAdd('Agregar un botón')}`;
           }
+          if (c.style === 'services') {
+            return `${t}<div class="v-svc"${cols}>${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false, txt: '' };
+              return `<button class="v-svi ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}><span class="v-svic">${ic(icOf(it))}</span><b>${esc(it.name || fname(it.entity) || 'Botón')}</b>${it.entity && s.txt ? `<small>${esc(s.txt)}</small>` : ''}</button>`; }).join('')}</div>${elAdd('Agregar un botón')}`;
+          }
           if (c.style === 'tiles') {
             const sw = (id) => id && !/^(scene|script|button|input_button|camera|alarm_control_panel)\./.test(id);
             return `${t}<div class="v-mosaic"${cols}>${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false, txt: '' };
@@ -888,7 +913,7 @@
       X.zonePolys = zones;
       const zoneOn = (z) => (z.lights || []).filter((id) => (st(id) || {}).state === 'on').length;
       const cen = (z) => { const P = z.pin || [z.poly.reduce((a, q) => a + q[0], 0) / z.poly.length, z.poly.reduce((a, q) => a + q[1], 0) / z.poly.length]; return P; };
-      return `<div class="v-plan${sz}" style="aspect-ratio:${ar}"><svg viewBox="0 0 1000 ${(1000 / ar).toFixed(0)}" preserveAspectRatio="none">
+      return `<div class="v-plan${sz}" style="aspect-ratio:${ar};--ar:${ar}"><svg viewBox="0 0 1000 ${(1000 / ar).toFixed(0)}" preserveAspectRatio="none">
         <defs>${zones.map((z, i) => `<mask id="vz${i}" maskUnits="userSpaceOnUse"><polygon points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}" fill="#fff"/></mask>`).join('')}</defs>
         <image href="${esc(isDay ? day : off)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" data-planimg="1"/>
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
@@ -1074,12 +1099,13 @@
       if (X.shell !== sig) {
         X.shell = sig; X.cache = {}; X.colSig = {}; X.partCache = {};
         X.el.className = `vista k-${K}${vertical ? ' vert' : ''}${editing() ? ' editing' : ''}${light ? ' light' : ''} st-${st}${bgx ? ' has-bg' : ''}${K === 'tablet' && !side ? ' noside' : ''}`;
-        const w = (x) => (x ? `minmax(0,${x}fr)` : 'auto');
-        const colDiv = (i) => `<div class="v-col v-c${i}" id="v-c${i}" data-col="${i}"></div>`;
-        const inner = (side ? cols.slice(1).map((_, j) => colDiv(j + 1)) : cols.map((_, i) => colDiv(i))).join('');
-        const tpl = (side ? cols.slice(1) : cols).map(w).join(' ');
-        const sideW = side && cols[0] ? ` style="flex:0 0 ${Math.round((cols[0] / cols.reduce((a, x) => a + (x || 0), 0)) * 100)}%;max-width:none"` : '';
-        X.tabletHTML = `<div class="v-tab">${side ? `<div class="v-c0 v-side" id="v-c0" data-col="0"${sideW}></div>` : ''}<div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top" data-zone="top"></div><div class="v-cols" style="grid-template-columns:${tpl}">${inner}</div><div class="v-bot" id="v-bot" data-zone="bottom"></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>`;
+        const W = colWidths(cols, side);
+        const colDiv = (i) => `<div class="v-col v-c${i}" id="v-c${i}" data-col="${i}" style="flex:${W[i]} 1 0"></div>`;
+        const gut = (i) => (editing() && ctx.edit.onCols ? `<div class="v-gut" data-gut="${i}" title="Arrastrá para cambiar el ancho"><i></i></div>` : '');
+        const ids = side ? cols.slice(1).map((_, j) => j + 1) : cols.map((_, i) => i);
+        const inner = ids.map((i, k) => (k ? gut(i - 1) : '') + colDiv(i)).join('');
+        const sideW = side ? ` style="--side:${W[0]}%"` : '';
+        X.tabletHTML = `<div class="v-tab"${sideW}>${side ? `<div class="v-c0 v-side" id="v-c0" data-col="0"></div>${gut('side')}` : ''}<div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top" data-zone="top"></div><div class="v-cols">${inner}</div><div class="v-bot" id="v-bot" data-zone="bottom"></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>`;
         X.el.innerHTML = K === 'tablet'
           ? `${X.tabletHTML}${shared()}`
           : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`;
@@ -1093,7 +1119,12 @@
         const colOf = (b) => Math.max(0, Math.min(nCol - 1, +b.col || 0));
         setCol('#v-top', bl.filter((b) => b.zone === 'top'), m, editing() ? addSlot(1, 'top') : '');
         setCol('#v-bot', bl.filter((b) => b.zone === 'bottom'), m, editing() ? addSlot(1, 'bottom') : '');
-        for (let i = 0; i < nCol; i++) setCol(`#v-c${i}`, bl.filter((b) => !b.zone && colOf(b) === i), m, addSlot(i));
+        for (let i = 0; i < nCol; i++) {
+          const list = bl.filter((b) => !b.zone && colOf(b) === i);
+          setCol(`#v-c${i}`, list, m, addSlot(i));
+          // al usar el dashboard, una columna sin tarjetas no deja un hueco: las otras ocupan su lugar
+          const ce = X.el.querySelector(`#v-c${i}`); if (ce && ce.classList) ce.classList.toggle('v-empty', !list.length && !editing());
+        }
         fit(vertical);
         const c = card();
         const p = drawPlayer();
@@ -1215,11 +1246,14 @@
      * así se ve igual en una tablet de 8" que en una de 12", sin tarjetas apretadas ni textos cortados. */
     function fit(vertical) {
       const e = X.el; if (!e || !e.style) return;
-      if (editing() || typeof innerWidth === 'undefined') { e.style.width = e.style.height = e.style.zoom = ''; return; }
+      if (typeof innerWidth === 'undefined') return;
+      const setVh = (h) => { if (e.style.setProperty) e.style.setProperty('--vh', `${h}px`); };
+      e.style.height = '';
+      if (editing()) { e.style.width = e.style.zoom = ''; setVh(innerHeight); return; }
       const iw = innerWidth, ih = innerHeight, W = Math.max(iw, vertical ? 800 : 1180), s = iw / W;
-      // zoom (y no transform) para que el alto, el scroll vertical y las ventanas fijas sigan andando bien
+      // zoom (y no transform) para que el scroll vertical y las ventanas fijas sigan andando bien
       e.style.zoom = s < 1 ? String(s) : ''; e.style.width = s < 1 ? W + 'px' : '';
-      e.style.height = Math.round(ih / s) + 'px';
+      setVh(Math.round(ih / s));
     }
     /** Micrófono a la vista siempre (como en el diseño), salvo que el instalador apague la voz. */
     function voiceOn() { const c = card(); return !!c && typeof c.voice === 'function' && !(c._config && c._config.voice === false); }
@@ -1466,6 +1500,45 @@
     const endSlide = () => { if (X.sliding) { X.sliding = false; setTimeout(render, 400); } };
     ['pointerup', 'pointercancel'].forEach((ev) => { if (typeof addEventListener === 'function') addEventListener(ev, endSlide); });
     if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', endSlide); // al volver a la app, nunca trabada
+    // editor: el ancho de las columnas se cambia arrastrando la manija que hay entre ellas
+    let gutDrag = null;
+    el.addEventListener('pointerdown', (e) => {
+      const g = editing() && ctx.edit.onCols && e.target.closest && e.target.closest('[data-gut]'); if (!g) return;
+      e.preventDefault(); e.stopPropagation();
+      const tab = X.el.querySelector('.v-tab'), k = g.dataset.gut;
+      gutDrag = { g, k, tab, a: k === 'side' ? null : X.el.querySelector(`#v-c${k}`), b: k === 'side' ? null : g.nextElementSibling, moved: false };
+      g.classList.add('on');
+      try { g.setPointerCapture(e.pointerId); } catch (_) { /* navegador viejo */ }
+    }, true);
+    el.addEventListener('pointermove', (e) => {
+      const d = gutDrag; if (!d) return;
+      d.moved = true;
+      if (d.k === 'side') {
+        const r = d.tab.getBoundingClientRect();
+        d.side = Math.max(15, Math.min(70, Math.round(((e.clientX - r.left) / r.width) * 100)));
+        d.tab.style.setProperty('--side', `${d.side}%`);
+        return;
+      }
+      if (!d.a || !d.b) return;
+      const ra = d.a.getBoundingClientRect(), rb = d.b.getBoundingClientRect(), tot = ra.width + rb.width, MIN = 150;
+      const wa = Math.max(MIN, Math.min(tot - MIN, e.clientX - ra.left));
+      d.a.style.flex = `${wa} 1 0`; d.b.style.flex = `${tot - wa} 1 0`;
+    });
+    const gutEnd = () => {
+      const d = gutDrag; if (!d) return;
+      gutDrag = null; d.g.classList.remove('on');
+      if (!d.moved) return;
+      X.gutAt = Date.now();
+      const L = X.layout || {}, side = L.side !== false;
+      const mids = [...X.el.querySelectorAll('.v-cols>.v-col')].map((c) => c.getBoundingClientRect().width);
+      const sum = mids.reduce((a, x) => a + x, 0) || 1;
+      if (side) {
+        const sp = d.side || colWidths(L.cols || [0, 1, 1], true)[0];
+        ctx.edit.onCols([sp, ...mids.map((w) => Math.max(1, Math.round(((100 - sp) * w) / sum)))]);
+      } else ctx.edit.onCols(mids.map((w) => Math.max(1, Math.round((100 * w) / sum))));
+    };
+    ['pointerup', 'pointercancel'].forEach((ev) => el.addEventListener(ev, gutEnd));
+    el.addEventListener('click', (e) => { if (X.gutAt && Date.now() - X.gutAt < 400 && e.target.closest && e.target.closest('[data-gut]')) e.stopPropagation(); }, true);
     // editor: los carteles del plano se arrastran a su lugar
     let pinDrag = null;
     el.addEventListener('pointerdown', (e) => {
@@ -1649,5 +1722,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, migrateLayout, TABLET_PRESETS, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
+  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, migrateLayout, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
 })(typeof window !== 'undefined' ? window : globalThis);

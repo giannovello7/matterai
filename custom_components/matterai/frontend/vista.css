@@ -133,12 +133,6 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .v-eq i{width:3px;border-radius:2px;background:var(--warm);animation:v-eq 1s infinite ease-in-out}.v-eq i:nth-child(2){animation-delay:.2s}.v-eq i:nth-child(3){animation-delay:.4s}
 @keyframes v-eq{0%,100%{height:4px}50%{height:12px}}
 /* ───── tablet (horizontal: plano · columnas; vertical: plano arriba) ───── */
-.vista.k-tablet{height:100vh;padding:16px;overflow:hidden;box-sizing:border-box}
-.v-tab{display:flex;gap:16px;height:100%}
-.v-c0{height:100%;flex:none;display:flex;flex-direction:column;gap:12px;max-width:46%}
-/* sólo la tarjeta que «llena el alto» (el plano) ocupa lo que sobra; las demás, su alto justo */
-.v-b.fill{flex:1 1 0;min-height:0}.v-b.fill>.v-plan{height:100%;width:auto;max-width:100%;margin:0 auto}
-.v-main{flex:1;min-width:0;display:flex;flex-direction:column;gap:12px}
 .k-tablet .v-head{gap:12px}.k-tablet .v-head .v-when b{font-size:50px;line-height:.95}.k-tablet .v-head .v-when span{font-size:13.5px}
 .k-tablet .v-chip{padding:10px 14px!important;border-radius:18px;font-size:22px;font-weight:400}.k-tablet .v-chip svg.i{width:26px;height:26px}
 .k-tablet .v-sq{width:44px;height:44px}
@@ -154,9 +148,6 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .k-tablet .v-b .v-scene.act{border-color:var(--warm)!important;background:var(--warm-s)!important}
 .k-tablet .v-top .v-kpi{background:var(--card)!important;border:1px solid var(--line)!important}
 .k-tablet .v-sgrid .v-scene{padding:14px 12px!important;border-radius:16px}
-.v-cols{flex:1;min-height:0;display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.v-c1,.v-c2{display:flex;flex-direction:column;gap:12px;min-height:0;overflow:auto;scrollbar-width:none}
-.v-c1::-webkit-scrollbar,.v-c2::-webkit-scrollbar{display:none}
 .k-tablet .v-b>h3:first-child{margin-top:0}
 .v-dock{display:flex;justify-content:space-between;gap:6px;padding:8px;border-radius:20px;background:var(--card);border:1px solid var(--line)}
 .vista .v-dock button{flex:1;width:auto;padding:8px 4px!important;border-radius:14px;font-size:11.5px;gap:4px}
@@ -165,21 +156,6 @@ html.with-inicio,body.with-inicio,body.with-inicio .home{background:#161b21}
 .vista .v-dock .v-mic{width:58px!important;height:58px;margin:-18px 6px 0;border-radius:50%;background:var(--fg)!important;color:var(--bg)!important}
 .vista .v-dock .v-mic svg.i{width:24px;height:24px}
 .v-dock .v-eq{top:4px;right:calc(50% - 20px)}
-/* tablet en vertical (como el diseño): el plano a la izquierda; arriba a la derecha la hora, el resumen y la
-   primera columna; abajo, de lado a lado, la segunda columna, la música y la barra */
-.vista.k-tablet.vert{height:100vh;overflow:hidden}
-.vert .v-tab{display:grid;grid-template-columns:auto minmax(0,1fr);grid-template-rows:auto auto minmax(0,1fr) auto auto auto auto;gap:12px;height:100%}
-.vert .v-main,.vert .v-cols{display:contents}
-.vert .v-c0{grid-row:1/4;grid-column:1;height:100%;max-width:52vw;min-height:0}
-.vert .v-b.fill>.v-plan{height:100%;width:auto;max-width:100%}
-.vert .v-head{grid-row:1;grid-column:2;flex-wrap:wrap;gap:10px}.vert .v-head .v-when b{font-size:40px}
-.vert .v-top{grid-row:2;grid-column:2;min-width:0}.vert .v-top .v-kpis{grid-template-columns:repeat(3,minmax(0,1fr))!important}
-.vert .v-c1{grid-row:3;grid-column:2;min-height:0}
-.vert .v-c2{grid-row:4;grid-column:1/3;flex-direction:row;overflow-x:auto;overflow-y:hidden;align-items:stretch;max-height:34vh}
-.vert .v-c2>.v-b,.vert .v-c2>.v-halfs{flex:1 0 260px;min-width:0;overflow:auto}
-.vert .v-c2>.v-eadd{flex:0 0 160px;margin:0}
-.vert .v-bot{grid-row:5;grid-column:1/3}.vert .v-player{grid-row:6;grid-column:1/3}.vert .v-dock{grid-row:7;grid-column:1/3}
-.vert .v-top:empty{display:none}
 /* ───── tema claro (se elige en el editor: oscuro, claro o según el equipo) ───── */
 .vista.light{--bg:#f2f3f5;--card:#ffffff;--card2:#eceef2;--line:rgba(22,27,33,.10);--fg:#161b21;--muted:#6a7383;--off:#d3d8e0;
   --warm:#d58a24;--warm-s:rgba(213,138,36,.14);--cool:#2b86c5;--cool-s:rgba(43,134,197,.12);--green:#2f9e63;--red:#d9534a;--red-s:rgba(217,83,74,.12)}
@@ -355,9 +331,6 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-isub{display:flex;align-items:center;gap:6px;margin:-4px 0 6px;color:var(--muted);font-size:12.5px}.v-isub svg.i{width:15px;height:15px;color:var(--cool)}
 
 /* tamaño del plano (tarjeta Plano → Tamaño): chico, mediano, normal o grande */
-.v-c0:has(.v-plan.sz-s),.v-c0:has(.v-plan.sz-m){justify-content:center}
-.v-c0 .v-plan.sz-s{height:62%}.v-c0 .v-plan.sz-m{height:80%}
-.v-c0:has(.v-plan.sz-xl){max-width:60%}.vert .v-c0:has(.v-plan.sz-xl){max-width:64vw}
 .k-phone .v-plan.sz-s{width:64%;margin:0 auto}.k-phone .v-plan.sz-m{width:82%;margin:0 auto}
 
 /* ═════════ piezas nuevas (2.23.3): fila de accesos, mosaicos, portadas, ambientes grandes y modos del aire ═════════ */
@@ -456,7 +429,7 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.st-vision :is(.v-nav,.v-dock) .v-mic{background:#fff!important;color:#1d1d1f!important;box-shadow:none!important;margin-top:0;width:46px!important;height:46px}
 /* tablet: la barra al costado (ornamento vertical) y la columna derecha como otra ventana */
 .vista.st-vision.k-tablet .v-tab{padding-left:88px}
-.vista.st-vision.k-tablet .v-dock{position:absolute;left:18px;top:50%;transform:translateY(-50%);flex-direction:column;justify-content:center;width:64px;padding:10px 7px;gap:8px;
+.vista.st-vision.k-tablet .v-dock{position:fixed;left:18px;top:50%;bottom:auto;margin:0;transform:translateY(-50%);flex-direction:column;justify-content:center;width:64px;padding:10px 7px;gap:8px;
   border-radius:32px;background:var(--vg)!important;border:0!important;box-shadow:var(--vg-hi),var(--vg-sh);z-index:3}
 .vista.st-vision.k-tablet .v-dock button{flex:none;width:50px;height:50px;padding:0!important;border-radius:50%;font-size:0;justify-content:center;color:rgba(255,255,255,.72)}
 .vista.st-vision.k-tablet .v-dock button.on{background:rgba(255,255,255,.22)!important;color:#fff}
@@ -473,51 +446,85 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.st-vision.light :is(.v-room.on,.v-tile.on,.v-tile.lit,.v-btn.on,.v-mtile.on){background:#1d1d1f!important;color:#fff!important}
 .vista.st-vision.light :is(.v-nav,.v-dock) .v-mic{background:#1d1d1f!important;color:#fff!important}
 
-/* ═════════ CONTROL4 — como un panel táctil de la marca (sin logos) ═════════
-   Carbón oscuro, tarjetas planas, ícono grande arriba y nombre abajo, acento celeste; lo activo en celeste con una raya
-   abajo; barra de abajo oscura de lado a lado; la música como barra «Now Playing». */
+/* ═════════ PANEL — como la pantalla de inicio de un panel táctil Control4 (sin logos ni nombres de marca) ═════════
+   Negro casi puro y plano: sin brillos, sin vidrio, sin sombras. Una barra de arriba con la hora a la izquierda y los
+   accesos a la derecha, títulos de sección chicos en mayúsculas, «servicios» como cuadrados oscuros con un ícono de línea
+   blanco grande y el nombre abajo, favoritos como rectángulos con el ícono en celeste, lo activo en celeste y la barra de
+   abajo de lado a lado con el elegido marcado arriba. Letra de interfaz neutra, sin redondeos grandes (6 px). */
 .vista.st-control4{--f-display:"Roboto","Helvetica Neue","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
-  --bg:#121519;--card:#22262d;--card2:#2c313a;--line:rgba(255,255,255,.06);--fg:#f1f3f6;--muted:#9097a3;--off:#3a404a;
-  --warm:#1f9bf0;--warm-s:rgba(31,155,240,.16);--cool:#1f9bf0;--cool-s:rgba(31,155,240,.16);--green:#36c37a;--red:#ef5350;--red-s:rgba(239,83,80,.16);letter-spacing:0}
-.vista.st-control4:not(.has-bg){background:linear-gradient(180deg,#1a1e24 0%,#121519 55%,#0d0f12 100%)}
-.vista.st-control4.has-bg::before{filter:brightness(.42) saturate(.9)}
-.vista.st-control4 :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile){background:var(--card)!important;border:0!important;border-radius:10px!important;box-shadow:0 1px 0 rgba(255,255,255,.04) inset,0 6px 18px rgba(0,0,0,.28)!important}
-.vista.st-control4 :is(.v-chip,.v-sq){background:var(--card)!important;border:0!important;border-radius:999px!important}
-.vista.st-control4 h3{margin:22px 4px 10px;text-transform:none;letter-spacing:.01em;font-size:16px;font-weight:500;color:var(--fg)}
-.vista.st-control4 .v-when b{font-size:26px!important;font-weight:400;letter-spacing:0}.vista.st-control4 .v-when span{font-size:12.5px;color:var(--muted)}
-/* botones del panel: ícono grande arriba, nombre abajo, centrados */
-.vista.st-control4 .v-btns{gap:10px}
-.vista.st-control4 .v-btns .v-btn{flex-direction:column!important;align-items:center!important;justify-content:center;text-align:center!important;gap:8px!important;min-height:104px;padding:16px 10px!important}
-.vista.st-control4 .v-btns .v-btn .v-bic{width:auto!important;height:auto!important;background:transparent!important;color:var(--fg)}
-.vista.st-control4 .v-btns .v-btn .v-bic svg.i{width:34px;height:34px;stroke-width:1.5}
-.vista.st-control4 .v-btns .v-btn .v-tx b{font-size:14px;font-weight:500}.vista.st-control4 .v-btns .v-btn .v-tx span{font-size:12px;color:var(--muted)}
-.vista.st-control4 .v-bic{background:var(--card2)!important;color:var(--fg)!important;border-radius:8px!important}
-/* activo: celeste con una raya abajo */
-.vista.st-control4 :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on){background:var(--card2)!important;box-shadow:inset 0 -3px 0 var(--warm),0 6px 18px rgba(0,0,0,.28)!important}
-.vista.st-control4 :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on) :is(.v-bic,.v-tic,.v-mbot>svg.i){color:var(--warm)!important}
+  --bg:#0a0b0d;--card:#18191c;--card2:#222428;--line:rgba(255,255,255,.07);--fg:#fff;--muted:#8e949c;--off:#2c2f34;
+  --warm:#2ea7e0;--warm-s:rgba(46,167,224,.16);--cool:#2ea7e0;--cool-s:rgba(46,167,224,.16);--green:#4cc38a;--red:#ef5350;--red-s:rgba(239,83,80,.16);
+  --c4-lit:#f5b942;letter-spacing:0}
+.vista.st-control4:not(.has-bg){background:#0a0b0d}
+.vista.st-control4.has-bg::before{filter:brightness(.35) saturate(.85)}
+/* todo plano: tarjetas oscuras sin borde ni sombra, esquinas de 6 px */
+.vista.st-control4 :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-scover,.v-plan){background:var(--card)!important;border:0!important;border-radius:6px!important;box-shadow:none!important}
+.vista.st-control4 .k-tablet .v-cols>.v-col>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:transparent;border:0;padding:0}
+.vista.st-control4.k-tablet :is(.v-cols>.v-col,.v-top,.v-bot,.v-side)>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis),
+.vista.st-control4.k-tablet :is(.v-cols>.v-col,.v-top,.v-bot,.v-side)>.v-row4>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:transparent;border:0;padding:0}
+.vista.st-control4 :is(.v-chip,.v-sq){background:var(--card)!important;border:0!important;border-radius:6px!important;box-shadow:none!important}
+/* títulos de sección: chicos, en mayúsculas, gris */
+.vista.st-control4 h3{margin:20px 2px 10px!important;font:500 12px/1.2 var(--f-display)!important;text-transform:uppercase;letter-spacing:.14em;color:var(--muted)!important}
+.vista.st-control4.k-tablet .v-b>h3:first-child{margin-top:4px!important}
+/* barra de arriba: la hora a la izquierda (fina), la fecha abajo, y una línea que la separa del resto */
+.vista.st-control4 .v-head{padding-bottom:14px;border-bottom:1px solid var(--line)}
+.vista.st-control4 .v-when b{font-size:30px!important;font-weight:300!important;letter-spacing:.01em}.vista.st-control4 .v-when span{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.vista.st-control4.k-tablet .v-chip{font-size:18px!important;padding:8px 14px!important}
+/* servicios: cuadrados oscuros, ícono de línea blanco grande al medio y el nombre abajo */
+.vista.st-control4 .v-svc{gap:10px;grid-template-columns:repeat(auto-fill,minmax(min(100%,124px),1fr))}
+.vista.st-control4 .v-svi{aspect-ratio:1;background:var(--card)!important;border:0!important;border-radius:6px!important;gap:12px;color:#fff}
+.vista.st-control4 .v-svi .v-svic svg.i{width:46px;height:46px;stroke-width:1.15}
+.vista.st-control4 .v-svi b{font-size:14px;font-weight:400;letter-spacing:.01em}
+.vista.st-control4 .v-svi:active{background:var(--card2)!important}
+.vista.st-control4 .v-svi.on .v-svic{color:var(--warm)}
+/* favoritos (escenas): rectángulos con el ícono en celeste a la izquierda */
+.vista.st-control4 :is(.v-sgrid,.v-scenes){gap:10px}
+.vista.st-control4 .v-sgrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,180px),1fr))!important}
+.vista.st-control4 .v-scene{display:flex!important;flex-direction:row!important;align-items:center;gap:12px!important;min-height:64px;padding:12px 14px!important;font-size:14.5px!important;font-weight:400!important;text-align:left;color:#fff}
+.vista.st-control4 .v-scene .v-sic{width:36px;height:36px;border-radius:50%;display:grid;place-items:center;background:var(--warm-s);color:var(--warm);flex:none}
+.vista.st-control4 .v-scene .v-sic svg.i{width:20px;height:20px}
+.vista.st-control4 .v-scene.act{background:var(--card2)!important;box-shadow:inset 3px 0 0 var(--warm)!important}
+.vista.st-control4 .v-scene.act .v-sic{background:var(--warm);color:#fff}
+/* botones, ambientes y mosaicos: planos, el ícono sin fondo; prendido = ícono en ámbar (luz) o celeste */
+.vista.st-control4 .v-bic{background:transparent!important;color:#fff!important;border-radius:0!important}
+.vista.st-control4 .v-btns .v-btn{flex-direction:column!important;align-items:center!important;justify-content:center;text-align:center!important;gap:10px!important;min-height:112px;padding:16px 10px!important}
+.vista.st-control4 .v-btns .v-btn .v-bic svg.i{width:38px;height:38px;stroke-width:1.2}
+.vista.st-control4 .v-btns .v-btn .v-tx b{font-size:14px;font-weight:400}.vista.st-control4 .v-btns .v-btn .v-tx span{font-size:12px;color:var(--muted)}
+.vista.st-control4 :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on){background:var(--card2)!important}
+.vista.st-control4 :is(.v-btn.on,.v-tile.on,.v-room.on,.v-mtile.on) :is(.v-bic,.v-tic,.v-mbot>svg.i){color:var(--warm)!important}
+.vista.st-control4 .v-tile.lit :is(.v-tic,.v-bic){color:var(--c4-lit)!important}
+.vista.st-control4 .v-tile{border-radius:6px!important}
+.vista.st-control4 .v-tiles.photo .v-tile{background:var(--card)!important}
+.vista.st-control4 .v-tiles.photo .v-tile.lit{background:linear-gradient(180deg,rgba(245,185,66,.12),var(--card) 70%)!important}
 .vista.st-control4 :is(.v-msw.on,.v-pw.on){background:var(--warm)!important}
-.vista.st-control4 .v-kpi{border-left:3px solid var(--warm)!important;border-radius:6px!important}
-.vista.st-control4 .v-kpi .v{font-weight:400;font-size:22px}
-/* barra de temas (Seguridad, Luces, Clima…) */
-.vista.st-control4 .v-chp{border-radius:999px!important;background:var(--card)!important;border:1px solid rgba(255,255,255,.08)!important;font-weight:500;color:var(--fg);padding:10px 16px!important}
+/* accesos en fila (si el instalador los usa): rectángulos, no pastillas */
+.vista.st-control4 .v-chp{border-radius:6px!important;background:var(--card)!important;border:0!important;font-weight:400;color:#fff;padding:10px 16px!important}
 .vista.st-control4 .v-chp svg.i{color:var(--warm)}
-.vista.st-control4 .v-tiles.photo .v-tile{background:linear-gradient(180deg,#2a2f37,#1c2026)!important}
+/* resumen: número grande y fino, el nombre chico en mayúsculas */
+.vista.st-control4 .v-kpi .l{text-transform:uppercase;letter-spacing:.08em;font-size:10.5px}
+.vista.st-control4 .v-kpi .v{font-weight:300;font-size:22px}
+/* clima, alarma y cámara */
+.vista.st-control4 .v-dring .d1{stroke:var(--warm)!important}.vista.st-control4 .v-dring circle{stroke-width:6;stroke-linecap:butt}
+.vista.st-control4 .v-dmid b{font-weight:300}
 .vista.st-control4 .v-clim .v-cset b{font-size:44px;font-weight:300}
-.vista.st-control4 .v-dring .d1{stroke:var(--warm)!important}
-.vista.st-control4 .v-modes button{background:var(--card2)!important;border-radius:8px!important}.vista.st-control4 .v-modes button.on{background:var(--warm)!important;color:#fff!important}
-.vista.st-control4 .v-sart{border-radius:8px}
-/* «Now Playing» */
-.vista.st-control4 .v-player{border-radius:10px!important;background:linear-gradient(90deg,#262b33,#1e2229)!important;padding:12px 16px!important}
-.vista.st-control4 .v-art{border-radius:6px!important}
-/* barra de abajo: oscura de lado a lado, la elegida en celeste con una raya arriba */
-.vista.st-control4 .v-nav{background:#0f1215!important;border-top:1px solid rgba(255,255,255,.06)!important}
-.vista.st-control4 :is(.v-nav,.v-dock) button{color:#8a919c}
-.vista.st-control4 :is(.v-nav,.v-dock) button.on{color:var(--warm)!important;background:transparent!important;box-shadow:inset 0 3px 0 var(--warm)}
-.vista.st-control4 :is(.v-nav,.v-dock) .v-mic{background:var(--warm)!important;color:#fff!important;box-shadow:0 6px 18px rgba(31,155,240,.35)}
-.vista.st-control4.k-tablet .v-dock{background:#0f1215!important;border:0!important;border-radius:0!important;border-top:1px solid rgba(255,255,255,.06)!important;justify-content:center}
-.vista.st-control4 :is(.v-sin,.v-min){background:#1b1f25!important;border:1px solid rgba(255,255,255,.06)!important;border-radius:12px!important}
-.vista.st-control4.light{--bg:#eef0f3;--card:#fff;--card2:#f3f5f8;--line:rgba(0,0,0,.06);--fg:#15181d;--muted:#5e6672;--off:#d3d8df}
-.vista.st-control4.light:not(.has-bg){background:linear-gradient(180deg,#f3f5f8,#e3e7ec)}
+.vista.st-control4 .v-modes button{background:var(--card2)!important;border-radius:6px!important}.vista.st-control4 .v-modes button.on{background:var(--warm)!important;color:#fff!important}
+.vista.st-control4 .v-alarm svg.i{color:var(--warm)}.vista.st-control4 .v-alarm.armed svg.i{color:var(--red)}
+.vista.st-control4 .v-sart{border-radius:6px}
+/* música: barra «escuchando» plana */
+.vista.st-control4 .v-player{padding:12px 16px!important}
+.vista.st-control4 .v-art{border-radius:4px!important}
+/* barra de abajo: negra, de lado a lado, íconos con el nombre en mayúsculas; la elegida en celeste con una raya arriba */
+.vista.st-control4 .v-nav{background:#000!important;border-top:1px solid var(--line)!important;border-radius:0!important}
+.vista.st-control4.k-tablet .v-dock{background:#000!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important;margin:0 -16px;padding:8px 16px;bottom:0;box-shadow:none;justify-content:center}
+.vista.st-control4 :is(.v-nav,.v-dock) button{color:#8e949c;text-transform:uppercase;letter-spacing:.08em;font-size:10.5px!important;border-radius:0!important}
+.vista.st-control4 :is(.v-nav,.v-dock) button.on{color:var(--warm)!important;background:transparent!important;box-shadow:inset 0 2px 0 var(--warm)}
+.vista.st-control4 :is(.v-nav,.v-dock) .v-mic{background:var(--warm)!important;color:#fff!important;box-shadow:none!important;border-radius:50%!important}
+.vista.st-control4 :is(.v-sin,.v-min){background:#15161a!important;border:1px solid var(--line)!important;border-radius:8px!important}
+/* tema claro */
+.vista.st-control4.light{--bg:#eceef1;--card:#fff;--card2:#f2f4f7;--line:rgba(0,0,0,.08);--fg:#111;--muted:#5f6670;--off:#d3d8df}
+.vista.st-control4.light:not(.has-bg){background:#eceef1}
+.vista.st-control4.light :is(.v-svi,.v-scene,.v-chp){color:#111}
+.vista.st-control4.light .v-bic{color:#111!important}
 .vista.st-control4.light .v-nav,.vista.st-control4.light.k-tablet .v-dock{background:#fff!important}
 
 /* ═════════ SAVANT — como un panel de la marca (sin logos) ═════════
@@ -558,7 +565,6 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.st-savant :is(.v-nav,.v-dock) .v-mic{background:transparent!important;color:var(--warm)!important;border:1px solid var(--warm);box-shadow:none}
 .vista.st-savant .v-dock{background:transparent!important;border:0!important;border-top:1px solid var(--line)!important;border-radius:0!important}
 .vista.st-savant :is(.v-sin,.v-min){background:#0b0b0b!important;border:1px solid var(--line)!important;border-radius:4px!important}
-.vista.st-savant.k-tablet .v-c0{max-width:52%}
 .vista.st-savant.light{--bg:#f6f4ef;--card:#fff;--card2:#f0ede5;--line:rgba(0,0,0,.08);--fg:#151410;--muted:#7b766b;--off:#dad4c7;--warm:#a5843f;--warm-s:rgba(165,132,63,.14)}
 .vista.st-savant.light:not(.has-bg){background:#f6f4ef}
 .vista.st-savant.light .v-nav{background:#f6f4ef!important}
@@ -634,24 +640,14 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-row4>.sp-1{grid-column:span 1}.v-row4>.sp-2{grid-column:span 2}.v-row4>.sp-3{grid-column:span 3}.v-row4>.sp-4{grid-column:span 4}
 .k-tablet .v-row4{gap:12px;flex:none}
 /* columnas de la tablet (las del medio; la del costado, si hay, va aparte como siempre) */
-.v-cols>.v-col{display:flex;flex-direction:column;gap:12px;min-height:0;min-width:0;overflow:auto;scrollbar-width:none}
-.v-cols>.v-col::-webkit-scrollbar{display:none}
-.v-cols>.v-col>.v-b{flex:none}.v-cols>.v-col>.v-b.fill{flex:1 1 0}
 .k-tablet .v-cols>.v-col>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis),
 .k-tablet :is(.v-cols>.v-col,.v-top,.v-bot,.v-side)>.v-row4>:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:var(--card);border:1px solid var(--line);border-radius:20px;padding:14px}
 .k-tablet .v-cols>.v-col>.v-b>h3{margin:0 0 10px}
-.noside .v-c0{height:auto;max-width:none;flex:initial}
 /* bandas de lado a lado (arriba, debajo de la hora; y abajo, arriba de la música) */
 .v-top,.v-bot{display:flex;flex-direction:column;gap:12px;min-width:0}
 .v-bot:empty{display:none}
 .vista.editing :is(.v-top,.v-bot)>.v-eadd{margin:0;padding:8px;font-size:12px;opacity:.7}
 .vista.editing .v-top:not(:has(.v-b))>.v-eadd::after{content:" · banda de arriba"}.vista.editing .v-bot:not(:has(.v-b))>.v-eadd::after{content:" · banda de abajo"}
-/* tablet vertical sin columna al costado: las columnas una al lado de la otra, debajo de la hora */
-.vert.noside .v-tab{display:flex;flex-direction:column}
-.vert.noside .v-main{display:flex;flex:1;min-height:0}
-.vert.noside .v-cols{display:grid;flex:1;min-height:0}
-.vert.noside .v-cols>.v-col{grid-row:auto;grid-column:auto;flex-direction:column;max-height:none;overflow:auto}
-.vert.noside :is(.v-head,.v-top,.v-bot,.v-player,.v-dock){grid-row:auto;grid-column:auto}
 /* arrastrar y soltar en el editor: la copia que sigue al puntero y la línea donde va a caer */
 .v-ghost{opacity:.9;transform:rotate(1.2deg) scale(.97);box-shadow:0 22px 50px rgba(0,0,0,.45);border-radius:18px;transition:none}
 .vista.editing .dragging{opacity:.28}
@@ -668,3 +664,87 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.editing .lift{transform:scale(1.03);box-shadow:0 0 0 2px var(--warm),0 14px 30px rgba(0,0,0,.4)!important;transition:transform .15s,box-shadow .15s}
 /* iPhone: ‹ nombre › arriba del visor de Frigate (una cámara por visor) */
 .v-camnav{display:flex;align-items:center;gap:8px;margin:0 0 8px}.v-camnav b{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--tx)}.v-camnav button{width:36px;height:36px;border-radius:50%;border:1px solid var(--line);background:var(--card);color:var(--tx);display:grid;place-items:center;cursor:pointer}.v-camnav button:first-child svg{transform:rotate(180deg)}.v-camnav svg{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2}
+
+/* ═════════ TABLET (2026-11, base nueva) ═════════
+   La pantalla se desplaza entera y cada columna crece con sus tarjetas: nada queda cortado ni con barritas adentro.
+   La barra de abajo queda siempre a la vista. El plano va al costado, fijo, con el alto de la pantalla y el ancho que
+   eligió el instalador (--side). Una columna vacía, al usar el dashboard, no deja un hueco. */
+.vista.k-tablet{--vh:100vh;min-height:var(--vh);height:auto;padding:16px 16px 0;overflow:visible;box-sizing:border-box}
+.v-tab{display:flex;gap:16px;align-items:flex-start}
+.v-side{flex:0 0 var(--side,34%);width:var(--side,34%);min-width:0;display:flex;flex-direction:column;gap:12px}
+/* con el plano: fijo al costado, del alto de la pantalla, y el plano entero adentro (sin deformarse) */
+.v-side:has(>.v-b.fill){position:sticky;top:16px;height:calc(var(--vh) - 32px)}
+.v-side>.v-b.fill{flex:1 1 0;min-height:0;container-type:size;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.v-side>.v-b.fill>.v-plan{width:min(100cqw,calc(100cqh * var(--ar,.6)));height:auto;max-width:none;margin:0 auto;flex:none}
+.v-side>.v-b.fill>.v-plan.sz-s{width:min(100cqw,calc(62cqh * var(--ar,.6)))}
+.v-side>.v-b.fill>.v-plan.sz-m{width:min(100cqw,calc(80cqh * var(--ar,.6)))}
+.v-side>.v-b.fill>.v-eladd{flex:none}
+.v-main{flex:1 1 0;min-width:0;min-height:calc(var(--vh) - 16px);display:flex;flex-direction:column;gap:14px}
+.v-cols{display:flex;gap:14px;align-items:flex-start}
+.v-cols>.v-col{display:flex;flex-direction:column;gap:14px;min-width:0;overflow:visible}
+.v-cols>.v-col.v-empty{display:none}
+.v-cols>.v-col>.v-b,.v-cols>.v-col>.v-b.fill{flex:none;min-height:0}
+.v-cols .v-b.fill>.v-plan{width:100%;height:auto}
+/* la barra de abajo: siempre a la vista, al pie de la pantalla aunque haya poco contenido */
+.k-tablet .v-player{flex:none}
+.k-tablet .v-bot{flex:none}
+.k-tablet .v-cols{flex:1 0 auto}
+.k-tablet .v-dock{position:sticky;bottom:12px;z-index:8;margin-bottom:12px;flex:none;box-shadow:0 10px 30px rgba(0,0,0,.35)}
+/* tablet parada: el plano arriba, de lado a lado, y las columnas debajo */
+.vert .v-tab{flex-direction:column;align-items:stretch}
+.vert .v-side{flex:none;width:auto}
+.vert .v-side:has(>.v-b.fill){position:static;height:calc(var(--vh) * .42)}
+.vert .v-head .v-when b{font-size:40px}
+/* editor: el nombre de cada tarjeta va arriba, afuera, sin tapar lo que tiene adentro */
+.vista.editing .v-b{margin-top:16px}
+.vista.editing .v-b>.v-btag{top:-21px}
+.vista.editing .v-cols>.v-col{min-height:120px;border-radius:16px}
+.vista.editing .v-cols>.v-col:not(:has(.v-b)){outline:1px dashed rgba(160,175,200,.3);display:flex;align-items:center;justify-content:center}
+.vista.editing .v-cols>.v-col:not(:has(.v-b))>.v-eadd::after{content:" · soltá tarjetas acá"}
+/* editor: manija para cambiar el ancho de las columnas (y del costado) arrastrando */
+.v-gut{flex:none;align-self:stretch;width:0;margin:0 -7px;position:relative;z-index:9;cursor:col-resize;touch-action:none}
+.v-tab>.v-gut{margin:0 -8px}
+.v-gut::before{content:"";position:absolute;top:0;bottom:0;left:-9px;width:18px}
+.v-gut>i{position:absolute;top:50%;left:-3px;width:6px;height:56px;margin-top:-28px;border-radius:6px;background:rgba(160,175,200,.45);transition:background .15s,height .15s}
+.v-gut:hover>i,.v-gut.on>i{background:var(--warm);height:84px;margin-top:-42px}
+.v-gut.on::after{content:"";position:absolute;top:0;bottom:0;left:-1px;width:2px;background:var(--warm);opacity:.6}
+.v-tab>.v-gut>i{position:sticky;top:calc(50vh - 28px);margin-top:0}
+
+/* ═════════ TARJETAS QUE SE ADAPTAN A SU ANCHO (2026-11) ═════════
+   Cada tarjeta mira el lugar que tiene (no la pantalla): en una columna angosta pone menos cosas por fila y en una
+   ancha, más. Así no se cortan ni se pisan en ningún dashboard, tablet o celular. «Botones por fila» del editor manda. */
+.vista .v-b{container-type:inline-size;min-width:0}
+.vista .v-b :is(.v-tiles,.v-tiles.photo){grid-template-columns:repeat(auto-fill,minmax(min(100%,132px),1fr))}
+.vista .v-b .v-sgrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,128px),1fr))}
+.vista .v-b .v-btns:not(.list){grid-template-columns:repeat(auto-fill,minmax(min(100%,140px),1fr))}
+.vista .v-b .v-rgrid{grid-template-columns:repeat(auto-fill,minmax(min(100%,140px),1fr))}
+.vista .v-b .v-mosaic{grid-template-columns:repeat(auto-fill,minmax(min(100%,150px),1fr))}
+.vista .v-b .v-kpis{grid-template-columns:repeat(auto-fit,minmax(min(100%,96px),1fr))}
+.vista .v-b .v-kpi .v{white-space:normal;overflow-wrap:anywhere;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.15}
+@container (max-width:380px){.vista .v-b .v-kpi{padding:9px 10px!important}.vista .v-b .v-kpi .v{font-size:14px}}
+.vista .v-b .v-halfs{grid-template-columns:repeat(auto-fit,minmax(min(100%,220px),1fr))}
+/* termostato: el número crece y achica con el círculo */
+.v-dring{width:min(300px,82%);container-type:inline-size}
+.v-dmid b{font-size:clamp(30px,25cqw,72px)}.v-dmid b i{font-size:clamp(14px,10cqw,28px)}
+.v-dmid small,.v-dmid span{font-size:clamp(10px,5.4cqw,13px)}
+/* textos de las tarjetas: nunca se salen de su lugar */
+.vista .v-b :is(.v-tile,.v-room,.v-scene,.v-btn,.v-kpi){min-width:0}
+.vista .v-b :is(.v-tile,.v-room,.v-scene,.v-btn) :is(b,span){overflow-wrap:anywhere}
+.vista .v-side>.v-b.fill{container-type:size}
+
+/* botones «Panel táctil» (servicios), en cualquier estilo */
+.v-svc{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,124px),1fr));gap:10px}
+.v-svi{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;aspect-ratio:1;min-width:0;padding:12px 8px;border-radius:16px;border:1px solid var(--line);background:var(--card);color:var(--fg);font:inherit;cursor:pointer;text-align:center}
+.v-svi .v-svic svg.i{width:40px;height:40px;stroke-width:1.3}
+.v-svi b{font-size:14px;font-weight:500;overflow-wrap:anywhere}.v-svi small{font-size:11.5px;color:var(--muted);margin-top:-6px}
+.v-svi.on .v-svic{color:var(--warm)}
+
+/* la barra de abajo de la tablet queda encima del contenido al desplazar: nunca transparente (si no, se leen las
+   tarjetas a través). En los estilos de vidrio, esmerilada (es una sola barra: no traba el desplazamiento). */
+.vista.st-savant.k-tablet .v-dock{background:#050505!important}
+.vista.st-apple.k-tablet .v-dock,.vista.st-cristal.k-tablet .v-dock{-webkit-backdrop-filter:blur(24px) saturate(1.4);backdrop-filter:blur(24px) saturate(1.4)}
+.vista.st-apple.k-tablet .v-dock{background:rgba(22,22,24,.82)!important}
+.vista.st-cristal.k-tablet .v-dock{background:rgba(24,34,48,.72)!important}
+.vista.st-apple.light.k-tablet .v-dock{background:rgba(249,249,249,.88)!important}
+.vista.st-cristal.light.k-tablet .v-dock{background:rgba(255,255,255,.75)!important}
+.vista.st-savant.light.k-tablet .v-dock{background:#f4f1ea!important}

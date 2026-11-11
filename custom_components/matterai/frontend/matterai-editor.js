@@ -456,7 +456,7 @@
       const P = window.MaeVista.TABLET_PRESETS || [], cur = this.colsInfo();
       const thumb = (o) => `<span class="ctn">${o.side ? '<i class="sd"></i>' : ''}<span class="cg">${(o.side ? o.cols.slice(1) : o.cols).map((w) => `<i style="flex:${w || 1}"></i>`).join('')}</span></span>`;
       this.modal('Columnas de la tablet', `<div class="cpk">${P.map(([k, l, o]) => `<button data-cp="${k}" class="${o.side === cur.side && o.cols.join() === cur.cols.join() ? 'on' : ''}">${thumb(o)}<b>${esc(l)}</b></button>`).join('')}</div>
-        <p class="hint">Las tarjetas de una columna que deja de existir pasan a la última. Arriba y abajo hay además una banda de lado a lado.</p>`, (e) => {
+        <p class="hint">Las tarjetas de una columna que deja de existir pasan a la última. Arriba y abajo hay además una banda de lado a lado. <b>El ancho de cada columna lo ajustás arrastrando la manija que hay entre ellas</b> en la pantalla.</p>`, (e) => {
         const x = e.target.closest('[data-cp]'); if (!x) return;
         const o = (P.find((y) => y[0] === x.dataset.cp) || [])[2]; if (!o) return;
         this.closeCatalog();
@@ -703,6 +703,7 @@
         onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' || a === 'menu' ? this.pick(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone) => this.openCatalog(col, zone),
+        onCols: this.K === 'tablet' ? (cols) => this.change(() => { const L = this.lay(); L.v = 2; L.cols = cols; }) : null,
         onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
         room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null,
         roomPage: R ? Object.assign({ name: R.name }, Editor.roomPageOf(R.cards || [])) : null };
@@ -1017,7 +1018,7 @@
           hs += this.styleSeg(c, [['', 'Un botón que abre todas'], ['list', 'Lista (las primeras 4)']], '');
           h += this.elemSection(b); break;
         case 'buttons':
-          hs += this.styleSeg(c, [['grid', 'Grilla'], ['list', 'Lista'], ['tiles', 'Mosaicos'], ['chips', 'Fila de accesos']], 'grid');
+          hs += this.styleSeg(c, [['grid', 'Grilla'], ['list', 'Lista'], ['tiles', 'Mosaicos'], ['chips', 'Fila de accesos'], ['services', 'Panel táctil']], 'grid');
           hs += `<div class="fld"><span>Botones por fila</span><span class="eseg">${[['', 'Auto'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']].map(([k, l]) => `<button data-ccols="${k}" class="${String(c.cols || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           h += this.elemSection(b); break;
         case 'alarm': h += this.ent('Alarma (vacío: la de la casa)', 'al', c.entity, PICK.alarm, 'cfg.entity'); break;
