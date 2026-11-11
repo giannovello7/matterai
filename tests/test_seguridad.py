@@ -336,6 +336,10 @@ async def test_shared_access_upgrades_itself(hass, hass_ws_client) -> None:
     new = await _valid(hass, up["result"]["token"])
     assert new is not None and house.is_device_user(new.user.id)
     assert hass.config_entries.async_get_entry(phone.entry_id).data["user_id"] == new.user.id, "su registro pasa a su usuario"
+    me2 = await _ws(hass_ws_client, hass, up["result"]["token"], 7, {"type": "matterai/app/me", "device_id": "dev-viejo"})
+    assert me2["result"]["webhook_id"] == "w1", "con el acceso nuevo, la app recupera su registro (no queda con un webhook muerto)"
+    other = await _ws(hass_ws_client, hass, shared_token, 8, {"type": "matterai/app/me", "device_id": "dev-viejo"})
+    assert "webhook_id" not in other["result"], "NEGATIVO: otro usuario no ve el registro de este equipo"
     again = await _ws(hass_ws_client, hass, up["result"]["token"], 3, {"type": "matterai/app/upgrade", "name": "x"})
     assert not again["success"] and again["error"]["code"] == "not_shared"  # NEGATIVO: no se multiplica
 

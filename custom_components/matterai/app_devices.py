@@ -157,6 +157,13 @@ def ws_app_me(hass: HomeAssistant, connection: websocket_api.ActiveConnection, m
         # firma de los accesos rápidos / stickers NFC de esta casa, y si todavía usa el acceso compartido viejo
         out["run_key"] = house.run_key
         out["shared"] = house.is_shared_user(connection.user.id)
+    # su registro de avisos/ubicación (mobile_app): si el equipo cambió de acceso (pasó a su propio usuario), puede haber
+    # quedado con un webhook que ya no existe y HA le contesta «OK» igual. Con esto lo recupera (sólo el suyo).
+    for e in app_entries(hass):
+        if msg["device_id"] and e.data.get("device_id") == msg["device_id"] and e.data.get("user_id") == connection.user.id:
+            out["webhook_id"] = e.data.get("webhook_id")
+            out["app_version"] = e.data.get("app_version") or ""
+            break
     connection.send_result(msg["id"], out)
 
 

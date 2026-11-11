@@ -59,14 +59,14 @@ Qué dispositivos de Home Assistant usa la app. Se elige por **dispositivo** (tr
 - **Mensaje a la app**: aparece en la pantalla de los equipos con la app abierta.
 - **Qué ve cada equipo**: el dashboard de cada celular o tablet. Avisa los vinculados dos veces y los quita.
 - **Accesos a la casa**: cada equipo tiene el suyo. **Desvincular** corta sólo ese equipo (celular perdido, empleado que ya no está).
-- **Celulares y tablets**: si está **conectado ahora**, la versión de la app (avisa si hay una más nueva), el **perfil** (completo, sin seguridad para los chicos, o sólo luces y clima), **pedir huella** para la alarma, cerraduras y portón, y **Probar** (mostrar un aviso, prender la pantalla o recargar la app).
+- **Celulares y tablets**: si está **conectado ahora**, la versión de la app (avisa si hay una más nueva; se actualiza sola cada vez que el equipo abre la app), el **perfil** (completo, sin seguridad para los chicos, o sólo luces y clima), **pedir huella** para la alarma, cerraduras y portón, y **Probar** (mostrar un aviso, prender la pantalla o recargar la app).
 
 ## Automatizaciones
 Escenas y automatizaciones MatterAI, pensadas para que las entienda cualquiera: escenas de un toque, «si pasa esto, hacé aquello», horarios, simulación de presencia, riego por zonas, luz que sigue el ritmo del día, luz por presencia, avisos si algo quedó abierto, me voy / llego, buenas noches, clima inteligente, despertador con luz, recordatorios, portero, cámaras con Frigate, tele inteligente e invitados con link para el portón. Las escenas y automatizaciones aparecen solas en las tarjetas **Escenas** y **Rutinas** de los dashboards.
 
 ## Estado de la casa, Mantenimiento y Copias
 - **Estado**: avisos de la casa (equipos sin responder, pilas bajas, actualizaciones, seguridad).
-- **Mantenimiento**: vigila los servicios (Frigate, Music Assistant, el túnel, etc.) y los reinicia solos si se caen. «Modo mantenimiento» pausa la vigilancia mientras trabajás.
+- **Mantenimiento**: vigila los servicios (Frigate, Music Assistant, el túnel, etc.) y los reinicia solos si se caen. «Modo mantenimiento» pausa la vigilancia mientras trabajás. Si desinstalaste un Zigbee2MQTT, su último «offline» que queda guardado en MQTT ya no cuenta: no se muestra ni hace reiniciar al que anda.
 - **Copias**: copia de seguridad en el panel central (se hacen solas; podés hacer una ahora o restaurar una parte).
 - **Plantillas**: guardás automatizaciones y diseños para usarlos en otras casas.
 

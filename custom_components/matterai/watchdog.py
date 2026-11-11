@@ -246,18 +246,36 @@ class Watchdog:
         self._pending_check = None
         self.hass.async_create_task(self.async_check())
 
+    def _z2m_count(self) -> int:
+        return sum(1 for t in self.tracked.values() if t.sdef.mqtt_bridge)
+
+    def live_bridges(self, z2m_count: int | None = None) -> dict[str, dict[str, Any]]:
+        """Los base_topic de los Zigbee2MQTT que existen.
+
+        Un Zigbee2MQTT desinstalado deja en el broker su último «offline» guardado (retenido) y se sigue
+        recibiendo para siempre. Si hay más base_topics que complementos y los «online» alcanzan para
+        todos, los «offline» que sobran son de uno que ya no está: no cuentan (ni para avisar, ni para
+        reiniciar el que sí anda)."""
+        n = self._z2m_count() if z2m_count is None else z2m_count
+        if n and len(self.bridges) > n:
+            online = {k: b for k, b in self.bridges.items() if b["state"] == "online"}
+            if len(online) >= n:
+                return online
+        return dict(self.bridges)
+
     def _bridge_for(self, t: Tracked, z2m_count: int) -> dict[str, Any] | None:
         """El estado MQTT de este Zigbee2MQTT. Con un solo Z2M y un solo base_topic, son el mismo."""
-        if not self.bridges:
+        bridges = self.live_bridges(z2m_count)
+        if not bridges:
             return None
-        if z2m_count == 1 and len(self.bridges) == 1:
-            return next(iter(self.bridges.values()))
+        if z2m_count == 1 and len(bridges) == 1:
+            return next(iter(bridges.values()))
         # varios: se busca un base_topic que se parezca al nombre del complemento
-        for base, b in self.bridges.items():
+        for base, b in bridges.items():
             if base.split("-")[-1] in t.slug or base in t.slug:
                 return b
-        offline = [b for b in self.bridges.values() if b["state"] == "offline"]
-        return offline[0] if offline else next(iter(self.bridges.values()))
+        offline = [b for b in bridges.values() if b["state"] == "offline"]
+        return offline[0] if offline else next(iter(bridges.values()))
 
     # ------------------------------------------------------------ coordinador (SLZB-06 / SMLIGHT)
     def coordinator_ok(self) -> tuple[bool, str]:
@@ -330,7 +348,7 @@ class Watchdog:
         self._sync_tracked(addons)
         now = dt_util.utcnow()
         self._async_other_integrations(now, force)
-        z2m_count = sum(1 for t in self.tracked.values() if t.sdef.mqtt_bridge)
+        z2m_count = self._z2m_count()
         if any(t.sdef.remote_probe for t in self.tracked.values()):
             await self._async_probe_remote(now)
         # dependencias primero
@@ -664,7 +682,7 @@ class Watchdog:
             "available": self.available,
             "maintenance_until": _ts(self.maintenance_until),
             "last_check": _ts(self.last_check),
-            "bridges": {k: {"state": v["state"], "since": _ts(v["since"])} for k, v in self.bridges.items()},
+            "bridges": {k: {"state": v["state"], "since": _ts(v["since"])} for k, v in self.live_bridges().items()},
             "coordinator": dict(zip(("ok", "detail"), self.coordinator_ok())),
             "remote": {"kind": self.remote["kind"], "since": _ts(self.remote["since"]), "detail": self.remote["detail"], "url": self.external_url()} if self.remote else None,
             "services": out,
