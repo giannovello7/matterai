@@ -1467,7 +1467,7 @@
       if (this._pickFrom === h.states && this._pickInc === inc) return this._picked;
       if (this._pickInc !== inc) { this._pickInc = inc; this._pickSet = new Set(inc); }
       const o = {}, all = h.states, set = this._pickSet;
-      for (const k in all) if (set.has(k)) o[k] = all[k];
+      for (const k in all) if (set.has(k) || k.startsWith('camera.')) o[k] = all[k]; // las cámaras, siempre
       this._pickFrom = all; this._picked = o;
       return o;
     }

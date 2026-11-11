@@ -28,8 +28,9 @@ from .const import DOMAIN, STORAGE_VERSION
 
 STORAGE_SELECTION_KEY = f"{DOMAIN}.app_entities"
 ENTITY_ID = re.compile(r"^[a-z_]+\.[a-z0-9_]+$")
-# siempre: lo que la app usa sin que sea un dispositivo de la casa
-ALWAYS_DOMAINS = {"sun", "zone"}
+# siempre: lo que la app usa sin que sea un dispositivo de la casa, y las cámaras (son del cliente siempre; qué ve cada
+# celular lo decide su perfil). Las cámaras de Frigate suelen no tener ambiente: si no, quedaban afuera y la app sin cámaras.
+ALWAYS_DOMAINS = {"sun", "zone", "camera"}
 # sueltas que se proponen de entrada (sin dispositivo): lo que el cliente usa
 PROPOSE_LOOSE = {"scene", "script", "automation", "person", "weather", "calendar", "alarm_control_panel", "camera"}
 # lo que nunca le sirve a la app (no se lista)
@@ -206,6 +207,8 @@ def proposal(hass: HomeAssistant, house_config: dict[str, Any], views: Any) -> t
             devices.add(d["id"])
         elif d["service"] and any(e.split(".")[0] in ("weather", "calendar") for e in d["entities"]):
             devices.add(d["id"])
+        elif any(e.startswith(("camera.", "alarm_control_panel.")) for e in d["entities"]):
+            devices.add(d["id"])  # cámaras (Frigate) y alarmas: aunque no tengan ambiente
     entities = {s["id"] for s in candidate_loose(hass) if s["domain"] in PROPOSE_LOOSE or s["id"] in used}
     # una entidad usada cuyo dispositivo no se propuso (p. ej. sin ambiente): entra igual
     for eid in used:

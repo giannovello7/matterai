@@ -1018,7 +1018,7 @@
           hs += this.styleSeg(c, [['', 'Un botón que abre todas'], ['list', 'Lista (las primeras 4)']], '');
           h += this.elemSection(b); break;
         case 'buttons':
-          hs += this.styleSeg(c, [['grid', 'Grilla'], ['list', 'Lista'], ['tiles', 'Mosaicos'], ['chips', 'Fila de accesos'], ['services', 'Panel táctil']], 'grid');
+          hs += this.styleSeg(c, [['grid', 'Grilla'], ['list', 'Lista'], ['tiles', 'Mosaicos'], ['chips', 'Fila de accesos'], ['services', 'Panel táctil'], ['devices', 'Equipos']], 'grid');
           hs += `<div class="fld"><span>Botones por fila</span><span class="eseg">${[['', 'Auto'], ['1', '1'], ['2', '2'], ['3', '3'], ['4', '4']].map(([k, l]) => `<button data-ccols="${k}" class="${String(c.cols || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           h += this.elemSection(b); break;
         case 'alarm': h += this.ent('Alarma (vacío: la de la casa)', 'al', c.entity, PICK.alarm, 'cfg.entity'); break;
@@ -1028,7 +1028,9 @@
           hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           h += '<p class="hint">El plano se arma en «Plano e imágenes» (en ⋯, arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
-        case 'weather': h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
+        case 'clock': hs += this.styleSeg(c, [['', 'Hora grande'], ['tiles', 'Día y hora en dos cuadros']], ''); break;
+        case 'music': hs += this.styleSeg(c, [['', 'Barra'], ['card', 'Tarjeta con controles']], ''); break;
+        case 'weather': hs += this.styleSeg(c, [['', 'Fila'], ['tile', 'Cuadro']], ''); h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
         case 'climate':
           h += this.ent('Aire o termostato', 'cl', c.entity, ['climate'], 'cfg.entity');
           hs += this.styleSeg(c, [['', 'Compacto (− y +)'], ['big', 'Termostato grande']], '');
@@ -1053,7 +1055,7 @@
             <p class="hint">Lista los sensores con la pila por debajo de ese número. Con todas bien, dice «Todas las pilas bien».</p>`;
           break;
         case 'covers': case 'lights': h += this.elemSection(b); break;
-        case 'energy': h += this.ent('Sensor de consumo (vacío: el de la casa)', 'en', c.entity, ['sensor'], 'cfg.entity'); break;
+        case 'energy': hs += this.styleSeg(c, [['', 'Línea'], ['bars', 'Barras']], ''); h += this.ent('Sensor de consumo (vacío: el de la casa)', 'en', c.entity, ['sensor'], 'cfg.entity'); break;
         case 'sensor':
           h += this.ent('Sensor', 'se', c.entity, ['sensor', 'input_number', 'number'], 'cfg.entity');
           h += `<div style="display:flex;gap:8px"><label class="fld"><span>Mínimo</span><input type="number" data-f="cfg.min" value="${esc(c.min != null ? c.min : '')}" placeholder="0"></label>
@@ -1235,6 +1237,9 @@
       return `<h4>Qué se ve arriba</h4>
         ${[['clock', 'Hora y fecha (al tocarla abre la agenda)'], ['weather', 'Clima (al tocarlo abre el pronóstico)'], ['bell', 'Campanita de avisos'], ['menu', 'Menú (opciones y soporte)']]
           .map(([k, l]) => `<label class="chk"><input type="checkbox" data-hd="${k}" ${H[k] !== false ? 'checked' : ''}> ${l}</label>`).join('')}
+        <h4>Saludo</h4>
+        <label class="chk"><input type="checkbox" data-hgreet ${H.greet ? 'checked' : ''}> Saludo en vez de la hora («Buenas tardes» y cómo está la casa)</label>
+        ${H.greet ? `<label class="fld"><span>Nombre para el saludo (opcional)</span><input data-hname value="${esc(H.name || '')}" maxlength="30" placeholder="Ej: Ana"></label>` : ''}
         <p class="hint">Vale para ${this.K === 'tablet' ? 'la tablet' : 'el celular'} de este dashboard. Si sacás el menú, las opciones siguen en la barra de abajo (si tiene «Menú»).</p>`;
     }
     dockKeys() { const l = this.lay(); return (l.dock && l.dock.length ? l.dock : window.MaeVista.DOCK_DEF[this.K]).slice(); }
@@ -1540,6 +1545,9 @@
       };
       const back = () => { this.zone = null; this.pz = null; this.drawProps(); this.syncPreview(); this.bind(); };
       W.querySelectorAll('#edr [data-zback],#edr [data-pzback]').forEach((x) => { x.onclick = back; });
+      const hset = (fn) => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); fn(H); l.header = Object.keys(H).length ? H : null; });
+      W.querySelectorAll('#edr [data-hgreet]').forEach((x) => { x.onchange = () => hset((H) => { if (x.checked) H.greet = true; else { delete H.greet; delete H.name; } }); });
+      W.querySelectorAll('#edr [data-hname]').forEach((x) => { x.onchange = () => hset((H) => { const v = x.value.trim().slice(0, 30); if (v) H.name = v; else delete H.name; }); });
       W.querySelectorAll('#edr [data-hd]').forEach((x) => { x.onchange = () => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); if (x.checked) delete H[x.dataset.hd]; else H[x.dataset.hd] = false; l.header = Object.keys(H).length ? H : null; }); });
       W.querySelectorAll('#edr [data-dk]').forEach((x) => { x.onclick = () => this.change(() => {
         const D = this.dockKeys(), i = +x.dataset.i, a = x.dataset.dk;
@@ -1832,6 +1840,9 @@
           L.blocks = clone(t.blocks).map((b) => Object.assign(b, { id: this.newId(b.type) }));
           L.v = 2; if (kk === 'tablet') { L.side = t.side; L.cols = t.cols; }
           L.style = k === 'matterai' ? null : k;
+          // el encabezado de la plantilla (Vidrio saluda en vez de mostrar la hora)
+          if (t.theme) L.theme = t.theme; // Vidrio arranca claro (se cambia en «Modo»)
+          if (t.header && t.header.greet) L.header = Object.assign({}, L.header || {}, { greet: true }); else if (L.header) delete L.header.greet;
           if (kk === 'tablet' && !L.orientation) L.orientation = 'landscape';
         });
         this.sel = null; this.el = null; this.roomEd = null; this.rdraft = null;

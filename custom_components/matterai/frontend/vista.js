@@ -221,7 +221,7 @@
     const roomsCfg = (style) => Object.assign({}, rooms ? rooms.cfg : { auto: true }, { style });
     const plan = base.blocks.find((b) => b.type === 'plan');
     const T = kind === 'tablet';
-    let B, G = null; // G: cómo se reparte la tablet (columnas, si la primera va al costado)
+    let B, G = null, hdr = null, thm = null; // G: cómo se reparte la tablet (columnas, si la primera va al costado); hdr: el encabezado
     const top = { zone: 'top' }, bot = { zone: 'bottom' };
     // equipos de la casa para los mosaicos y los accesos
     const pick = (pred, n) => Object.keys(S).filter((id) => pred(id, S[id])).slice(0, n);
@@ -242,26 +242,38 @@
     ].filter(Boolean);
     const camHalf = (id, i, col) => n(`cam${i}`, col, { type: 'camera', title: S[id] && S[id].attributes.friendly_name ? String(S[id].attributes.friendly_name).replace(/^(c[aá]mara|camera)\s*/i, '') : 'Cámara', size: 'half', cfg: { entity: id, video: 'photo' } });
     if (k === 'vision') {
-      // Apple Vision Pro: ambientes arriba como pestañas, termostato y música en una columna clara a la derecha,
-      // datos grandes y mosaicos cuadrados con su interruptor
-      // tablet: las pestañas de ambientes de lado a lado arriba; ambientes · lo del medio (doble) · hora, clima y música
-      G = { side: false, cols: [1, 2, 1] };
+      // Vidrio (como un dashboard de visionOS): todo adentro de UNA ventana de vidrio esmerilado (clara de entrada) sobre la
+      // casa desenfocada. Barra de íconos vertical a la izquierda (como la de visionOS). Al medio: la cámara y el consumo en
+      // barras, los números de un vistazo y los equipos en fila (nombre, ícono grande y fino, interruptor). A la derecha,
+      // en un panel más claro: la hora, el termostato grande con sus modos y la música con sus controles. Abajo, los
+      // ambientes en una cápsula.
+      const chipsV = [{ name: 'Mi casa', icon: '', tap: { type: 'screen', screen: 'casa' } }, ...roomChips.slice(0, 5)];
+      const power = m && m.power;
+      const devs = (col) => n('devs', col, { type: 'buttons', cfg: { style: 'devices', items: tilesFor(4) } });
+      const energy = (col, sp) => (power ? n('energy', col, { cfg: { style: 'bars' }, span: sp }) : null);
+      const cam = (col, sp) => (cams.length ? n('cam', col, { type: 'camera', title: S[cams[0]] && S[cams[0]].attributes.friendly_name ? String(S[cams[0]].attributes.friendly_name) : 'Cámara', cfg: { entity: cams[0], video: 'photo' }, span: power ? sp : 4 }) : null);
+      const thermo = (col) => (clim ? n('climate', col, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : n('weather', col, { cfg: { style: 'tile' } }));
+      G = { side: false, cols: [68, 32] };
       B = T ? [
-        n('chips', 1, Object.assign({ type: 'buttons', cfg: { style: 'chips', items: roomChips } }, top)),
-        n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('photo') }),
-        n('kpis', 1, { cfg: { auto: true } }),
-        n('tiles', 1, { type: 'buttons', title: 'Dispositivos', cfg: { style: 'tiles', cols: 2, items: tilesFor(4) } }),
-        n('energy', 1, { title: 'Consumo' }),
-        n('clock', 2),
-        clim ? n('climate', 2, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : n('weather', 2),
-        n('music', 2, { title: 'Música' }),
-      ] : [
-        n('chips', 0, { type: 'buttons', cfg: { style: 'chips', items: roomChips } }),
+        cam(0, 2),
+        energy(0, 2),
         n('kpis', 0, { cfg: { auto: true } }),
-        clim ? n('climate', 0, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : null,
-        n('tiles', 0, { type: 'buttons', title: 'Dispositivos', cfg: { style: 'tiles', cols: 2, items: tilesFor(4) } }),
-        n('music', 0, { title: 'Música' }),
+        devs(0),
+        n('clock', 1),
+        thermo(1),
+        n('music', 1, { cfg: { style: 'card' } }),
+        n('chips', 0, Object.assign({ type: 'buttons', cfg: { style: 'chips', items: chipsV } }, bot)),
+      ] : [
+        n('chips', 0, { type: 'buttons', cfg: { style: 'chips', items: chipsV } }),
+        n('kpis', 0, { cfg: { auto: true } }),
+        thermo(0),
+        devs(0),
+        n('music', 0, { cfg: { style: 'card' } }),
+        energy(0, 4),
+        cam(0, 4),
       ];
+      hdr = { greet: true };
+      thm = 'light';
     } else if (k === 'control4') {
       // Como la pantalla de inicio de un panel táctil Control4 (sin logos): arriba los favoritos (escenas), abajo la
       // grilla grande de «servicios» (Luces, Clima, Seguridad, Música, Cámaras…), cuadrados oscuros con el ícono de línea
@@ -316,6 +328,8 @@
       ];
     } else return base;
     const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: k });
+    if (hdr) out.header = Object.assign({}, base.header || {}, hdr);
+    if (thm) out.theme = thm;
     if (T && G) { out.v = 2; out.side = G.side; out.cols = G.cols; out.blocks.forEach((b) => { if (b.size === 'half' && !b.span) { b.span = 2; delete b.size; } }); }
     return out;
   }
@@ -688,6 +702,12 @@
             return `${t}<div class="v-chips">${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false };
               return `<button class="v-chp ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}>${it.icon === '' ? '' : ic(icOf(it))}<span>${esc(it.name || fname(it.entity) || 'Botón')}</span></button>`; }).join('')}</div>${elAdd('Agregar un botón')}`;
           }
+          if (c.style === 'devices') {
+            const sw = (id) => id && !/^(scene|script|button|input_button|camera|alarm_control_panel|sensor|binary_sensor)\./.test(id);
+            return `${t}<div class="v-devs"${cols}>${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false, txt: '' };
+              return `<button class="v-dev ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}><b>${esc(it.name || fname(it.entity) || 'Botón')}</b><span class="v-devic">${ic(icOf(it))}</span>
+                <span class="v-devb"><span>${esc(s.txt || '')}</span>${sw(it.entity) ? `<i class="v-msw ${s.on ? 'on' : ''}"></i>` : ''}</span></button>`; }).join('')}</div>${elAdd('Agregar un botón')}`;
+          }
           if (c.style === 'services') {
             return `${t}<div class="v-svc"${cols}>${items.map((it, i) => { const s = it.entity ? entState(it.entity) : { on: false, txt: '' };
               return `<button class="v-svi ${s.on ? 'on' : ''}" data-it="${i}"${EL(i)}><span class="v-svic">${ic(icOf(it))}</span><b>${esc(it.name || fname(it.entity) || 'Botón')}</b>${it.entity && s.txt ? `<small>${esc(s.txt)}</small>` : ''}</button>`; }).join('')}</div>${elAdd('Agregar un botón')}`;
@@ -732,6 +752,16 @@
           const p = player();
           if (!p) return editing() ? `${t}<p class="v-empty">Aparece cuando hay música sonando.</p>` : '';
           const art = p.attributes.entity_picture ? `style="background-image:url('${esc(url(p.attributes.entity_picture))}')"` : '';
+          if (c.style === 'card') {
+            const A = p.attributes, dur = Number(A.media_duration) || 0;
+            let pos = Number(A.media_position) || 0;
+            if (p.state === 'playing' && A.media_position_updated_at) pos += (Date.now() - Date.parse(A.media_position_updated_at)) / 1000;
+            pos = Math.max(0, Math.min(dur || pos, pos));
+            const mmss = (x) => `${Math.floor(x / 60)}:${String(Math.floor(x % 60)).padStart(2, '0')}`;
+            return `<div class="v-card v-mplay" data-k="player">${t}<b class="v-mt">${esc(A.media_title || 'Música')}</b><span class="v-ma">${esc(A.media_artist || fname(p.entity_id))}</span>
+              ${dur ? `<span class="v-mprog"><i style="width:${((pos / dur) * 100).toFixed(1)}%"></i></span><span class="v-mtime"><span>${mmss(pos)}</span><span>${mmss(dur)}</span></span>` : ''}
+              <span class="v-mctl"><button class="v-mb" data-mpv="${esc(p.entity_id)}" aria-label="Anterior">${ic('next')}</button><button class="v-mb pl" data-mp="${esc(p.entity_id)}" aria-label="${p.state === 'playing' ? 'Pausar' : 'Reproducir'}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button><button class="v-mb" data-mn="${esc(p.entity_id)}" aria-label="Siguiente">${ic('next')}</button></span></div>`;
+          }
           return `<div class="v-card v-mcard" data-k="player">${t}<div class="v-music"><span class="v-art" ${art}></span><span class="v-tx"><b>${esc(p.attributes.media_title || 'Música')}</b><span>${esc(p.attributes.media_artist || fname(p.entity_id))}</span></span>
             <button class="v-mb pl" data-mp="${esc(p.entity_id)}">${ic(p.state === 'playing' ? 'pause' : 'play')}</button><button class="v-mb" data-mn="${esc(p.entity_id)}">${ic('next')}</button></div></div>`;
         }
@@ -743,6 +773,9 @@
         }
         case 'clock': {
           const d = new Date(), w = m.weather;
+          if (c.style === 'tiles') {
+            return `<div class="v-ctiles" data-scr="agenda"><div class="v-ct"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long' }))}</span></div><div class="v-ct"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { month: 'long' }))}</span></div></div>`;
+          }
           return `<div class="v-clock" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || 'sun')}${esc(Math.round(Number(w.attributes.temperature)))}°</button>` : ''}</div>`;
         }
         case 'plan': return planHTML(m, c.zoom);
@@ -752,6 +785,10 @@
           const a = w.attributes, bits = [WX_TXT[w.state] || w.state];
           if (a.humidity != null) bits.push(`humedad ${Math.round(a.humidity)}%`);
           if (a.wind_speed != null) bits.push(`viento ${Math.round(a.wind_speed)} ${a.wind_speed_unit || 'km/h'}`);
+          if (c.style === 'tile') {
+            return `<div class="v-card v-wxt" ${c.tap ? 'data-btap="1"' : 'data-scr="clima"'}>${t}<span class="v-wxi">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}</span>
+              <span class="v-wxs">${esc(WX_TXT[w.state] || w.state)}</span><b>${esc(Math.round(Number(a.temperature)))}<i>°</i></b>${a.humidity != null ? `<small>Humedad ${esc(Math.round(a.humidity))}%</small>` : ''}</div>`;
+          }
           return `<div class="v-card v-wx" ${c.tap ? 'data-btap="1"' : 'data-scr="clima"'}>${t}<div class="v-row"><span class="v-wxi">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}</span>
             <span class="v-tx"><b class="v-big">${esc(Math.round(Number(a.temperature)))}°</b><span>${esc(bits.join(' · '))}</span></span><span class="v-chev">${ic('chev')}</span></div></div>`;
         }
@@ -850,6 +887,13 @@
           const id = c.entity && st(c.entity) ? c.entity : m.power && m.power.entity_id;
           if (!id) return editing() ? `${t}<p class="v-empty">Elegí el sensor de consumo en las propiedades.</p>` : '';
           const s = st(id), pts = hist(id);
+          if (c.style === 'bars') {
+            const N = 7, t1 = Date.now(), t0 = t1 - 864e5, bk = Array.from({ length: N }, () => []);
+            (pts || []).forEach(([tt, v]) => { const i = Math.min(N - 1, Math.max(0, Math.floor(((tt - t0) / (t1 - t0)) * N))); bk[i].push(v); });
+            const av = bk.map((a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : 0)), hi = Math.max(1, ...av);
+            return `<div class="v-card v-enb" data-more="${esc(id)}">${t}<b class="v-big">${esc(s.state)}<small> ${esc(s.attributes.unit_of_measurement || '')}</small></b><span class="v-ens">Últimas 24 h</span>
+              <span class="v-bars">${av.map((v) => `<i><i style="height:${Math.max(4, (v / hi) * 100).toFixed(0)}%"></i></i>`).join('')}</span></div>`;
+          }
           return `<div class="v-card v-en" data-more="${esc(id)}">${t}<div class="v-row"><span class="v-bic">${ic('bolt')}</span><span class="v-tx"><b class="v-big">${esc(s.state)}<small> ${esc(s.attributes.unit_of_measurement || '')}</small></b><span>${esc(fname(id))} · últimas 24 h</span></span></div>${spark(pts)}</div>`;
         }
         case 'sensor': {
@@ -945,6 +989,16 @@
     function head(m, compact) {
       const d = new Date(), w = m.weather, ns = notes(m).length, H = (X.layout && X.layout.header) || {};
       const on = (k) => H[k] !== false;
+      if (H.greet) {
+        const hr = d.getHours(), hi = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
+        const S = (hass() || {}).states || {}, ae = (card() && card()._config && card()._config.app_entities) || null;
+        const lit = Object.keys(S).filter((x) => x.startsWith('light.') && S[x].state === 'on' && (!ae || ae.includes(x))).length;
+        const how = ns ? `${ns} aviso${ns === 1 ? '' : 's'} para revisar` : 'Todo funcionando bien';
+        const greet = `<button class="v-greet" data-scr="avisos"><b>${esc(hi)}${H.name ? `, ${esc(H.name)}` : ''}</b><span>${esc(how)}${lit ? ` · ${lit} luz${lit === 1 ? '' : 'es'} prendida${lit === 1 ? '' : 's'}` : ''}</span></button>`;
+        return `${greet}<span class="v-hsp"></span>
+        ${on('bell') ? `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>` : ''}
+        ${on('menu') ? `<button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>` : ''}`;
+      }
       return `${on('clock') ? '' : '<span class="v-hsp"></span>'}${on('clock') ? `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>` : ''}
         ${w && on('weather') ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(w.state === 'sunny' || w.state === 'clear-night' ? 'Despejado' : w.state === 'rainy' || w.state === 'pouring' ? 'Lluvia' : 'Nublado')}</small>`}</button>` : ''}
         ${on('bell') ? `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>` : ''}
@@ -1420,6 +1474,7 @@
         return c.call('media_player', 'media_play_pause', { entity_id: id });
       }
       const mn = t.closest('[data-mn]'); if (mn) return c.call('media_player', 'media_next_track', { entity_id: mn.dataset.mn });
+      const mpv = t.closest('[data-mpv]'); if (mpv) return c.call('media_player', 'media_previous_track', { entity_id: mpv.dataset.mpv });
       const cn = t.closest('[data-camnext]'); if (cn) return nextCam(cn, Number(cn.dataset.camnext) || 1);
       if (t.closest('[data-camall]')) return c.openCameras();
       const av = t.closest('[data-actv]'); if (av) return c.openActivity(av.dataset.actv ? { room: av.dataset.actv } : undefined);

@@ -183,3 +183,17 @@ async def test_avisos_llevan_a_donde_se_arregla(hass) -> None:
     many = next(a for a in collect(hass)["alerts"] if a["key"] == "unavailable:many")
     assert len(many["items"]) == 11 and all(x["url"].startswith("/config/devices/device/") for x in many["items"])
     assert many["items"][0]["area"] and many["items"][0]["since"]
+
+
+async def test_camaras_siempre(hass, hass_ws_client) -> None:
+    """Las cámaras de Frigate suelen no tener ambiente: la propuesta las trae y, aunque no se elijan, la app las tiene."""
+    d = await _house(hass)
+    cam, _ = _device(hass, "Portón", "fcam", None, ["camera.porton"])
+    await hass.async_block_till_done()
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "matterai/entities/list"})
+    by = {x["id"]: x for x in (await ws.receive_json())["result"]["devices"]}
+    assert by[cam]["selected"], "la propuesta trae la cámara aunque no tenga ambiente"
+    await ws.send_json({"id": 2, "type": "matterai/entities/save", "devices": [d["living"]], "entities": []})
+    assert (await ws.receive_json())["success"]
+    assert "camera.porton" in hass.data[DOMAIN]["selection"].allowed(), "una selección vieja sin la cámara no deja a la app sin cámaras"
