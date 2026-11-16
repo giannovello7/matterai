@@ -2883,6 +2883,10 @@
       const rec = new SR();
       rec.lang = 'es-AR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
       const vo = this._vo = { state: 'listening', text: '', rec };
+      // diagnóstico (Ayuda → Estado): los pasos del micrófono, para ver en qué se queda la segunda vez
+      const vlog = (m) => { try { if (window.__maeLog) window.__maeLog('voz', m); } catch (_) { /* nada */ } };
+      this._voN = (this._voN || 0) + 1; vlog(`pedido ${this._voN}: arranca (${SR.name || 'navegador'})`);
+      ['start', 'audiostart', 'soundstart', 'speechstart', 'speechend', 'audioend', 'nomatch'].forEach((k) => { try { rec[`on${k}`] = () => vlog(`pedido ${this._voN}: ${k}`); } catch (_) { /* no lo tiene */ } });
       rec.onresult = (e) => {
         let t = ''; let final = false;
         for (let i = e.resultIndex; i < e.results.length; i++) { t += e.results[i][0].transcript; if (e.results[i].isFinal) final = true; }
@@ -2890,6 +2894,7 @@
         if (final) { vo.final = true; this._voiceSend(t); }
       };
       rec.onerror = (e) => {
+        vlog(`pedido ${this._voN}: error ${e && e.error}${e && e.message ? ' ' + e.message : ''}`);
         if (this._vo !== vo) return;
         // despertado con «Mate»: el permiso del micrófono ya está dado (Mate estaba escuchando). Si falla al arrancar es
         // que Android todavía no lo soltó: se reintenta solo, sin mostrar «no tengo permiso»
@@ -2908,7 +2913,7 @@
           : e.error === 'no-speech' ? 'No escuché nada. Tocá el micrófono y hablá.' : 'No te pude escuchar, probá de nuevo.';
         this._voiceRender(); this._voiceAutoClose(3500);
       };
-      rec.onend = () => { vo.ended = true; if (this._vo === vo && vo.state === 'listening' && !vo.final) { if (vo.text) this._voiceSend(vo.text); else this._voiceStop(true); } };
+      rec.onend = () => { vlog(`pedido ${this._voN}: fin${vo.text ? ' con texto' : ' sin texto'}`); vo.ended = true; if (this._vo === vo && vo.state === 'listening' && !vo.final) { if (vo.text) this._voiceSend(vo.text); else this._voiceStop(true); } };
       this._voiceRender(true);
       this._haptic('light');
       clearTimeout(this._voWD);
