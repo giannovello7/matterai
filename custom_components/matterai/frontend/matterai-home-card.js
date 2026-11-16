@@ -2908,13 +2908,13 @@
           : e.error === 'no-speech' ? 'No escuché nada. Tocá el micrófono y hablá.' : 'No te pude escuchar, probá de nuevo.';
         this._voiceRender(); this._voiceAutoClose(3500);
       };
-      rec.onend = () => { if (this._vo === vo && vo.state === 'listening' && !vo.final) { if (vo.text) this._voiceSend(vo.text); else this._voiceStop(true); } };
+      rec.onend = () => { vo.ended = true; if (this._vo === vo && vo.state === 'listening' && !vo.final) { if (vo.text) this._voiceSend(vo.text); else this._voiceStop(true); } };
       this._voiceRender(true);
       this._haptic('light');
       clearTimeout(this._voWD);
       this._voWD = setTimeout(() => { // escucha "muda" (pasa en algunos navegadores): se graba y transcribe la casa
         if (this._vo === vo && vo.state === 'listening' && !vo.text) {
-          try { rec.abort(); } catch (_) { /* ya terminó */ }
+          this._voiceRelease(vo, 0);
           if (this._canRecord() && !this._isNative()) { this._vo = null; this._recStart(); return; }
           this._voiceFail('No te pude escuchar desde acá.', this._isNative() ? 'Probá de nuevo en un momento.' : this._micBlockedWhy());
         }
@@ -2924,7 +2924,9 @@
     async _voiceSend(text) {
       const vo = this._vo; if (!vo || vo.state !== 'listening') return;
       vo.state = 'thinking'; vo.text = text; this._voiceRender();
-      try { if (vo.rec) vo.rec.abort(); } catch (_) { /* ya terminó */ }
+      // el reconocimiento termina solo cuando da el texto final. Cortarlo («abort») cuando ya terminó o está terminando
+      // deja el micrófono trabado para la vez siguiente (Safari de iPhone y Android): sólo se corta si sigue escuchando
+      this._voiceRelease(vo, 1500);
       try {
         const r = await this._hass.callWS({ type: 'matterai/voice', text });
         if (this._vo !== vo) return;
@@ -3149,10 +3151,18 @@
       this._hfMark();
     }
 
+    /** Suelta el reconocimiento de una sesión: nada si ya terminó sola; si sigue escuchando, se corta (ya, o pasado un
+     *  momento si acaba de dar el texto final y está por terminar sola). */
+    _voiceRelease(vo, ms) {
+      if (!vo || !vo.rec || vo.ended || vo.released) return;
+      const cut = () => { if (vo.ended || vo.released) return; vo.released = true; try { vo.rec.abort(); } catch (_) { /* ya terminó */ } };
+      clearTimeout(vo.relT);
+      if (ms > 0) vo.relT = setTimeout(cut, ms); else cut();
+    }
     _voiceAutoClose(ms) { const vo = this._vo; clearTimeout(this._voT); this._voT = setTimeout(() => { if (this._vo === vo) this._voiceStop(true); }, ms); }
     _voiceStop(close) {
       const vo = this._vo; clearTimeout(this._voT);
-      if (vo && vo.rec) { try { vo.rec.abort(); } catch (_) { /* ya terminó */ } }
+      if (vo && vo.rec) this._voiceRelease(vo, 0);
       if (vo && vo.cleanup) vo.cleanup();
       if (close) {
         this._vo = null;
