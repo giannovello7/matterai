@@ -1518,7 +1518,10 @@
     function openCam(id, list) {
       try { window.__maeCamStart = id; } catch (_) { /* fuera del navegador */ }
 
-      const c = card(); if (c && c._config && c._config.camera_card && !camOff()) return c.openCameras(); return ctx.openEntity(id);
+      // Si el seguro había dejado de armar la tarjeta sola (la app se cerró dos veces al abrir), tocar la cámara la vuelve a
+      // pedir: siempre se llega a la tarjeta de Frigate, nunca a un reemplazo.
+      if (camOff()) { try { window.MaeCamGuard.reset(); } catch (_) { /* sin seguro */ } X.cache = {}; X.partCache = {}; }
+      const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
     }
     function nextCam(elx, d) {
       if (CAM_ONE) { const t = Date.now(); if (t - (X.camAt || 0) < CAM_GAP) return; X.camAt = t; } // freno: un cambio a la vez
