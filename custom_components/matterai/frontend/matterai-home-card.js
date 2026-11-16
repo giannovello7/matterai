@@ -2628,9 +2628,9 @@
         return;
       }
       const el = document.createElement(TAG);
-      // iPhone / iPad en la app: una cámara por visor (como el inicio nuevo) y con el seguro avisado
+      // iPhone / iPad en la app: el seguro queda avisado
       let camCfg = this._config.camera_card;
-      if (IOS_DEV && window.MaeCamGuard) { try { window.MaeCamGuard.arm(); } catch (_) { /* sin seguro */ } camCfg = Object.assign({}, camCfg, { cameras: (camCfg.cameras || []).slice(0, 1) }); }
+      if (IOS_DEV && window.MaeCamGuard) { try { window.MaeCamGuard.arm(); } catch (_) { /* sin seguro */ } }
       try { el.setConfig(Object.assign({}, camCfg, { type: `custom:${TAG}` })); } catch (e) {
         host.innerHTML = `<div class="camload">${ic('alert')}<span>Error en camera_card: ${esc(e.message || e)}</span></div>`;
         return;

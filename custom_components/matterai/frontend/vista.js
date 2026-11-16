@@ -555,7 +555,8 @@
     const IOS = typeof navigator !== 'undefined' && (/iPhone|iPad|iPod/.test(navigator.userAgent || '') || (/Macintosh/.test(navigator.userAgent || '') && navigator.maxTouchPoints > 1));
     /* iPhone / iPad (hasta probarlo con una Mac): el visor de Frigate con las 6 cámaras juntas queda cargando o iOS cierra
        la página; con una cámara anda. Una cámara por visor, ‹ nombre › arriba para cambiar y un freno entre cambios. */
-    const CAM_ONE = IOS, CAM_GAP = 1500;
+    // Todas las cámaras en una sola tarjeta de Frigate, también en iPhone (como en Home Assistant). Antes iba de a una porque al pasar de cámara iOS cerraba la página: era una falla de las miniaturas de eventos de la tarjeta 8.1.0, que la 8.2.0 no tiene (probado en el iPhone del usuario el 2026-11-16).
+    const CAM_ONE = false, CAM_GAP = 1500;
     const camSrc = (id) => { const s = st(id); return s && s.attributes.entity_picture ? url(s.attributes.entity_picture) + (s.attributes.entity_picture.includes('?') ? '&' : '?') + 't=' + Math.floor(Date.now() / 10000) : ''; };
     /** Equipos de una tarjeta: los elegidos, o los de los ambientes elegidos, o los de la casa (hasta 8). */
     function entsOf(c, m, dom, roomKey) {
