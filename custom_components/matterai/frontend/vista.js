@@ -1023,7 +1023,8 @@
       const sel = editing() && ctx.edit.selected === b.id;
       const sp = spanOf(b), cls = ` sp-${sp}${b.fill ? ' fill' : ''}${!shown ? ' hid' : ''}${(b.show || []).length ? ' cond' : ''}`;
       // en el editor, como Lovelace: la tarjeta entera se arrastra; ✎ la edita (o tocarla) y ⋮ tiene duplicar, copiar y borrar
-      const tool = `<span class="v-ecard"><button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
+      const ins = ctx.edit && ctx.edit.onAdd && !ctx.embed ? '<button class="v-eins" data-eins title="Agregar una tarjeta acá" aria-label="Agregar una tarjeta acá">+</button>' : '';
+      const tool = `${ins}<span class="v-ecard"><button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
       const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
       return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${tool}${ctx.edit.onSpan && !ctx.embed && !b.fill ? '<span class="v-rsz" data-rsz title="Arrastrá para cambiar el ancho"><i></i></span>' : ''}` : ''}${inner}</section>`;
     }
@@ -1083,7 +1084,9 @@
     // en vivo también en iPhone / iPad: la app le saca al visor el modo MJPEG (el que llenaba la memoria y hacía que iOS
     // cerrara la página) y usa WebRTC o MSE. Mientras carga el visor, o si no está, fotos seguidas.
     // el visor de Frigate (como en Home Assistant); se pausa mientras está abierta la ventana de cámaras (un solo visor)
-    function liveOk() { const c = card(); return !X.livePaused && !X.liveFail && !!(c && typeof c.liveCam === 'function'); }
+    // (en un iPhone donde el visor hizo que iOS cerrara la página queda apagado: fotos seguidas; ver CamGuard en app.js)
+    const camOff = () => { try { return !!(window.MaeCamGuard && window.MaeCamGuard.off()); } catch (_) { return false; } };
+    function liveOk() { const c = card(); return !X.livePaused && !X.liveFail && !camOff() && !!(c && typeof c.liveCam === 'function'); }
     /** Pone el visor en vivo de cada cámara en su lugar; es siempre el mismo (no se vuelve a conectar si no cambió la cámara). */
     function mountLive() {
       if (!X.el.querySelectorAll || editing()) return;
@@ -1094,6 +1097,7 @@
         let L = X.live[id];
         if (!L || L.key !== key) {
           const ids = CAM_ONE ? [key] : [key].concat((X.camList[id] || []).filter((x) => x !== key));
+          try { if (window.MaeCamGuard) window.MaeCamGuard.arm(); } catch (_) { /* sin seguro */ }
           const elx = card().liveCam(ids);
           if (!elx) { waitLive(); return; }
           L = X.live[id] = { el: elx, key };
@@ -1183,6 +1187,7 @@
         set('#v-dock', dockHTML(m, p));
       } else {
         setCol('#v-c1', bl, m, addSlot(0));
+        if (X.el.style && X.el.style.setProperty) { if (editing() && ctx.edit.viewH) X.el.style.setProperty('--vh', `${ctx.edit.viewH}px`); else X.el.style.removeProperty('--vh'); }
         set('#v-allb', `${ic('grid')}Toda la casa`);
         { const ab = X.el.querySelector('#v-allb'); if (ab && ab.classList) ab.classList.toggle('off', ((L.header || {}).casa) === false); }
         // reproductor: sólo con música; se esconde al botón Música
@@ -1301,7 +1306,7 @@
       if (typeof innerWidth === 'undefined') return;
       const setVh = (h) => { if (e.style.setProperty) e.style.setProperty('--vh', `${h}px`); };
       e.style.height = '';
-      if (editing()) { e.style.width = e.style.zoom = ''; setVh(innerHeight); return; }
+      if (editing()) { e.style.width = e.style.zoom = ''; setVh(ctx.edit.viewH || innerHeight); return; }
       const iw = innerWidth, ih = innerHeight, W = Math.max(iw, vertical ? 800 : 1180), s = iw / W;
       // zoom (y no transform) para que el scroll vertical y las ventanas fijas sigan andando bien
       e.style.zoom = s < 1 ? String(s) : ''; e.style.width = s < 1 ? W + 'px' : '';
@@ -1440,6 +1445,7 @@
         const ela = t.closest('[data-elact]'); if (ela && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, ela.dataset.elact, ctx.edit.el);
         if (t.closest('[data-eladd]') && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, 'add');
         const add = t.closest('[data-eadd]'); if (add && ctx.edit.onAdd) return ctx.edit.onAdd(+add.dataset.eadd, add.dataset.ezone || null);
+        if (t.closest('[data-eins]') && b && ctx.edit.onAdd) return ctx.edit.onAdd(null, null, { target: b.dataset.block, after: false });
         // lo que se toca adentro de la tarjeta: un ambiente, un dato del resumen, un botón
         let sub = null;
         const rm = t.closest('[data-room]'), kt = t.closest('[data-kt]'), it = t.closest('[data-it]');
@@ -1511,7 +1517,7 @@
     function openCam(id, list) {
       try { window.__maeCamStart = id; } catch (_) { /* fuera del navegador */ }
 
-      const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
+      const c = card(); if (c && c._config && c._config.camera_card && !camOff()) return c.openCameras(); return ctx.openEntity(id);
     }
     function nextCam(elx, d) {
       if (CAM_ONE) { const t = Date.now(); if (t - (X.camAt || 0) < CAM_GAP) return; X.camAt = t; } // freno: un cambio a la vez
@@ -1674,7 +1680,9 @@
     };
     const under = (x, y) => { const rn = X.el.getRootNode ? X.el.getRootNode() : null, d = rn && rn.elementFromPoint ? rn : X.el.ownerDocument; return d.elementFromPoint ? d.elementFromPoint(x, y) : null; };
     const autoScroll = (x, y) => {
-      const n = under(x, y), sc = n && n.closest && n.closest('.v-col,.v-sin,.v-side');
+      let sc = under(x, y);
+      while (sc && sc !== X.el && !(sc.scrollHeight > sc.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
+      if (sc === X.el) sc = null;
       const box = sc || X.el.ownerDocument.scrollingElement;
       if (!box || !box.getBoundingClientRect) return;
       const r = sc ? box.getBoundingClientRect() : { top: 0, bottom: X.el.ownerDocument.defaultView.innerHeight };
@@ -1683,18 +1691,85 @@
     el.addEventListener('pointerdown', (e) => {
       if (!editing() || e.button > 0 || pinDrag) return;
       const t = e.target;
-      if (t.closest && t.closest('input,select,textarea,.v-ecard,.v-etool,.v-eltool,.v-eadd,[data-eact],[data-radd],[data-rme],.v-pin')) return;
+      if (t.closest && t.closest('input,select,textarea,.v-ecard,.v-etool,.v-eltool,.v-eadd,.v-eins,[data-eact],[data-radd],[data-rme],.v-pin')) return;
       let kind0 = null, node = null;
       const it = t.closest && t.closest('[data-el]'), ri = t.closest && t.closest('[data-ri]'), blk = t.closest && t.closest('[data-block]'), dk = t.closest && t.closest('[data-dkk]');
-      if (dk && ctx.edit.onDock) { kind0 = 'dock'; node = dk; } else if (it && it.dataset.el !== 'cam' && blk) { kind0 = 'el'; node = it; } else if (ri) { kind0 = 'ri'; node = ri; } else if (blk) { kind0 = 'card'; node = blk; }
+      // Como en Lovelace: agarrando de cualquier parte se mueve la TARJETA. Lo de adentro (un botón, una escena) sólo se
+      // reordena arrastrando cuando esa tarjeta es la que se está editando (antes, agarrar un botón no movía nada).
+      const mine = blk && ctx.edit.selected === blk.dataset.block;
+      if (dk && ctx.edit.onDock) { kind0 = 'dock'; node = dk; } else if (it && it.dataset.el !== 'cam' && blk && mine) { kind0 = 'el'; node = it; } else if (ri && (!blk || mine)) { kind0 = 'ri'; node = ri; } else if (blk) { kind0 = 'card'; node = blk; }
       if (!node) return;
-      dnd = { kind: kind0, node, sel: kind0 === 'el' ? '[data-el]' : kind0 === 'ri' ? '[data-ri]' : kind0 === 'dock' ? '[data-dkk]' : '[data-block]', x0: e.clientX, y0: e.clientY, on: false, block: blk && blk.dataset.block };
+      dnd = { kind: kind0, node, sel: kind0 === 'el' ? '[data-el]' : kind0 === 'ri' ? '[data-ri]' : kind0 === 'dock' ? '[data-dkk]' : '[data-block]', x0: e.clientX, y0: e.clientY, on: false, block: blk && blk.dataset.block, pid: e.pointerId };
       // con el dedo: hay que mantenerla apretada un momento (si se mueve antes, es para desplazar la pantalla)
       if (e.pointerType === 'touch') {
         const d0 = dnd; d0.touch = true; d0.armed = false;
         d0.lt = setTimeout(() => { if (dnd !== d0) return; d0.armed = true; node.classList.add('lift'); try { if (navigator.vibrate) navigator.vibrate(12); } catch (_) { /* sin vibración */ } }, LONG_MS);
       }
     }, true);
+    /* Dónde cae una tarjeta: se mira la columna o banda bajo el puntero (aunque esté en un hueco, debajo de la última
+       tarjeta o la columna esté vacía) y, adentro, la tarjeta más cercana: antes o después, o a su lado si es angosta. */
+    const AREAS = '[data-col], #v-c1, .v-top, .v-bot, .v-embed'; // (#v-c1 sin data-col: la única columna del celular)
+    const markArea = (area) => { X.el.querySelectorAll('.dropin').forEach((n) => { if (n !== area) n.classList.remove('dropin'); }); if (area) area.classList.add('dropin'); };
+    const cardDrop = (x, y) => {
+      const scope = dnd.node.closest('#v-sheet') || X.el;
+      const areas = Array.from(scope.querySelectorAll(AREAS)).filter((n) => n.getClientRects().length && (scope !== X.el || !n.closest('#v-sheet')));
+      const rc = (n) => n.getBoundingClientRect();
+      let area = areas.find((n) => { const r = rc(n); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; });
+      if (!area) { // fuera de todas: la columna que está en esa vertical (arriba o abajo del puntero)
+        const inX = areas.filter((n) => { const r = rc(n); return n.matches('[data-col],#v-c1,.v-embed') && x >= r.left && x <= r.right; });
+        area = inX.sort((p, q) => { const d = (n) => { const r = rc(n); return y < r.top ? r.top - y : y - r.bottom; }; return d(p) - d(q); })[0];
+      }
+      if (!area) return null;
+      const where = area.dataset.zone ? { zone: area.dataset.zone } : { col: +area.dataset.col || 0 };
+      const kids = Array.from(area.querySelectorAll(':scope > [data-block], :scope > .v-row4 > [data-block]')).filter((n) => n !== dnd.node);
+      if (!kids.length) { const r = rc(area); return { area, drop: where, rect: { left: r.left + 6, top: r.top + 8, width: r.width - 12, height: 0 }, edge: 'top' }; }
+      const vd = (n) => { const r = rc(n); return y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0; };
+      const near = kids.slice().sort((p, q) => vd(p) - vd(q))[0];
+      const row = kids.filter((n) => n === near || sideways(n, near)); // las que están en su misma fila
+      const ar = rc(area);
+      let k = near, edge;
+      if (row.length > 1 || rc(near).width < ar.width * 0.75) {
+        const hd = (n) => { const r = rc(n); return x < r.left ? r.left - x : x > r.right ? x - r.right : 0; };
+        k = row.slice().sort((p, q) => hd(p) - hd(q))[0];
+        const r = rc(k);
+        // muy arriba o muy abajo de la fila: va antes o después de la fila entera; si no, a un lado de la tarjeta
+        if (y < r.top - 4) { k = row[0]; edge = 'top'; } else if (y > r.bottom + 4) { k = row[row.length - 1]; edge = 'bottom'; } else edge = x < r.left + r.width / 2 ? 'left' : 'right';
+      } else { const r = rc(k); edge = y < r.top + r.height / 2 ? 'top' : 'bottom'; }
+      return { area, drop: { target: k.dataset.block, after: edge === 'bottom' || edge === 'right' }, rect: rc(k), edge };
+    };
+    const dragMove = (x, y) => {
+      if (!dnd || !dnd.on) return;
+      dnd.px = x; dnd.py = y;
+      { const base = X.el.getBoundingClientRect(); dnd.ghost.g.style.left = `${x - dnd.ghost.dx - base.left}px`; dnd.ghost.g.style.top = `${y - dnd.ghost.dy - base.top}px`; }
+      autoScroll(x, y);
+      dnd.drop = null;
+      if (dnd.kind === 'card') {
+        const c = cardDrop(x, y);
+        markArea(c && c.area);
+        if (c) { dnd.drop = c.drop; showLine(c.rect, c.edge); } else hideLine();
+        return;
+      }
+      const n = under(x, y);
+      if (!n || !n.closest) { hideLine(); return; }
+      if (dnd.kind === 'dock') {
+        const tgt = n.closest('[data-dkk]');
+        if (tgt && tgt !== dnd.node) {
+          const r = tgt.getBoundingClientRect(), after = x > r.left + r.width / 2;
+          dnd.drop = { from: dnd.node.dataset.dkk, to: tgt.dataset.dkk, after };
+          showLine(r, after ? 'right' : 'left'); return;
+        }
+      } else {
+        const tgt = n.closest(dnd.sel);
+        const same = tgt && tgt !== dnd.node && (dnd.kind === 'ri' || (tgt.closest('[data-block]') || {}).dataset.block === dnd.block);
+        if (same) {
+          const edge = edgeFor(tgt, x, y), ti = +(dnd.kind === 'el' ? tgt.dataset.el : tgt.dataset.ri), fi = +(dnd.kind === 'el' ? dnd.node.dataset.el : dnd.node.dataset.ri);
+          let to = ti + (edge === 'bottom' || edge === 'right' ? 1 : 0); if (fi < to) to -= 1;
+          dnd.drop = { from: fi, to };
+          showLine(tgt.getBoundingClientRect(), edge); return;
+        }
+      }
+      hideLine();
+    };
     el.addEventListener('pointermove', (e) => {
       if (!dnd) return;
       if (dnd.touch && !dnd.armed) {
@@ -1706,53 +1781,21 @@
         dnd.on = true; X.dnd = true;
         dnd.ghost = ghostOf(dnd.node); dnd.node.classList.add('dragging');
         dnd.ghost.dx = e.clientX - dnd.ghost.r.left; dnd.ghost.dy = e.clientY - dnd.ghost.r.top;
+        if (dnd.kind === 'card') X.el.classList.add('dnd-card');
+        // el arrastre sigue aunque el puntero salga de la pantalla de vista previa (para llevarla más arriba o más abajo)
+        try { if (el.setPointerCapture && dnd.pid != null) el.setPointerCapture(dnd.pid); } catch (_) { /* sin captura */ }
       }
       e.preventDefault();
-      { const base = X.el.getBoundingClientRect(); dnd.ghost.g.style.left = `${e.clientX - dnd.ghost.dx - base.left}px`; dnd.ghost.g.style.top = `${e.clientY - dnd.ghost.dy - base.top}px`; }
-      autoScroll(e.clientX, e.clientY);
-      const n = under(e.clientX, e.clientY);
-      dnd.drop = null;
-      if (!n || !n.closest) { hideLine(); return; }
-      if (dnd.kind === 'card') {
-        const tgt = n.closest('[data-block]');
-        if (tgt && tgt !== dnd.node && !tgt.contains(dnd.node)) {
-          const edge = edgeFor(tgt, e.clientX, e.clientY);
-          dnd.drop = { target: tgt.dataset.block, after: edge === 'bottom' || edge === 'right' };
-          showLine(tgt.getBoundingClientRect(), edge); return;
-        }
-        // en una columna o banda, debajo de la última tarjeta (o vacía)
-        const area = n.closest('[data-col],[data-zone]');
-        if (area && !tgt) {
-          const kids = Array.from(area.querySelectorAll(':scope > [data-block], :scope > .v-row4 > [data-block]')).filter((x) => x !== dnd.node);
-          dnd.drop = area.dataset.zone ? { zone: area.dataset.zone } : { col: +area.dataset.col };
-          if (kids.length) showLine(kids[kids.length - 1].getBoundingClientRect(), 'bottom');
-          else { const r = area.getBoundingClientRect(); showLine({ left: r.left, top: r.top + 6, width: r.width, height: 0 }, 'top'); }
-          return;
-        }
-      } else if (dnd.kind === 'dock') {
-        const tgt = n.closest('[data-dkk]');
-        if (tgt && tgt !== dnd.node) {
-          const r = tgt.getBoundingClientRect(), after = e.clientX > r.left + r.width / 2;
-          dnd.drop = { from: dnd.node.dataset.dkk, to: tgt.dataset.dkk, after };
-          showLine(r, after ? 'right' : 'left'); return;
-        }
-      } else {
-        const tgt = n.closest(dnd.sel);
-        const same = tgt && tgt !== dnd.node && (dnd.kind === 'ri' || (tgt.closest('[data-block]') || {}).dataset.block === dnd.block);
-        if (same) {
-          const edge = edgeFor(tgt, e.clientX, e.clientY), ti = +(dnd.kind === 'el' ? tgt.dataset.el : tgt.dataset.ri), fi = +(dnd.kind === 'el' ? dnd.node.dataset.el : dnd.node.dataset.ri);
-          let to = ti + (edge === 'bottom' || edge === 'right' ? 1 : 0); if (fi < to) to -= 1;
-          dnd.drop = { from: fi, to };
-          showLine(tgt.getBoundingClientRect(), edge); return;
-        }
-      }
-      hideLine();
+      dragMove(e.clientX, e.clientY);
+      if (ctx.edit && ctx.edit.onDragAt) ctx.edit.onDragAt(e.clientX, e.clientY);
     }, { passive: false });
     const endDnd = (ok) => {
       const d = dnd; dnd = null;
       if (!d) return;
       clearTimeout(d.lt); if (d.node && d.node.classList) d.node.classList.remove('lift');
-      hideLine();
+      hideLine(); markArea(null); X.el.classList.remove('dnd-card');
+      try { if (d.pid != null && el.releasePointerCapture && el.hasPointerCapture && el.hasPointerCapture(d.pid)) el.releasePointerCapture(d.pid); } catch (_) { /* ya */ }
+      if (d.on && ctx.edit && ctx.edit.onDragEnd) ctx.edit.onDragEnd();
       if (d.ghost) d.ghost.g.remove();
       if (d.node && d.node.classList) d.node.classList.remove('dragging');
       if (!d.on) return;
@@ -1798,6 +1841,9 @@
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
+      /** Arrastrando: el puntero quedó en otro lugar de la pantalla sin moverse (el editor la desplazó). */
+      dragPoint(x, y) { dragMove(x, y); },
+      dragging: () => !!(dnd && dnd.on),
       /** Un solo visor a la vez: mientras la app muestra el visor grande, el del inicio se saca (y vuelve al cerrarlo). */
       pauseLive(on) { if (!!X.livePaused === !!on) return; X.livePaused = !!on; X.cache = {}; X.partCache = {}; render(); },
       destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },

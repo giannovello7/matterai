@@ -930,3 +930,21 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-rsztip:empty{display:none}
 .vista.st-vision .v-rsz>i,.vista.st-control4 .v-rsz>i{background:#f2b766}.vista.st-vision .v-rsztip,.vista.st-control4 .v-rsztip{background:#f2b766}
 .vista.st-vision.editing .v-b.rsz,.vista.st-control4.editing .v-b.rsz{outline-color:#f2b766}
+
+/* ───────────── EDITOR: mover y agregar tarjetas (2026-11-16) ───────────── */
+/* mientras se arrastra una tarjeta: todas las columnas y bandas se marcan como lugares donde soltar */
+.vista.editing.dnd-card :is([data-col],.v-top,.v-bot,.v-embed){outline:1px dashed rgba(242,183,102,.35);outline-offset:2px;border-radius:16px;min-height:64px;transition:background .12s,outline-color .12s}
+.vista.editing.dnd-card :is([data-col],.v-top,.v-bot,.v-embed).dropin{outline:2px dashed var(--warm);background:rgba(242,183,102,.07)}
+.vista.editing.dnd-card .v-eadd,.vista.editing.dnd-card .v-eins{visibility:hidden}
+.vista.editing.dnd-card{cursor:grabbing}
+.v-dropline{border-radius:4px;box-shadow:0 0 0 1px rgba(0,0,0,.25),0 0 12px var(--warm)}
+/* «+» en el borde de arriba de cada tarjeta: agrega una justo antes */
+.vista.editing .v-b>button.v-eins{position:absolute;z-index:6;left:50%;top:-13px;transform:translateX(-50%);width:26px;height:22px;padding:0;display:none;align-items:center;justify-content:center;border-radius:999px;border:1px solid var(--warm);background:#1b1f26;color:var(--warm);font-family:inherit;font-size:17px;font-weight:700;line-height:1;cursor:pointer;pointer-events:auto!important}
+.vista.editing .v-b:hover>.v-eins,.vista.editing .v-b.sel>.v-eins{display:flex}
+.vista.editing .v-b>button.v-eins:hover{background:var(--warm);color:#1b1408}
+.vista.light.editing .v-b>button.v-eins{background:#fff}
+/* el «+ Agregar tarjeta» del final de cada columna: siempre visible y fácil de acertar */
+.vista.editing .v-cols>.v-col>.v-eadd,.vista.editing .v-side>.v-eadd{min-height:46px}
+.vista.editing .v-side:not(:has(.v-b)){outline:1px dashed rgba(160,175,200,.3);border-radius:16px}
+/* en el editor el celular mide lo que mide el equipo (no el alto de la ventana de vista previa) */
+.vista.k-phone.editing{min-height:var(--vh,100vh)}

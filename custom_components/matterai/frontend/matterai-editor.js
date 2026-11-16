@@ -116,12 +116,15 @@
   .guide ol{margin:0;padding-left:18px;color:#c4cad6;font-size:13px;line-height:1.6}
   .ed{grid-template-columns:minmax(0,1fr)!important;grid-template-rows:auto 1fr}
   .ed-top{grid-column:1/-1!important;grid-row:1}.ed-c{grid-column:1!important;grid-row:2}.ed-l,.ed-r{display:none!important}
-  .ed-c{position:relative;transition:padding .2s}.ed.dlgon .ed-c{padding-right:calc(min(540px,46vw) + 24px)}
+  .fold{position:absolute;left:-14px;right:-14px;height:0;border-top:2px dashed rgba(242,183,102,.55);pointer-events:none;z-index:3}
+  .fold span{position:absolute;right:14px;top:4px;padding:2px 8px;border-radius:999px;background:rgba(27,20,8,.85);color:#f2b766;font-size:11px;white-space:nowrap}
+  .fold[hidden]{display:none}
+  .ed-c{position:relative}.ed.dlgon .ed-c{padding-right:calc(min(540px,46vw) + 24px)}
   .ed-top .saved{font-size:12.5px;color:#7fd6a4;padding:0 6px}.ed-top .saved.dirty{color:#f2b766}
   .ed-top .tname{display:flex;flex-direction:column;min-width:0;max-width:240px;margin-right:6px}.ed-top .tname h2{margin:0;font-size:16px;line-height:1.2;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ed-top .tname .saved{padding:0;font-size:11.5px}
   .emenu-l .ml{display:block;padding:10px 12px 3px;font-size:10.5px;letter-spacing:.12em;text-transform:uppercase;color:#8f99ab}
-  .ehint{position:absolute;left:50%;bottom:12px;transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:rgba(30,36,46,.92);border:1px solid rgba(160,175,200,.2);color:#c4cad6;font-size:12.5px;white-space:nowrap;pointer-events:none}
+  .ehint{position:fixed;z-index:5;left:50%;bottom:12px;max-width:calc(100vw - 40px);overflow:hidden;text-overflow:ellipsis;transform:translateX(-50%);padding:8px 14px;border-radius:999px;background:rgba(30,36,46,.92);border:1px solid rgba(160,175,200,.2);color:#c4cad6;font-size:12.5px;white-space:nowrap;pointer-events:none}
   .ehint:empty{display:none}.ehint b{color:#f2b766}
   .dlg{position:fixed;z-index:40;top:62px;right:12px;bottom:12px;width:min(540px,46vw);display:none;flex-direction:column;background:#161b21;border:1px solid rgba(160,175,200,.22);border-radius:18px;box-shadow:0 24px 70px rgba(0,0,0,.55);overflow:hidden}
   .ed.dlgon .dlg{display:flex}
@@ -247,7 +250,7 @@
       root.appendChild(this.host);
       this.wrap = this.host.attachShadow({ mode: 'open' });
       this.wrap.innerHTML = `<style>${CSS}</style><div class="ed" id="ed"><div class="ed-top" id="edt"></div>
-        <div class="ed-c" id="edc"><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div></div><div class="ehint" id="ehint"></div></div>
+        <div class="ed-c" id="edc"><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div><div class="fold" id="fold" hidden><span>Hasta acá se ve en el equipo sin deslizar</span></div></div><div class="ehint" id="ehint"></div></div>
         <aside class="dlg" id="dlg"><div class="dlg-h" id="dlgh"></div><div class="dlg-b" id="edr"></div><div class="dlg-f" id="dlgf"></div></aside></div><div class="toastE" id="toastE"></div>`;
       this.$ = (s) => this.wrap.querySelector(s);
       // el prearmado necesita el modelo de la casa (ambientes, cámaras, ausente, rutinas): igual que en la app
@@ -334,7 +337,6 @@
           B.splice(j + (where.after ? 1 : 0), 0, b);
         } else if (where.zone && this.K === 'tablet') { b.zone = where.zone; b.fill = false; B.push(b); }
         else { b.col = this.K === 'tablet' ? where.col || 0 : 0; delete b.zone; B.push(b); }
-        this.sel = b.id;
       });
     }
     /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
@@ -374,7 +376,9 @@
         weather: 'cloud', climate: 'snow', covers: 'curt', lights: 'bulb', energy: 'bolt', sensor: 'temp', people: 'user', text: 'list', image: 'film', activity: 'list', frigate: 'cam', openings: 'door', agenda: 'cal', irrigation: 'water', batteries: 'battery' };
       const box = document.createElement('div');
       box.className = 'catp';
-      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${inRoomZ ? ` · ${esc(this.rdraft ? this.rdraft.name : 'ambiente')} (${zone === 'room-bottom' ? 'abajo' : 'arriba'} de los equipos)` : K === 'tablet' ? (zone ? ` · banda de ${zone === 'top' ? 'arriba' : 'abajo'}` : col != null ? ` · ${this.colName(col).toLowerCase()}` : '') : ''}</b><button class="eb sm" data-cx>✕</button></div>
+      const atB = at && !inRoomZ ? this.blocks().find((x) => x.id === at.target) : null;
+      const atTxt = atB ? ` · ${at.after ? 'después' : 'antes'} de «${esc(atB.title || (CAT[atB.type] || {}).name || atB.type)}»` : '';
+      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${atTxt ? atTxt : inRoomZ ? ` · ${esc(this.rdraft ? this.rdraft.name : 'ambiente')} (${zone === 'room-bottom' ? 'abajo' : 'arriba'} de los equipos)` : K === 'tablet' ? (zone ? ` · banda de ${zone === 'top' ? 'arriba' : 'abajo'}` : col != null ? ` · ${this.colName(col).toLowerCase()}` : '') : ''}</b><button class="eb sm" data-cx>✕</button></div>
         <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div></div>`;
       this.wrap.appendChild(box);
       this.catBox = box;
@@ -556,6 +560,7 @@
       const d = this.$ && this.$('#dlg'); if (!d) return;
       const open = this.dlgOpen();
       this.$('#ed').classList.toggle('dlgon', open);
+      this.sizeFrame();
       if (!open) { this.$('#dlgh').innerHTML = ''; this.$('#dlgf').innerHTML = ''; return; }
       const b = this.selBlock(), CAT = window.MaeVista.CATALOG;
       const title = this.rscope && b ? `${this.rdraft ? this.rdraft.name : 'Ambiente'} › ${(CAT[b.type] || {}).name || b.type}${b.title && b.title !== (CAT[b.type] || {}).name ? ` · ${b.title}` : ''}` : this.zone === 'header' ? 'Parte de arriba' : this.zone === 'dock' ? 'Barra de abajo' : this.zone === 'dash' ? 'Diseño de este dashboard' : this.zone === 'allb' ? 'Botón «Toda la casa»'
@@ -594,7 +599,7 @@
       const hint = this.$('#ehint');
       this.$('#ed').classList.toggle('playing', !!this.playing);
       if (hint && this.playing) hint.innerHTML = 'Modo prueba: usalo como en el celular (luces, cámaras, ambientes). Los equipos se mueven de verdad. <b>✎ Editar</b> vuelve al editor.';
-      else if (hint) hint.innerHTML = this.dlgOpen() ? '' : 'Tocá una tarjeta para editarla · Arrastrala para moverla (con el dedo: mantenela apretada) · <b>+ Agregar tarjeta</b> al final de cada columna · Tocá arriba o la barra de abajo para cambiarlas';
+      else if (hint) hint.innerHTML = this.dlgOpen() ? '' : '<b>Arrastrá</b> una tarjeta desde cualquier parte para moverla (con el dedo: mantenela apretada) · Tocala para editarla · <b>+</b> arriba de una tarjeta o al final de una columna para agregar';
       this.drawPreview(); this.drawProps(); this.drawDlg(); this.bind();
     }
     blocks() {
@@ -644,17 +649,59 @@
       return '';
     }
     /** Tamaño de la pantalla de la vista previa (celular 390×800, tablet 1180×760) escalada al lugar libre. */
+    deviceSize() {
+      const ori = this.lay().orientation || 'landscape';
+      return this.K === 'phone' ? [390, 800] : ori === 'portrait' ? [760, 1180] : [1180, 760];
+    }
+    /** Editando se muestra el dashboard entero, del ancho del equipo y tan alto como haga falta: no hay que deslizar
+     *  adentro de la pantallita para llegar al final de una columna (se desplaza el editor). Una línea marca hasta dónde
+     *  se ve en el equipo sin deslizar. Probando, o con un ambiente abierto, la pantalla es la del equipo. */
     sizeFrame() {
-      const K = this.K, ori = this.lay().orientation || 'landscape';
-      const size = K === 'phone' ? [390, 800] : ori === 'portrait' ? [760, 1180] : [1180, 760];
-      const box = this.$('#edc').getBoundingClientRect();
-      const W = size[0] + 20, H = size[1] + 20;
-      const sc = Math.max(0.2, Math.min(1, (box.width - 48) / W, (box.height - 48) / H));
+      const size = this.deviceSize();
+      const edc = this.$('#edc'), cs = getComputedStyle(edc);
+      const availW = edc.clientWidth - parseFloat(cs.paddingLeft) - parseFloat(cs.paddingRight);
+      const availH = edc.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom);
+      const full = !this.playing && !this.rdraft;
+      const contentH = full ? Math.max(size[1], this.contentH || 0) : size[1];
+      const W = size[0] + 20, H = contentH + 20;
+      const sc = Math.max(0.2, Math.min(1, availW / W, full ? 1 : availH / H));
       const fr = this.$('#frame'), fw = this.$('#fwrap');
       fr.style.width = `${W}px`; fr.style.height = `${H}px`; fr.style.transform = `scale(${sc})`;
       fw.style.width = `${Math.round(W * sc)}px`; fw.style.height = `${Math.round(H * sc)}px`;
+      const fold = this.$('#fold');
+      if (fold) { fold.hidden = !(full && contentH > size[1] + 12); fold.style.top = `${Math.round((size[1] + 10) * sc)}px`; }
       return size;
     }
+    /** El alto real del dashboard dentro de la vista previa (cambia al agregar, mover o editar tarjetas). */
+    watchHeight(W) {
+      const pv = W.document.getElementById('pv');
+      const measure = () => { const h = pv ? pv.offsetHeight : 0; if (h && Math.abs(h - (this.contentH || 0)) > 2) { this.contentH = h; this.sizeFrame(); } };
+      try { this.hRO = new W.ResizeObserver(measure); this.hRO.observe(pv); } catch (_) { /* sin ResizeObserver: queda del alto del equipo */ }
+      measure();
+    }
+    /** Arrastrando una tarjeta: si el puntero llega cerca del borde de arriba o de abajo, el editor se desplaza solo. */
+    dragAt(x, y) {
+      this.dragP = { x, y };
+      if (this.dragRAF) return;
+      const step = () => {
+        this.dragRAF = null;
+        const P = this.dragP, ifr = this.ifr, edc = this.$('#edc');
+        if (!P || !ifr || !edc || !this.vista || !this.vista.dragging || !this.vista.dragging()) { this.dragP = null; return; }
+        const r = ifr.getBoundingClientRect(), sc = r.width / (ifr.offsetWidth || 1), box = edc.getBoundingClientRect();
+        const oy = r.top + P.y * sc, EDGE = 70;
+        const d = oy < box.top + EDGE ? -Math.ceil((box.top + EDGE - oy) / 4) : oy > box.bottom - EDGE ? Math.ceil((oy - (box.bottom - EDGE)) / 4) : 0;
+        if (d) {
+          const before = edc.scrollTop;
+          edc.scrollTop += Math.max(-28, Math.min(28, d));
+          const moved = edc.scrollTop - before;
+          // la pantalla se movió debajo del puntero quieto: se le avisa dónde quedó
+          if (moved) { P.y += moved / sc; this.vista.dragPoint(P.x, P.y); }
+        }
+        this.dragRAF = setTimeout(step, 16);
+      };
+      this.dragRAF = setTimeout(step, 16);
+    }
+    dragEnd() { this.dragP = null; if (this.dragRAF) { clearTimeout(this.dragRAF); this.dragRAF = null; } }
     /** La vista previa es una pantalla de verdad (un iframe con el motor de la app): la barra de abajo, el alto y el
      *  ancho se comportan como en el equipo, y los estilos del panel no la tocan. */
     drawPreview() {
@@ -667,7 +714,7 @@
       ifr.title = 'Vista previa';
       ifr.srcdoc = `<!doctype html><html lang="es" class="mae-ed"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
         <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Red+Hat+Display:wght@400;500;600;700&family=Red+Hat+Mono:wght@400;500&display=swap">
-        <link rel="stylesheet" href="${BASE}/vista.css?t=${this.ver}"><style>html,body{margin:0;background:#161b21}</style></head>
+        <link rel="stylesheet" href="${BASE}/vista.css?t=${this.ver}"><style>html,body{margin:0;background:#161b21}html{scrollbar-width:none}html::-webkit-scrollbar{display:none}</style></head>
         <body><div id="pv"></div><script src="${BASE}/matterai-home-card.js?t=${this.ver}"><\/script><script src="${BASE}/vista.js?t=${this.ver}"><\/script></body></html>`;
       ifr.onload = () => {
         const W = ifr.contentWindow;
@@ -692,6 +739,7 @@
         }, ctx()));
         this.vista.setView(this.viewFor());
         this.previewRoom();
+        this.watchHeight(W);
       };
       fr.appendChild(ifr);
       void size;
@@ -702,7 +750,8 @@
       return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
         onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' || a === 'menu' ? this.pick(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
-        onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone) => this.openCatalog(col, zone),
+        onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone, at) => this.openCatalog(col, zone, at),
+        viewH: this.deviceSize()[1], onDragAt: (x, y) => this.dragAt(x, y), onDragEnd: () => this.dragEnd(),
         onCols: this.K === 'tablet' ? (cols) => this.change(() => { const L = this.lay(); L.v = 2; L.cols = cols; }) : null,
         onSpan: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; this.lay().v = 2; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
         onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
