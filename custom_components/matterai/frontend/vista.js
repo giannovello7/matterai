@@ -311,7 +311,6 @@
       G = { side: false, cols: [2, 1, 1] };
       B = T ? [
         n('rooms', 0, { title: 'Ambientes', cfg: roomsCfg('photo') }),
-        n('clock', 1),
         n('scenes', 1, { title: 'Escenas', cfg: { auto: true } }),
         clim ? n('climate', 1, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : n('weather', 1),
         n('alarm', 2, { title: 'Seguridad' }),
@@ -1026,7 +1025,7 @@
       // en el editor, como Lovelace: la tarjeta entera se arrastra; ✎ la edita (o tocarla) y ⋮ tiene duplicar, copiar y borrar
       const tool = `<span class="v-ecard"><button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
       const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
-      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${tool}` : ''}${inner}</section>`;
+      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${tool}${ctx.edit.onSpan && !ctx.embed && !b.fill ? '<span class="v-rsz" data-rsz title="Arrastrá para cambiar el ancho"><i></i></span>' : ''}` : ''}${inner}</section>`;
     }
     /** Ancho de una tarjeta en cuartos de su columna (4 = completa). */
     function spanOf(b) { const n = +b.span || (b.size === 'half' ? 2 : 4); return Math.max(1, Math.min(4, n)); }
@@ -1555,6 +1554,36 @@
     ['pointerup', 'pointercancel'].forEach((ev) => { if (typeof addEventListener === 'function') addEventListener(ev, endSlide); });
     if (typeof document !== 'undefined' && document.addEventListener) document.addEventListener('visibilitychange', endSlide); // al volver a la app, nunca trabada
     // editor: el ancho de las columnas se cambia arrastrando la manija que hay entre ellas
+    // editor: el ancho de una tarjeta (¼, ½, ¾ o completo) se cambia arrastrando su borde derecho, como en Lovelace
+    let rszDrag = null;
+    const SPAN_TXT = { 1: '¼', 2: '½', 3: '¾', 4: 'Completo' };
+    el.addEventListener('pointerdown', (e) => {
+      const h = editing() && ctx.edit.onSpan && e.target.closest && e.target.closest('[data-rsz]'); if (!h) return;
+      const sec = h.closest('[data-block]'), box = sec && sec.closest('.v-col,.v-top,.v-bot,.v-side,#v-c1'); if (!sec || !box) return;
+      e.preventDefault(); e.stopPropagation();
+      const rb = box.getBoundingClientRect(), rs = sec.getBoundingClientRect();
+      const tip = document.createElement('span'); tip.className = 'v-rsztip'; sec.appendChild(tip);
+      rszDrag = { h, sec, tip, id: sec.dataset.block, left: rs.left, unit: rb.width / 4, span: 0 };
+      sec.classList.add('rsz');
+      try { h.setPointerCapture(e.pointerId); } catch (_) { /* navegador viejo */ }
+    }, true);
+    el.addEventListener('pointermove', (e) => {
+      const d = rszDrag; if (!d) return;
+      const n = Math.max(1, Math.min(4, Math.round((e.clientX - d.left) / d.unit)));
+      if (n === d.span) return;
+      d.span = n; d.tip.textContent = SPAN_TXT[n];
+      // se ve en el momento: la tarjeta toma el ancho que va a tener
+      d.sec.style.width = `${d.unit * n - 6}px`; d.sec.style.maxWidth = 'none'; d.sec.style.gridColumn = `span ${n}`;
+    });
+    const rszEnd = () => {
+      const d = rszDrag; if (!d) return;
+      rszDrag = null; X.gutAt = Date.now();
+      d.sec.classList.remove('rsz'); d.sec.style.width = d.sec.style.maxWidth = d.sec.style.gridColumn = '';
+      if (d.tip.parentNode) d.tip.parentNode.removeChild(d.tip);
+      if (d.span) ctx.edit.onSpan(d.id, d.span);
+    };
+    ['pointerup', 'pointercancel'].forEach((ev) => el.addEventListener(ev, rszEnd));
+    el.addEventListener('click', (e) => { if (X.gutAt && Date.now() - X.gutAt < 400 && e.target.closest && e.target.closest('[data-rsz]')) e.stopPropagation(); }, true);
     let gutDrag = null;
     el.addEventListener('pointerdown', (e) => {
       const g = editing() && ctx.edit.onCols && e.target.closest && e.target.closest('[data-gut]'); if (!g) return;

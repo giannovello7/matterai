@@ -900,3 +900,33 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .vista.st-vision.k-tablet:not(.editing) .v-cols>.v-col>.v-b:last-child>.v-devs{flex:1}
 .vista.st-vision.k-phone .v-b .v-kpis{grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
 .vista.st-vision.k-phone .v-kpi{padding:11px 12px!important}.vista.st-vision.k-phone .v-kpi .v{font-size:16px}
+/* una columna del costado sin tarjetas (casa sin plano) no deja un tercio de la pantalla vacío */
+.v-side.v-empty{display:none}
+/* resumen: hasta 6 datos en una fila en la tablet */
+.vista.k-tablet .v-b .v-kpis{grid-template-columns:repeat(auto-fit,minmax(min(100%,108px),1fr))}
+/* hora y clima en una columna angosta: el clima baja en vez de apretar la fecha */
+.v-clock{flex-wrap:wrap;row-gap:8px}
+/* Vidrio con la tablet parada: la ventana ocupa el ancho; el panel de la derecha pasa abajo, en dos mitades
+   (la hora y la música de un lado, el termostato del otro) */
+.vista.st-vision.k-tablet.vert:not(.editing) .v-tab{align-items:stretch;justify-content:center}
+.vista.st-vision.k-tablet.vert .v-cols{flex-direction:column}
+.vista.st-vision.k-tablet.vert .v-cols>.v-col{flex:none!important;width:auto}
+.vista.st-vision.k-tablet.vert .v-cols>.v-col:last-child:not(:first-child){display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:12px}
+.vista.st-vision.k-tablet.vert .v-cols>.v-col:last-child:not(:first-child)>.t-climate{grid-column:2;grid-row:1/3}
+.vista.st-vision.k-tablet.vert .v-cols>.v-col:last-child:not(:first-child)>.t-clock{grid-column:1;grid-row:1}
+.vista.st-vision.k-tablet.vert .v-cols>.v-col:last-child:not(:first-child)>.t-music{grid-column:1;grid-row:2}
+/* tablet parada: una columna que quedaría demasiado angosta baja a la fila siguiente (no se aprieta) */
+.vista.k-tablet.vert:not(.st-vision) .v-cols{flex-wrap:wrap}
+.vista.k-tablet.vert:not(.st-vision) .v-cols>.v-col{min-width:280px}
+/* si el dashboard ya tiene su tarjeta de música, la barra de música de abajo no se repite */
+.vista.k-tablet:has(.v-cols .t-music :is(.v-mcard,.v-mplay)) .v-player{display:none!important}
+.vista.k-phone:not(.st-vision) .v-b .v-kpis{grid-template-columns:repeat(auto-fit,minmax(min(100%,96px),1fr))}
+/* editor: manija en el borde derecho de cada tarjeta para cambiar su ancho arrastrando (¼ · ½ · ¾ · completo) */
+.v-rsz{position:absolute;z-index:6;top:0;bottom:0;right:-9px;width:18px;cursor:ew-resize;touch-action:none;display:none;align-items:center;justify-content:center;pointer-events:auto!important}
+.v-rsz>i{width:6px;height:44px;max-height:70%;border-radius:6px;background:var(--warm);box-shadow:0 0 0 2px rgba(0,0,0,.35);pointer-events:none}
+.vista.editing .v-b:hover>.v-rsz,.vista.editing .v-b.sel>.v-rsz,.vista.editing .v-b.rsz>.v-rsz{display:flex}
+.vista.editing .v-b.rsz{outline:2px solid var(--warm);z-index:7}
+.v-rsztip{position:absolute;z-index:8;top:50%;right:14px;transform:translateY(-50%);padding:5px 12px;border-radius:999px;background:var(--warm);color:#1b1408;font:700 13px/1.2 system-ui,sans-serif;pointer-events:none;box-shadow:0 6px 18px rgba(0,0,0,.4)}
+.v-rsztip:empty{display:none}
+.vista.st-vision .v-rsz>i,.vista.st-control4 .v-rsz>i{background:#f2b766}.vista.st-vision .v-rsztip,.vista.st-control4 .v-rsztip{background:#f2b766}
+.vista.st-vision.editing .v-b.rsz,.vista.st-control4.editing .v-b.rsz{outline-color:#f2b766}

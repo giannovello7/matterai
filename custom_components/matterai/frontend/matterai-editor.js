@@ -704,6 +704,7 @@
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone) => this.openCatalog(col, zone),
         onCols: this.K === 'tablet' ? (cols) => this.change(() => { const L = this.lay(); L.v = 2; L.cols = cols; }) : null,
+        onSpan: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; this.lay().v = 2; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
         onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
         room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null,
         roomPage: R ? Object.assign({ name: R.name }, Editor.roomPageOf(R.cards || [])) : null };
