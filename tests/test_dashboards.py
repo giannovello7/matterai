@@ -482,7 +482,7 @@ async def test_layout_v2_columns_bands_spans(hass, hass_ws_client, hass_client_n
     assert got["v"] == 2 and got["cols"] == [2, 1, 1] and got["side"] is False
     assert {b["id"]: (b.get("zone"), b.get("span"), b.get("fill")) for b in got["blocks"]}["k"][0] == "top"
     # NEGATIVO: columnas o anchos fuera de rango
-    for i, bad in enumerate([{"cols": [1, 1, 1, 1, 1]}, {"cols": [9]}, {"blocks": [{"id": "x", "type": "kpis", "span": 5}]}, {"blocks": [{"id": "x", "type": "kpis", "zone": "left"}]}, {"blocks": [{"id": "x", "type": "kpis", "col": 4}]}]):
+    for i, bad in enumerate([{"cols": [1, 1, 1, 1, 1]}, {"cols": [101]}, {"blocks": [{"id": "x", "type": "kpis", "span": 5}]}, {"blocks": [{"id": "x", "type": "kpis", "zone": "left"}]}, {"blocks": [{"id": "x", "type": "kpis", "col": 4}]}]):
         await ws.send_json({"id": 10 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"tablet": {"blocks": PHONE, **bad}}}})
         assert not (await ws.receive_json())["success"], bad
 
@@ -509,3 +509,23 @@ async def test_room_pages_house_and_dashboard(hass, hass_ws_client) -> None:
         assert not (await ws.receive_json())["success"], bad
         await ws.send_json({"id": 20 + i, "type": "matterai/views/save", "view": {"name": "Mal", "layouts": {"phone": {"blocks": PHONE}}, "room_pages": {"Quincho": bad}}})
         assert not (await ws.receive_json())["success"], bad
+
+
+def test_estilos_nuevos_y_anchos_se_pueden_guardar() -> None:
+    """Todo lo que arma el editor tiene que pasar la validación: estilos nuevos de tarjeta, anchos en % y el saludo."""
+    import re
+    from pathlib import Path
+
+    from custom_components.matterai.view_schema import BLOCK, layout_schema
+
+    for st in ("services", "devices", "tile", "card", "bars", "tiles", "covers"):
+        assert BLOCK({"id": "b", "type": "buttons", "cfg": {"style": st}})["cfg"]["style"] == st
+    lay = layout_schema(40)({"v": 2, "cols": [68, 32], "side": False, "header": {"greet": True, "name": "Ana"}})
+    assert lay["cols"] == [68, 32] and lay["header"] == {"greet": True, "name": "Ana"}
+    # los estilos que ofrece el editor: ninguno puede faltar acá (si falta, «No se pudo guardar»)
+    ed = (Path(__file__).parent.parent / "custom_components/matterai/frontend/matterai-editor.js").read_text(encoding="utf-8")
+    vista = (Path(__file__).parent.parent / "custom_components/matterai/frontend/vista.js").read_text(encoding="utf-8")
+    used = set(re.findall(r"\.style (?:===|!==) '([a-z0-9_]+)'", ed + vista)) | set(re.findall(r"\bstyle: '([a-z0-9_]+)'", vista))
+    used -= {"matterai", "apple", "cristal", "vision", "control4", "savant"}  # estilos del dashboard entero
+    for st in sorted(used):
+        BLOCK({"id": "b", "type": "buttons", "cfg": {"style": st}})

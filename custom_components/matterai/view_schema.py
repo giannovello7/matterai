@@ -95,7 +95,7 @@ CFG = vol.Schema({
     vol.Optional("rooms"): vol.All([_name], vol.Length(max=24)),
     vol.Optional("items"): vol.All([ITEM], vol.Length(max=24)),  # botones, resumen
     vol.Optional("auto"): bool,                                 # true: que lo elija la app según la casa
-    vol.Optional("style"): vol.Any(None, vol.In(["list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers"])),
+    vol.Optional("style"): vol.Any(None, vol.In(["list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers", "services", "devices", "tile", "card", "bars"])),
     # desde la 2.16
     vol.Optional("cols"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=4))),  # botones por fila
     vol.Optional("text"): vol.Any(None, vol.All(str, vol.Length(max=600))),               # tarjeta de texto
@@ -171,6 +171,8 @@ HEADER = vol.Schema({
     vol.Optional("bell"): bool,     # campanita de avisos
     vol.Optional("menu"): bool,     # menú
     vol.Optional("casa"): bool,     # botón «Toda la casa» al final del inicio del celular
+    vol.Optional("greet"): bool,    # saludo en vez de la hora (2.28)
+    vol.Optional("name"): vol.Any(None, vol.All(str, vol.Length(max=30))),  # nombre para el saludo
 }, extra=vol.REMOVE_EXTRA)
 
 
@@ -199,7 +201,7 @@ def layout_schema(max_blocks: int) -> vol.Schema:
         vol.Optional("bg"): vol.Any(None, BG),                                            # desde la 2.23: fondo propio
         # diseño v2 (2.24): columnas de la tablet con su ancho y la columna al costado
         vol.Optional("v"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=2))),
-        vol.Optional("cols"): vol.Any(None, vol.All([vol.All(vol.Coerce(int), vol.Range(min=0, max=6))], vol.Length(min=1, max=4))),
+        vol.Optional("cols"): vol.Any(None, vol.All([vol.All(vol.Coerce(int), vol.Range(min=0, max=100))], vol.Length(min=1, max=4))),
         vol.Optional("side"): vol.Any(None, bool),
     }, extra=vol.REMOVE_EXTRA)
 
