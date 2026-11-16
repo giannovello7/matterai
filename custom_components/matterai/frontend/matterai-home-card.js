@@ -1732,6 +1732,7 @@
       if (!this._hass || !this._root) return;
       const m = this._m = this._model();
       if (this.hasAttribute('headless')) {
+        this._dropCamCard(); // si llegó a armarse antes de quedar oculta
         this._sugs = this._suggestions(m);
         if (this._room || this._panel) { if (this._drag) this._sheetDirty = true; else this._renderSheet(); }
         this._actLive();
@@ -2587,7 +2588,16 @@
 
     /* Advanced Camera Card dentro del dashboard (una cámara a la vez, con flechas, video fluido por go2rtc).
        Si la tarjeta no está disponible en 20 s, se vuelve a las miniaturas. */
-    _camInline() { const c = this._config; return !!(c.camera_card && c.camera_inline !== false && !this._camFail && !featOff(c, 'cameras')); }
+    _camInline() {
+      const c = this._config;
+      // Detrás del inicio de la app (headless) esta tarjeta no se ve: no arma su visor. Antes lo armaba igual, oculto y
+      // con TODAS las cámaras andando a la vez; en el iPhone eso cerraba la app apenas abría.
+      if (this.hasAttribute && this.hasAttribute('headless')) return false;
+      try { if (window.MaeCamGuard && window.MaeCamGuard.off()) return false; } catch (_) { /* sin seguro */ }
+      return !!(c.camera_card && c.camera_inline !== false && !this._camFail && !featOff(c, 'cameras'));
+    }
+    /** Saca el visor de cámaras de esta tarjeta (deja de pedir video). */
+    _dropCamCard() { const e = this._camEl; this._camEl = null; if (e && e.parentNode) e.parentNode.removeChild(e); }
 
     /** Dentro de HA pero fuera de un dashboard (el panel MatterAI), HA no carga las tarjetas de HACS:
      *  se trae la de cámaras (Frigate / advanced-camera-card) de los recursos de Lovelace. En la app la carga la app. */
@@ -2603,7 +2613,7 @@
     }
     _mountCamCard() {
       const host = this._root && this._root.getElementById('camcard');
-      if (!host) { this._camEl = null; return; }
+      if (!host || !this._camInline()) { this._dropCamCard(); return; }
       if (this._camEl && this._camEl.parentNode === host) { this._camEl.hass = this._hass; return; }
       const TAG = 'advanced-camera-card';
       if (!customElements.get(TAG)) {
@@ -2618,7 +2628,10 @@
         return;
       }
       const el = document.createElement(TAG);
-      try { el.setConfig(Object.assign({}, this._config.camera_card, { type: `custom:${TAG}` })); } catch (e) {
+      // iPhone / iPad en la app: una cámara por visor (como el inicio nuevo) y con el seguro avisado
+      let camCfg = this._config.camera_card;
+      if (IOS_DEV && window.MaeCamGuard) { try { window.MaeCamGuard.arm(); } catch (_) { /* sin seguro */ } camCfg = Object.assign({}, camCfg, { cameras: (camCfg.cameras || []).slice(0, 1) }); }
+      try { el.setConfig(Object.assign({}, camCfg, { type: `custom:${TAG}` })); } catch (e) {
         host.innerHTML = `<div class="camload">${ic('alert')}<span>Error en camera_card: ${esc(e.message || e)}</span></div>`;
         return;
       }
