@@ -3254,6 +3254,8 @@
     /** Para el motor de dashboards: el visor de Frigate (Advanced Camera Card) con estas cámaras, en vivo.
      *  Devuelve null si todavía no cargó (la pide y avisa con whenDefined) o si no se puede armar. */
     liveCam(ids) {
+      // en la app: la tarjeta de cámaras propia de MatterAI (camaras.js)
+      if (typeof window !== 'undefined' && typeof window.__maeLiveCam === 'function') { const own = window.__maeLiveCam(ids); if (own) return own; }
       const TAG = 'advanced-camera-card';
       if (!ids || !ids.length || typeof customElements === 'undefined') return null;
       if (!customElements.get(TAG)) { this._ensureCamCard(); return null; }

@@ -61,6 +61,17 @@ Qué dispositivos de Home Assistant usa la app. Se elige por **dispositivo** (tr
 - **Accesos a la casa**: cada equipo tiene el suyo. **Desvincular** corta sólo ese equipo (celular perdido, empleado que ya no está).
 - **Celulares y tablets**: si está **conectado ahora**, la versión de la app (avisa si hay una más nueva; se actualiza sola cada vez que el equipo abre la app), el **perfil** (completo, sin seguridad para los chicos, o sólo luces y clima), **pedir huella** para la alarma, cerraduras y portón, y **Probar** (mostrar un aviso, prender la pantalla o recargar la app).
 
+## Cámaras en la app
+
+La app tiene su propia tarjeta de cámaras (no usa la tarjeta de Frigate). Sirve para todas las cámaras de Home Assistant, mezcladas:
+
+- **Cámaras comunes** (RTSP / «Generic Camera», ONVIF y las demás integraciones): en vivo.
+- **Cámaras de Frigate**: en vivo y, además, **eventos** (con miniatura, qué detectó y a qué hora) y **grabaciones por hora** de los últimos días. El botón del reloj aparece sólo en estas.
+- **Pasar de cámara**: deslizando o con las flechas. **Zoom**: pellizco, doble toque o la rueda del mouse; con zoom, se arrastra para moverse. **Pantalla completa**: el botón de la esquina.
+- Los controles aparecen al tocar la imagen y se esconden solos. Se ve un solo video a la vez (el de la cámara que estás mirando).
+- El video llega por Home Assistant (WebRTC; si la cámara no lo ofrece, HLS; si tampoco, fotos seguidas). No hace falta abrir ningún puerto de las cámaras.
+- Si una grabadora manda la imagen angosta (por ejemplo 1080P Lite, 960×1080), se estira sola si en la configuración de cámaras esa cámara tiene `dimensions.layout.fit: fill`.
+
 ## Automatizaciones
 Escenas y automatizaciones MatterAI, pensadas para que las entienda cualquiera: escenas de un toque, «si pasa esto, hacé aquello», horarios, simulación de presencia, riego por zonas, luz que sigue el ritmo del día, luz por presencia, avisos si algo quedó abierto, me voy / llego, buenas noches, clima inteligente, despertador con luz, recordatorios, portero, cámaras con Frigate, tele inteligente e invitados con link para el portón. Las escenas y automatizaciones aparecen solas en las tarjetas **Escenas** y **Rutinas** de los dashboards.
 

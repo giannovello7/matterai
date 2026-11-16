@@ -1521,6 +1521,8 @@
       // Si el seguro había dejado de armar la tarjeta sola (la app se cerró dos veces al abrir), tocar la cámara la vuelve a
       // pedir: siempre se llega a la tarjeta de Frigate, nunca a un reemplazo.
       if (camOff()) { try { window.MaeCamGuard.reset(); } catch (_) { /* sin seguro */ } X.cache = {}; X.partCache = {}; }
+      // en la app: la ventana «Cámaras» con la tarjeta propia, en esa cámara
+      try { if (typeof window.__maeOpenCams === 'function' && window.__maeOpenCams(id)) return undefined; } catch (_) { /* sigue */ }
       const c = card(); if (c && c._config && c._config.camera_card) return c.openCameras(); return ctx.openEntity(id);
     }
     function nextCam(elx, d) {
