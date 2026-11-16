@@ -251,13 +251,15 @@
       const power = m && m.power;
       const devs = (col) => n('devs', col, { type: 'buttons', cfg: { style: 'devices', items: tilesFor(4) } });
       const energy = (col, sp) => (power ? n('energy', col, { cfg: { style: 'bars' }, span: sp }) : null);
-      const cam = (col, sp) => (cams.length ? n('cam', col, { type: 'camera', title: S[cams[0]] && S[cams[0]].attributes.friendly_name ? String(S[cams[0]].attributes.friendly_name) : 'Cámara', cfg: { entity: cams[0], video: 'photo' }, span: power ? sp : 4 }) : null);
+      // la cámara comparte la fila con el consumo (o con el clima si la casa no mide consumo)
+      const cam = (col, sp) => (cams.length ? n('cam', col, { type: 'camera', cfg: { entity: cams[0], video: 'photo' }, span: sp }) : null);
+      const side2 = (col, sp) => (power ? energy(col, sp) : m && m.weather ? n('weather', col, { cfg: { style: 'tile' }, span: sp }) : null);
       const thermo = (col) => (clim ? n('climate', col, { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : n('weather', col, { cfg: { style: 'tile' } }));
       G = { side: false, cols: [68, 32] };
       B = T ? [
         cam(0, 2),
-        energy(0, 2),
-        n('kpis', 0, { cfg: { auto: true } }),
+        side2(0, 2),
+        n('kpis', 0, { cfg: { auto: true, max: 3 } }),
         devs(0),
         n('clock', 1),
         thermo(1),
@@ -265,7 +267,7 @@
         n('chips', 0, Object.assign({ type: 'buttons', cfg: { style: 'chips', items: chipsV } }, bot)),
       ] : [
         n('chips', 0, { type: 'buttons', cfg: { style: 'chips', items: chipsV } }),
-        n('kpis', 0, { cfg: { auto: true } }),
+        n('kpis', 0, { cfg: { auto: true, max: 3 } }),
         thermo(0),
         devs(0),
         n('music', 0, { cfg: { style: 'card' } }),
@@ -275,36 +277,32 @@
       hdr = { greet: true };
       thm = 'light';
     } else if (k === 'control4') {
-      // Como la pantalla de inicio de un panel táctil Control4 (sin logos): arriba los favoritos (escenas), abajo la
-      // grilla grande de «servicios» (Luces, Clima, Seguridad, Música, Cámaras…), cuadrados oscuros con el ícono de línea
-      // blanco y el nombre abajo. A la derecha lo que se mira de un vistazo: el aire, la alarma, una cámara y la música.
-      // tablet: dos columnas (la de los servicios más ancha); el ancho se ajusta en el editor
-      const services = [
-        { name: 'Ambientes', icon: 'home', tap: { type: 'screen', screen: 'casa' } },
-        { name: 'Luces', icon: 'bulb', tap: { type: 'screen', screen: 'luces' } },
-        clim ? { name: 'Clima', icon: 'temp', tap: { type: 'more_info', entity: clim } } : { name: 'Clima', icon: 'temp', tap: { type: 'screen', screen: 'clima' } },
-        { name: 'Seguridad', icon: 'shield', tap: { type: 'screen', screen: 'seguridad' } },
-        { name: 'Música', icon: 'music', tap: { type: 'screen', screen: 'musica' } },
-        cams.length ? { name: 'Cámaras', icon: 'cam', tap: { type: 'screen', screen: 'camaras' } } : null,
-        { name: 'Aberturas', icon: 'door', tap: { type: 'screen', screen: 'aberturas' } },
-        { name: 'Agenda', icon: 'cal', tap: { type: 'screen', screen: 'agenda' } },
-      ].filter(Boolean);
-      const svc = (col) => n('svc', col, { type: 'buttons', title: 'Servicios', cfg: { style: 'services', items: services } });
-      const fav = (col) => n('fav', col, { type: 'scenes', title: 'Favoritos', cfg: { auto: true } });
-      G = { side: false, cols: [62, 38] };
+      // Panel, como la pantalla de inicio del Control4 nuevo (sin logos): fondo de color desenfocado; arriba una fila de
+      // accesos en pastillas (Seguridad, Luces, Clima…); debajo los favoritos como cuadrados de color con el nombre abajo
+      // (las escenas); después mosaicos anchos translúcidos con el ícono a la izquierda y dos renglones (rótulo chico y
+      // valor): el aire con − 24 +, la alarma, los portones y las luces; las cámaras al lado; y abajo, de lado a lado, la
+      // música. En la tablet la barra es una columna de íconos a la izquierda; en el celular, abajo.
+      const fav = (col, extra) => n('fav', col, Object.assign({ type: 'scenes', cfg: { auto: true, style: 'covers' } }, extra || {}));
+      const chips = (col, extra) => n('chips', col, Object.assign({ type: 'buttons', cfg: { style: 'chips', items: themeChips } }, extra || {}));
+      const tiles = (col, extra) => n('grid', col, Object.assign({ type: 'buttons', cfg: { cols: 2, items: tilesFor(4) } }, extra || {}));
+      const air = (col, extra) => (clim ? n('climate', col, Object.assign({ cfg: { entity: clim } }, extra || {})) : n('weather', col, extra || {}));
+      const alarm = (col, extra) => (m && m.alarm ? n('alarm', col, extra || {}) : null);
+      const cam = (col, extra) => (cams.length ? n('cam', col, Object.assign({ type: 'camera', cfg: { entity: cams[0], video: 'photo' } }, extra || {})) : null);
+      G = { side: false, cols: [1] };
       B = T ? [
+        chips(0, top),
         fav(0),
-        svc(0),
-        clim ? n('climate', 1, { title: 'Clima', cfg: { entity: clim, style: 'big' } }) : n('weather', 1, { title: 'Clima' }),
-        m && m.alarm ? n('alarm', 1, { title: 'Seguridad' }) : null,
-        cams.length ? n('cam', 1, { type: 'camera', title: 'Cámaras', cfg: { entity: cams[0], video: 'photo' } }) : null,
-        n('music', 1, { title: 'Escuchando' }),
+        air(0, { span: 2 }),
+        alarm(0, { span: 2 }) || n('weather', 0, { span: 2 }),
+        tiles(0, { span: 2 }),
+        cam(0, { span: 2 }),
       ] : [
+        chips(0),
         fav(0),
-        svc(0),
-        clim ? n('climate', 0, { title: 'Clima', cfg: { entity: clim } }) : null,
-        m && m.alarm ? n('alarm', 0, { title: 'Seguridad' }) : null,
-        n('music', 0, { title: 'Escuchando' }),
+        air(0),
+        alarm(0),
+        tiles(0),
+        cam(0),
       ];
     } else if (k === 'savant') {
       // Savant / Lutron: los ambientes son la pantalla (tarjetas grandes), negro y dorado, todo minimalista;
@@ -636,7 +634,8 @@
       const c = b.cfg || {}, K = kind(), t = b.title ? `<h3>${esc(b.title)}</h3>` : '';
       switch (b.type) {
         case 'kpis': {
-          const items = (c.items && c.items.length && !c.auto) ? c.items : kpiAuto(m, K);
+          let items = (c.items && c.items.length && !c.auto) ? c.items : kpiAuto(m, K);
+          if (+c.max > 0) items = items.slice(0, +c.max); // «hasta N datos» (plantillas que muestran pocos y grandes)
           X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items; X.shown[b.id] = items;
           return `${t}<div class="v-kpis n${Math.min(items.length, K === 'tablet' ? 6 : 3)}">${items.map((it, i) => kpi(m, it, i)).join('')}</div>${elAdd('Agregar un dato')}`;
         }
