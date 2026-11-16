@@ -385,7 +385,7 @@
       const inp = box.querySelector('input'), g = box.querySelector('.catg');
       const paint = () => {
         const q = inp.value.trim().toLowerCase();
-        const list = Object.entries(CAT).filter(([, c]) => c.kinds.includes(K)).filter(([k, c]) => !q || `${k} ${c.name} ${c.desc}`.toLowerCase().includes(q));
+        const list = Object.entries(CAT).filter(([, c]) => c.kinds.includes(K) && !c.hidden).filter(([k, c]) => !q || `${k} ${c.name} ${c.desc}`.toLowerCase().includes(q));
         const GROUPS = [['La casa', ['rooms', 'plan', 'lights', 'covers', 'climate', 'scenes', 'routines', 'buttons', 'irrigation']], ['Seguridad', ['alarm', 'lock', 'frigate', 'camera', 'featured', 'openings', 'away', 'people']],
           ['Información', ['kpis', 'clock', 'weather', 'energy', 'sensor', 'agenda', 'activity', 'batteries']], ['Multimedia', ['music']], ['Otras', ['text', 'image']]];
         const known = new Set(GROUPS.flatMap((x) => x[1]));
@@ -634,7 +634,7 @@
       if (K === 'tablet') {
         [['Columna del plano', 0], ['Columna 1', 1], ['Columna 2', 2]].forEach(([t, c]) => { h += `<h4 style="margin-top:6px">${t}</h4><div class="colbox" data-colbox="${c}">${B.filter((b) => (b.col || 0) === c).map(row).join('') || '<span class="hint">Arrastrá tarjetas acá</span>'}</div>`; });
       } else h += `<div class="colbox" data-colbox="0">${B.map(row).join('') || '<span class="hint">Agregá tarjetas del catálogo</span>'}</div>`;
-      h += `<h4>Agregar tarjeta</h4><div class="cat">${Object.entries(CAT).filter(([, c]) => c.kinds.includes(K)).map(([k, c]) => `<button data-add="${k}"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></button>`).join('')}</div>
+      h += `<h4>Agregar tarjeta</h4><div class="cat">${Object.entries(CAT).filter(([, c]) => c.kinds.includes(K) && !c.hidden).map(([k, c]) => `<button data-add="${k}"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></button>`).join('')}</div>
         <p class="hint" style="margin-top:12px">Tocá una tarjeta en la vista previa para editarla y arrastrala para moverla (también acá, en la lista).</p>
         <p class="hint">Atajos: <b>Ctrl+Z</b> deshacer · <b>Ctrl+Y</b> rehacer · <b>Ctrl+S</b> guardar · <b>Ctrl+D</b> duplicar · <b>Supr</b> borrar · <b>Alt+↑/↓</b> mover · <b>Esc</b> soltar la tarjeta.</p>`;
       this.$('#edl').innerHTML = h;

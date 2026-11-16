@@ -528,4 +528,7 @@ def test_estilos_nuevos_y_anchos_se_pueden_guardar() -> None:
     used = set(re.findall(r"\.style (?:===|!==) '([a-z0-9_]+)'", ed + vista)) | set(re.findall(r"\bstyle: '([a-z0-9_]+)'", vista))
     used -= {"matterai", "apple", "cristal", "vision", "control4", "savant"}  # estilos del dashboard entero
     for st in sorted(used):
-        BLOCK({"id": "b", "type": "buttons", "cfg": {"style": st}})
+        assert BLOCK({"id": "b", "type": "buttons", "cfg": {"style": st}})["cfg"]["style"] == st, st
+    # un estilo que esta versión no conoce (editor más nuevo): no rechaza el dashboard, la tarjeta queda sin estilo
+    assert BLOCK({"id": "b", "type": "buttons", "cfg": {"style": "del_futuro"}})["cfg"]["style"] is None
+    assert BLOCK({"id": "b", "type": "buttons", "cfg": {"style": ""}})["cfg"]["style"] is None

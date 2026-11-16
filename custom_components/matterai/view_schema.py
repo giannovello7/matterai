@@ -95,7 +95,7 @@ CFG = vol.Schema({
     vol.Optional("rooms"): vol.All([_name], vol.Length(max=24)),
     vol.Optional("items"): vol.All([ITEM], vol.Length(max=24)),  # botones, resumen
     vol.Optional("auto"): bool,                                 # true: que lo elija la app según la casa
-    vol.Optional("style"): vol.Any(None, vol.In(["list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers", "services", "devices", "tile", "card", "bars"])),
+    vol.Optional("style"): lambda v: _card_style(v),
     # desde la 2.16
     vol.Optional("cols"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=4))),  # botones por fila
     vol.Optional("text"): vol.Any(None, vol.All(str, vol.Length(max=600))),               # tarjeta de texto
@@ -144,6 +144,18 @@ ZONE = vol.Schema({
     vol.Required("poly"): vol.All([_point], vol.Length(min=3, max=40)),
     vol.Optional("pin"): vol.Any(None, _point),
 }, extra=vol.REMOVE_EXTRA)
+
+
+CARD_STYLES = ("list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers", "services", "devices", "tile", "card", "bars")
+
+
+def _card_style(v: Any) -> str | None:
+    """«Cómo se ve» de una tarjeta. Uno que esta versión no conoce (lo escribió un editor más nuevo) queda sin estilo:
+    la tarjeta se ve con el de siempre, pero el dashboard se guarda. Antes se rechazaba el guardado entero."""
+    if v is None or v == "":
+        return None
+    v = str(v)[:24]
+    return v if v in CARD_STYLES else None
 
 
 def _media(v: Any) -> str:

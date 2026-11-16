@@ -55,12 +55,12 @@
   /* Catálogo de tarjetas (lo usa el editor: nombre, descripción, en qué equipo tiene sentido) */
   const CATALOG = {
     kpis: { name: 'Resumen', desc: 'Alarma, portón, luces, temperatura, aires, consumo', kinds: ['phone', 'tablet'] },
-    featured: { name: 'Cámara con botón', desc: 'Una cámara grande y su portón o puerta', kinds: ['phone', 'tablet'] },
+    featured: { name: 'Cámara con botón', desc: 'Una cámara grande y su portón o puerta', kinds: ['phone', 'tablet'], hidden: true },
     rooms: { name: 'Ambientes', desc: 'Los ambientes elegidos, con su interruptor', kinds: ['phone', 'tablet'] },
     scenes: { name: 'Escenas', desc: 'Escenas y scripts para tocar', kinds: ['phone', 'tablet'] },
     buttons: { name: 'Botones', desc: 'Botones a elección, con su acción', kinds: ['phone', 'tablet'] },
-    frigate: { name: 'Cámaras en vivo (Frigate)', desc: 'Video en vivo con el visor de Frigate: pasar de cámara, eventos y grabaciones', kinds: ['phone', 'tablet'] },
-    camera: { name: 'Portero: cámara con botones', desc: 'Una cámara en vivo con sus botones (abrir, ver más)', kinds: ['phone', 'tablet'] },
+    frigate: { name: 'Cámaras', desc: 'En vivo: pasar de cámara, zoom y pantalla completa. En las de Frigate, eventos y grabaciones', kinds: ['phone', 'tablet'] },
+    camera: { name: 'Portero: cámara con botones', desc: 'Una cámara en vivo con sus botones (abrir, ver más)', kinds: ['phone', 'tablet'], hidden: true },
     alarm: { name: 'Alarma', desc: 'Botón grande para armar y desarmar', kinds: ['phone', 'tablet'] },
     away: { name: 'Modo ausente', desc: 'Un interruptor o escena «me voy»', kinds: ['phone', 'tablet'] },
     routines: { name: 'Rutinas', desc: 'Automatizaciones con su interruptor', kinds: ['phone', 'tablet'] },
