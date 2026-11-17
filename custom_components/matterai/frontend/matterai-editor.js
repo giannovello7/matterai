@@ -226,6 +226,9 @@
     alarm: 'big', lock: 'big', away: 'big', music: 'big', weather: 'big', text: 'text', clock: 'clock' };
   function open(panel, viewId, kind) { return new Editor(panel, viewId, kind).start(); }
 
+  // tarjetas que ya no se ofrecen para agregar (siguen andando en los dashboards que las tienen): una sola de cámaras
+  const NO_CAT = ['featured', 'camera'];
+
   class Editor {
     constructor(panel, viewId, kind) {
       this.k0 = kind === 'tablet' || kind === 'phone' ? kind : null;
@@ -233,7 +236,10 @@
     }
 
     async start() {
-      await loadScript(`${BASE}/vista.js?t=${Date.now()}`);
+      // el motor SIEMPRE recién bajado: si quedaba la copia de antes de actualizar (la página de Home Assistant no se
+      // recarga sola), el catálogo era el viejo y los dashboards se pasaban mal a secciones
+      await new Promise((res, rej) => { const s = document.createElement('script'); s.src = `${BASE}/vista.js?t=${Date.now()}`; s.dataset.maeEd = `${BASE}/vista.js`; s.onload = res; s.onerror = rej; document.head.appendChild(s); });
+      if (!window.MaeVista || !window.MaeVista.toSections) { this.p._toast('Recargá la página (Ctrl+F5): quedó una versión vieja del editor'); return undefined; }
       this.ver = Date.now();
       const [lst, cfg] = await Promise.all([this.hass.callWS({ type: 'matterai/views/list' }), this.hass.callWS({ type: 'matterai/config' })]);
       const v = lst.views.find((x) => x.id === this.viewId);
@@ -304,6 +310,7 @@
     /** Lo que se hace con una tarjeta (desde la lista, la barra de la vista previa o el teclado). */
     blockAct(id, act) {
       const B = this.blocks(), i = B.findIndex((b) => b.id === id); if (i < 0) return;
+      if (act === 'w') return this.change(() => { const n = +B[i].span || 4, nx = n >= 4 ? 1 : n + 1; delete B[i].size; if (nx >= 4) delete B[i].span; else B[i].span = nx; });
       if (act === 'up' || act === 'down') return this.change(() => this.move(id, act === 'up' ? -1 : 1));
       if (act === 'left' || act === 'right') return this.change(() => { const S = this.secs(), k = S.findIndex((x) => x.id === this.secOf(B[i])), nx = S[k + (act === 'left' ? -1 : 1)]; if (nx) B[i].sec = nx.id; });
       if (act === 'dup') return this.change(() => { const nb = clone(B[i]); nb.id = this.newId(nb.type); B.splice(i + 1, 0, nb); this.sel = nb.id; });
@@ -386,7 +393,7 @@
       const inp = box.querySelector('input'), g = box.querySelector('.catg');
       const paint = () => {
         const q = inp.value.trim().toLowerCase();
-        const list = Object.entries(CAT).filter(([, c]) => c.kinds.includes(K) && !c.hidden).filter(([k, c]) => !q || `${k} ${c.name} ${c.desc}`.toLowerCase().includes(q));
+        const list = Object.entries(CAT).filter(([k, c]) => c.kinds.includes(K) && !c.hidden && !NO_CAT.includes(k)).filter(([k, c]) => !q || `${k} ${c.name} ${c.desc}`.toLowerCase().includes(q));
         const GROUPS = [['La casa', ['rooms', 'plan', 'lights', 'covers', 'climate', 'scenes', 'routines', 'buttons', 'irrigation']], ['Seguridad', ['alarm', 'lock', 'frigate', 'camera', 'featured', 'openings', 'away', 'people']],
           ['Información', ['kpis', 'clock', 'weather', 'energy', 'sensor', 'agenda', 'activity', 'batteries']], ['Multimedia', ['music']], ['Otras', ['text', 'image']]];
         const known = new Set(GROUPS.flatMap((x) => x[1]));
@@ -669,7 +676,7 @@
       if (K === 'tablet') {
         [['Columna del plano', 0], ['Columna 1', 1], ['Columna 2', 2]].forEach(([t, c]) => { h += `<h4 style="margin-top:6px">${t}</h4><div class="colbox" data-colbox="${c}">${B.filter((b) => (b.col || 0) === c).map(row).join('') || '<span class="hint">Arrastrá tarjetas acá</span>'}</div>`; });
       } else h += `<div class="colbox" data-colbox="0">${B.map(row).join('') || '<span class="hint">Agregá tarjetas del catálogo</span>'}</div>`;
-      h += `<h4>Agregar tarjeta</h4><div class="cat">${Object.entries(CAT).filter(([, c]) => c.kinds.includes(K) && !c.hidden).map(([k, c]) => `<button data-add="${k}"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></button>`).join('')}</div>
+      h += `<h4>Agregar tarjeta</h4><div class="cat">${Object.entries(CAT).filter(([k, c]) => c.kinds.includes(K) && !c.hidden && !NO_CAT.includes(k)).map(([k, c]) => `<button data-add="${k}"><b>${esc(c.name)}</b><small>${esc(c.desc)}</small></button>`).join('')}</div>
         <p class="hint" style="margin-top:12px">Tocá una tarjeta en la vista previa para editarla y arrastrala para moverla (también acá, en la lista).</p>
         <p class="hint">Atajos: <b>Ctrl+Z</b> deshacer · <b>Ctrl+Y</b> rehacer · <b>Ctrl+S</b> guardar · <b>Ctrl+D</b> duplicar · <b>Supr</b> borrar · <b>Alt+↑/↓</b> mover · <b>Esc</b> soltar la tarjeta.</p>`;
       this.$('#edl').innerHTML = h;

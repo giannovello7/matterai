@@ -164,7 +164,15 @@
   /** Pasa un diseño de columnas y bandas (v2) a secciones (v3). Lo que ya es v3 queda igual. */
   function toSections(L0, kind) {
     if (!L0) return L0;
-    if (Array.isArray(L0.secs) && L0.secs.length) return L0;
+    if (Array.isArray(L0.secs) && L0.secs.length) {
+      // Un editor con una copia vieja del motor (sin recargar la página después de actualizar) metía todo en una sola
+      // sección y dejaba las columnas viejas en cada tarjeta: quedaba todo amontonado y con huecos. Se rearma bien.
+      const B0 = L0.blocks || [], ids = new Set(L0.secs.map((x) => x.id));
+      const stale = L0.secs.length === 1 && B0.length > 1 && B0.some((b) => b.zone || (+b.col || 0) > 0) && B0.every((b) => !b.sec || b.sec === L0.secs[0].id);
+      if (!stale) return B0.every((b) => ids.has(b.sec)) ? L0 : Object.assign({}, L0, { blocks: B0.map((b) => (ids.has(b.sec) ? b : Object.assign({}, b, { sec: L0.secs[0].id }))) });
+      L0 = Object.assign({}, L0, { v: 2, blocks: B0.map((b) => { const x = Object.assign({}, b); delete x.sec; return x; }) });
+      delete L0.secs;
+    }
     const L = migrateLayout(L0, kind), blocks = (L.blocks || []).map((b) => Object.assign({}, b));
     const secs = [], out = [];
     const add = (id, w, list) => { if (!list.length) return; secs.push({ id, title: '', w }); list.forEach((b) => { b.sec = id; delete b.col; delete b.zone; delete b.fill; out.push(b); }); };
@@ -438,7 +446,9 @@
     function layout(m) {
       // embebido (las tarjetas de adentro de un ambiente): sólo su lista, nunca el prearmado
       if (ctx.embed) { const v = X.view || {}; return { blocks: v.blocks || [], v: 2, theme: v.theme || null, style: v.style || null, bg: null, plan: v.plan || null }; }
-      return migrateLayout(layoutRaw(m), kind());
+      // por secciones: se pasa por toSections (arregla los que quedaron mal pasados); si no, el diseño de columnas de antes
+      const L0 = layoutRaw(m);
+      return L0 && Array.isArray(L0.secs) && L0.secs.length ? toSections(L0, kind()) : migrateLayout(L0, kind());
     }
     function layoutRaw(m) {
       const v = X.view || {};
@@ -1073,7 +1083,7 @@
       const sp = spanOf(b), cls = ` sp-${sp}${b.fill ? ' fill' : ''}${!shown ? ' hid' : ''}${(b.show || []).length ? ' cond' : ''}`;
       // en el editor, como Lovelace: la tarjeta entera se arrastra; ✎ la edita (o tocarla) y ⋮ tiene duplicar, copiar y borrar
       const ins = ctx.edit && ctx.edit.onAdd && !ctx.embed ? '<button class="v-eins" data-eins title="Agregar una tarjeta acá" aria-label="Agregar una tarjeta acá">+</button>' : '';
-      const tool = `${ins}<span class="v-ecard"><button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
+      const tool = `${ins}<span class="v-ecard">${editing() && ctx.edit.onSpan && !ctx.embed ? `<button data-eact="w" class="v-ewbtn" title="Ancho: tocá para cambiarlo (¼, ½, ¾, completo)" aria-label="Cambiar el ancho">${{ 1: '¼', 2: '½', 3: '¾', 4: '↔' }[spanOf(b)]}</button>` : ''}<button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
       const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
       return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${tool}${ctx.edit.onSpan && !ctx.embed && !b.fill ? '<span class="v-rsz" data-rsz title="Arrastrá para cambiar el ancho"><i></i></span>' : ''}` : ''}${inner}</section>`;
     }
