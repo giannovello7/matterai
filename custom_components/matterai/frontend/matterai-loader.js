@@ -13,3 +13,9 @@ try {
 } catch (_) { /* sin red: se usa lo que haya */ }
 url.searchParams.set('v', tag ? tag.replace(/[^\w.-]/g, '') : String(Date.now()));
 await import(/* webpackIgnore: true */ url.href);
+// con la tarjeta MatterAI viene también la tarjeta «Dashboard MatterAI» (el dashboard de la app, adentro de Home Assistant)
+if (file === 'matterai-home-card.js') {
+  const d = new URL('matterai-dashboard-card.js', BASE);
+  d.searchParams.set('v', url.searchParams.get('v') || String(Date.now()));
+  try { await import(/* webpackIgnore: true */ d.href); } catch (e) { console.warn('[MatterAI] tarjeta Dashboard MatterAI', e); }
+}

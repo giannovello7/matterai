@@ -552,3 +552,42 @@ def test_secciones_se_guardan_y_llegan_al_equipo() -> None:
             sch(bad)
     out = resolve({"id": "v", "name": "V", "kind": "phone", "layouts": {"phone": lay, "tablet": None}}, "phone")
     assert out["v"] == 3 and len(out["secs"]) == 2 and out["blocks"][0]["sec"] == "s1"
+
+
+async def test_dashboard_en_la_app_de_home_assistant(hass, hass_ws_client, hass_read_only_access_token) -> None:
+    """La tarjeta «Dashboard MatterAI» (adentro de Home Assistant): cualquier usuario con sesión recibe su dashboard
+    (el elegido en la tarjeta, o el general) y le llega de nuevo cada vez que el instalador guarda."""
+    await _setup(hass)
+    ws = await hass_ws_client(hass)
+    await ws.send_json({"id": 1, "type": "matterai/views/save", "view": {"name": "Familia", "layouts": {"phone": {"blocks": PHONE}}}})
+    v = (await ws.receive_json())["result"]
+    await ws.send_json({"id": 2, "type": "matterai/views/default", "view_id": v["id"]})
+    assert (await ws.receive_json())["success"]
+    # un usuario común de Home Assistant (no es un equipo de la app)
+    ro = await hass_ws_client(hass, hass_read_only_access_token)
+    await ro.send_json({"id": 10, "type": "matterai/ha/views"})
+    lst = (await ro.receive_json())["result"]
+    assert lst["default"] == v["id"] and lst["views"][0]["name"] == "Familia"
+    await ro.send_json({"id": 11, "type": "matterai/ha/view", "kind": "phone"})
+    assert (await ro.receive_json())["success"]
+    ev = await ro.receive_json()
+    assert ev["type"] == "event" and ev["event"]["view"]["id"] == v["id"] and ev["event"]["view"]["blocks"][0]["type"] == "kpis"
+    # el instalador guarda: la tarjeta lo recibe sola
+    await ws.send_json({"id": 3, "type": "matterai/views/save", "view": {"id": v["id"], "name": "Familia", "layouts": {"phone": {"blocks": PHONE[:1]}}}})
+    assert (await ws.receive_json())["success"]
+    ev = await ro.receive_json()
+    assert len(ev["event"]["view"]["blocks"]) == 1
+    # un dashboard fijo en la tarjeta
+    await ws.send_json({"id": 4, "type": "matterai/views/save", "view": {"name": "Tablet", "kind": "tablet", "layouts": {"tablet": {"blocks": PHONE}}}})
+    t = (await ws.receive_json())["result"]
+    await ro.send_json({"id": 12, "type": "matterai/ha/view", "view_id": t["id"], "kind": "tablet"})
+    got, ok = None, False
+    for _ in range(6):  # (en el medio llegan los avisos del guardado a la otra suscripción)
+        m = await ro.receive_json()
+        if m["id"] == 12 and m["type"] == "result":
+            ok = m["success"]
+        elif m["id"] == 12 and m["type"] == "event":
+            got = m["event"]["view"]
+            break
+    assert ok
+    assert got and got["id"] == t["id"] and got["kind"] == "tablet"

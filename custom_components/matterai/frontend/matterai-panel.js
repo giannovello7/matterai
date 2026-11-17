@@ -1049,7 +1049,16 @@
           <div class="dv-auto"><span class="dv-ic"><ha-icon icon="mdi:auto-fix"></ha-icon></span><span class="dv-t"><b>Inicio automático</b><small class="mut" style="display:block">${r.default ? 'No se usa: hay un dashboard por defecto (★).' : 'Lo ven los equipos que no tienen dashboard, porque no hay uno por defecto (★). Se arma solo con los ambientes, escenas y cámaras de la casa.'}</small></span>
             ${r.default ? '' : '<button class="b" id="vauto"><ha-icon icon="mdi:pencil-ruler"></ha-icon>Personalizarlo</button>'}</div>
         </div>
-        <div class="dv-note"><b>¿Quién ve cada dashboard?</b> Se elige en <button class="lnk" data-go="app">Equipos</button>, al lado de cada celular o tablet (o marcándolos adentro de cada dashboard).</div>`}
+        <div class="dv-note"><b>¿Quién ve cada dashboard?</b> Se elige en <button class="lnk" data-go="app">Equipos</button>, al lado de cada celular o tablet (o marcándolos adentro de cada dashboard).</div>
+        <div class="box" id="vha"><div class="bh"><h2><ha-icon icon="mdi:home-assistant"></ha-icon> En la app de Home Assistant</h2></div>
+          <p class="mut" style="margin:0 0 10px">Para los clientes que usan la app de Home Assistant: les armo un panel «Casa» que muestra el dashboard de acá (el mismo de la app MatterAI). Cuando lo cambiás en el editor, se actualiza solo.</p>
+          <div class="row" style="align-items:center;gap:10px;flex-wrap:wrap">
+            <label class="dv-pick" style="min-width:220px"><span>Qué dashboard muestra</span><select id="vhav"><option value="">El de cada usuario (o el general)</option>${views.map((x) => `<option value="${esc(x.id)}">${esc(x.name || x.id)}</option>`).join('')}</select></label>
+            <button class="b pri" id="vhago"><ha-icon icon="mdi:view-dashboard-variant"></ha-icon>Crear o actualizar el panel «Casa»</button>
+            <a class="b" id="vhaopen" href="/matterai-casa/casa" target="_top" hidden><ha-icon icon="mdi:open-in-app"></ha-icon>Abrirlo</a>
+          </div>
+          <p class="mut" style="margin:10px 0 0;font-size:12.5px">Para que el cliente lo vea al abrir la app: en su usuario de Home Assistant, Perfil → Panel → «Casa». La tarjeta también se puede poner a mano en cualquier panel: <code>type: custom:matterai-dashboard</code>.</p>
+        </div>`}
 ${eqBox}
       </div>`;
       // en la página Equipos van sólo el estilo y el cuadro de equipos
@@ -1067,6 +1076,20 @@ ${eqBox}
         const name = $('vnewn').value.trim(); if (!name) { $('vnewn').focus(); return; }
         const nv = await call({ type: 'matterai/views/save', view: { name, kind: 'phone', pinned: [] } }, 'Dashboard creado');
         if (nv) { this._vopen.add(nv.id); saveOpen(); await again(); edit(nv.id); }
+      };
+      if ($('vhago')) $('vhago').onclick = async () => {
+        // un panel de Home Assistant («Casa», /matterai-casa) con la tarjeta «Dashboard MatterAI» ocupando toda la pantalla
+        const URL_PATH = 'matterai-casa', vid = $('vhav').value;
+        const list = (await call({ type: 'lovelace/dashboards/list' })) || [];
+        if (!list.some((d) => d.url_path === URL_PATH)) {
+          const ok = await call({ type: 'lovelace/dashboards/create', url_path: URL_PATH, title: 'Casa', icon: 'mdi:home-automation', show_in_sidebar: true, require_admin: false, mode: 'storage' });
+          if (!ok) return;
+        }
+        const card = Object.assign({ type: 'custom:matterai-dashboard' }, vid ? { view: vid } : {});
+        try {
+          await this._hass.callWS({ type: 'lovelace/config/save', url_path: URL_PATH, config: { title: 'Casa', views: [{ title: 'Casa', path: 'casa', icon: 'mdi:home', type: 'panel', cards: [card] }] } });
+          this._toast('Listo: panel «Casa» en Home Assistant'); $('vhaopen').hidden = false;
+        } catch (e) { this._toast(`No se pudo: ${e.message || e}`); }
       };
       if ($('vauto')) $('vauto').onclick = async () => {
         const nv = await call({ type: 'matterai/views/save', view: { name: 'General', kind: 'phone', pinned: [] } });

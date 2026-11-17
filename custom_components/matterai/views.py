@@ -20,6 +20,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import config_validation as cv
+from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
 from homeassistant.helpers.event import async_call_later
 from homeassistant.helpers.storage import Store
 
@@ -27,6 +28,7 @@ from .const import DOMAIN
 from .view_schema import BLOCK, PLAN, ROOM_PAGES, check_size, layout_schema
 
 _LOGGER = logging.getLogger(__name__)
+SIGNAL_VIEWS = f"{DOMAIN}_views_updated"  # cambió algún dashboard (o cuál es el general): la tarjeta de HA se redibuja
 
 STORAGE_KEY = f"{DOMAIN}.views"
 KINDS = ("phone", "tablet")
@@ -90,6 +92,7 @@ class Views:
         self.seen = data.get("seen") or {}
 
     def _save(self) -> None:
+        async_dispatcher_send(self.hass, SIGNAL_VIEWS)
         self._store.async_delay_save(lambda: {"views": self.views, "assign": self.assign, "users": self.users, "default": self.default, "history": self.history,
                                               "seen": self.seen}, 2)
 
@@ -200,6 +203,8 @@ def _targets(hass: HomeAssistant, v: Views, vid: str) -> list[str]:
 def _notify(hass: HomeAssistant, device_ids: list[str]) -> None:
     """Los equipos con ese dashboard lo vuelven a pedir al instante."""
     from .app_devices import fire_command  # noqa: PLC0415
+
+    async_dispatcher_send(hass, SIGNAL_VIEWS)  # y las tarjetas «Dashboard MatterAI» de Home Assistant (también al probar)
 
     if device_ids:
         fire_command(hass, "view", device_ids)
@@ -488,5 +493,47 @@ def ws_app_view_pin(hass: HomeAssistant, connection: websocket_api.ActiveConnect
     connection.send_result(msg["id"], view)
 
 
-WS_COMMANDS = (ws_views_list, ws_views_save, ws_views_delete, ws_views_assign, ws_views_assign_user, ws_views_default, ws_views_preview,
+def _ha_view(hass: HomeAssistant, user_id: str, view_id: str | None, kind: str | None) -> dict[str, Any] | None:
+    """El dashboard que ve un usuario de Home Assistant en la tarjeta «Dashboard MatterAI»: el que eligió el instalador
+    en la tarjeta; si no, el que tiene asignado ese usuario; si no, el general de la casa (o ninguno: el prearmado)."""
+    v = _rt(hass).get("views")
+    if v is None:
+        return None
+    vid = view_id if view_id in v.views else (v.users.get(user_id) if v.users.get(user_id) in v.views else v.default)
+    view = v.views.get(vid) if vid else None
+    trial = v.preview(view["id"]) if view else None  # «Probar en el equipo» también se ve acá
+    return resolve(trial or view, kind)
+
+
+@websocket_api.websocket_command({
+    vol.Required("type"): f"{DOMAIN}/ha/view",
+    vol.Optional("view_id"): vol.Any(None, vol.All(str, vol.Length(max=40))),
+    vol.Optional("kind"): vol.Any(None, vol.In(KINDS)),
+})
+@callback
+def ws_ha_view(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Para la tarjeta «Dashboard MatterAI» dentro de Home Assistant (cualquier usuario con sesión: el dashboard dice
+    cómo se ven sus equipos, que ese usuario ya puede ver en Home Assistant). Queda escuchando y lo vuelve a mandar
+    cada vez que se guarda un dashboard."""
+    uid = connection.user.id
+
+    @callback
+    def _send() -> None:
+        connection.send_message(websocket_api.event_message(msg["id"], {"view": _ha_view(hass, uid, msg.get("view_id"), msg.get("kind"))}))
+
+    connection.subscriptions[msg["id"]] = async_dispatcher_connect(hass, SIGNAL_VIEWS, _send)
+    connection.send_result(msg["id"])
+    _send()
+
+
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/ha/views"})
+@callback
+def ws_ha_views(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
+    """Los nombres de los dashboards (para elegir cuál mostrar en la tarjeta de Home Assistant)."""
+    v = _rt(hass).get("views")
+    items = [{"id": k, "name": x.get("name") or k, "kind": x.get("kind") or "phone"} for k, x in ((v.views if v else {}) or {}).items()]
+    connection.send_result(msg["id"], {"views": items, "default": v.default if v else None})
+
+
+WS_COMMANDS = (ws_ha_view, ws_ha_views, ws_views_list, ws_views_save, ws_views_delete, ws_views_assign, ws_views_assign_user, ws_views_default, ws_views_preview,
                ws_views_preview_end, ws_views_history, ws_views_history_get, ws_app_view, ws_app_view_pin)

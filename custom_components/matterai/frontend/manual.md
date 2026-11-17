@@ -61,6 +61,17 @@ Qué dispositivos de Home Assistant usa la app. Se elige por **dispositivo** (tr
 - **Accesos a la casa**: cada equipo tiene el suyo. **Desvincular** corta sólo ese equipo (celular perdido, empleado que ya no está).
 - **Celulares y tablets**: si está **conectado ahora**, la versión de la app (avisa si hay una más nueva; se actualiza sola cada vez que el equipo abre la app), el **perfil** (completo, sin seguridad para los chicos, o sólo luces y clima), **pedir huella** para la alarma, cerraduras y portón, y **Probar** (mostrar un aviso, prender la pantalla o recargar la app).
 
+## El dashboard en la app de Home Assistant
+
+Para los clientes que usan la app de Home Assistant (y no queremos que cambien de app): el mismo dashboard que arman en el editor se ve también ahí.
+
+- **Panel MatterAI → Dashboards → «En la app de Home Assistant» → «Crear o actualizar el panel Casa»**: crea en Home Assistant un panel «Casa» (/matterai-casa) con el dashboard ocupando toda la pantalla. Se elige cuál muestra: uno fijo, o «el de cada usuario» (el asignado, o el general de la casa).
+- Para que el cliente lo vea al abrir la app: en su usuario de Home Assistant, Perfil → Panel → «Casa».
+- **Se actualiza solo** cuando guardás en el editor (también «Probar en el equipo»). Elige celular o tablet según el ancho de la pantalla.
+- Ambientes, clima, música y escenas se abren igual que en la app MatterAI; un equipo abre la ventana de Home Assistant; las cámaras van con la tarjeta de cámaras de MatterAI.
+- No están las funciones propias de la app MatterAI (micrófono, ubicación, accesos rápidos, avisos propios). Alrededor se ven las barras de Home Assistant.
+- También se puede poner a mano en cualquier panel: `type: custom:matterai-dashboard` (opcional `view: <id>` y `kind: phone|tablet`).
+
 ## Cámaras en la app
 
 La app tiene su propia tarjeta de cámaras (no usa la tarjeta de Frigate). Sirve para todas las cámaras de Home Assistant, mezcladas:
