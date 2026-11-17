@@ -123,6 +123,8 @@ BLOCK = vol.Schema({
     vol.Optional("zone"): vol.Any(None, vol.In(["top", "bottom"])),
     vol.Optional("span"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=4))),
     vol.Optional("fill"): vol.Any(None, bool),
+    # diseño v3 (2.29): a qué sección pertenece la tarjeta
+    vol.Optional("sec"): vol.Any(None, vol.All(str, vol.Match(r"^[\w-]{1,24}$"))),
     vol.Optional("show"): vol.Any(None, vol.All([COND], vol.Length(max=6))),  # se ve sólo si se cumple todo
     vol.Optional("cfg", default=dict): CFG,
 }, extra=vol.REMOVE_EXTRA)
@@ -201,6 +203,13 @@ BG = vol.Schema({
 }, extra=vol.REMOVE_EXTRA)
 
 
+SECTION = vol.Schema({
+    vol.Required("id"): vol.All(str, vol.Match(r"^[\w-]{1,24}$")),
+    vol.Optional("title"): vol.Any(None, vol.All(str, vol.Length(max=40))),
+    vol.Optional("w", default=12): vol.All(vol.Coerce(int), vol.Range(min=3, max=12)),
+}, extra=vol.REMOVE_EXTRA)
+
+
 def layout_schema(max_blocks: int) -> vol.Schema:
     """Un diseño (el del celular o el de la tablet) de un dashboard."""
     return vol.Schema({
@@ -212,7 +221,9 @@ def layout_schema(max_blocks: int) -> vol.Schema:
         vol.Optional("style"): vol.Any(None, vol.In(STYLES)),                             # desde la 2.23: estilo prearmado
         vol.Optional("bg"): vol.Any(None, BG),                                            # desde la 2.23: fondo propio
         # diseño v2 (2.24): columnas de la tablet con su ancho y la columna al costado
-        vol.Optional("v"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=2))),
+        vol.Optional("v"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=3))),
+        # diseño v3 (2.29): secciones, cada una con su título y su ancho en doceavos de la pantalla
+        vol.Optional("secs"): vol.Any(None, vol.All([SECTION], vol.Length(min=1, max=24))),
         vol.Optional("cols"): vol.Any(None, vol.All([vol.All(vol.Coerce(int), vol.Range(min=0, max=100))], vol.Length(min=1, max=4))),
         vol.Optional("side"): vol.Any(None, bool),
     }, extra=vol.REMOVE_EXTRA)

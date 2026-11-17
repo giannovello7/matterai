@@ -532,3 +532,23 @@ def test_estilos_nuevos_y_anchos_se_pueden_guardar() -> None:
     # un estilo que esta versión no conoce (editor más nuevo): no rechaza el dashboard, la tarjeta queda sin estilo
     assert BLOCK({"id": "b", "type": "buttons", "cfg": {"style": "del_futuro"}})["cfg"]["style"] is None
     assert BLOCK({"id": "b", "type": "buttons", "cfg": {"style": ""}})["cfg"]["style"] is None
+
+
+def test_secciones_se_guardan_y_llegan_al_equipo() -> None:
+    """Diseño v3: secciones con título y ancho; cada tarjeta dice a cuál pertenece."""
+    import pytest
+    import voluptuous as vol
+
+    from custom_components.matterai.view_schema import layout_schema
+    from custom_components.matterai.views import resolve
+
+    sch = layout_schema(40)
+    lay = sch({"v": 3, "secs": [{"id": "s1", "title": "Seguridad", "w": 8}, {"id": "s-abc", "w": 4}],
+               "blocks": [{"id": "a", "type": "kpis", "sec": "s1"}, {"id": "b", "type": "music", "sec": "s-abc", "span": 2}]})
+    assert lay["v"] == 3 and [x["w"] for x in lay["secs"]] == [8, 4] and lay["secs"][0]["title"] == "Seguridad"
+    assert [b["sec"] for b in lay["blocks"]] == ["s1", "s-abc"]
+    for bad in ({"secs": [{"id": "s1", "w": 2}]}, {"secs": [{"id": "con espacio"}]}, {"v": 4}, {"blocks": [{"id": "a", "type": "kpis", "sec": "mal id"}]}):
+        with pytest.raises(vol.Invalid):
+            sch(bad)
+    out = resolve({"id": "v", "name": "V", "kind": "phone", "layouts": {"phone": lay, "tablet": None}}, "phone")
+    assert out["v"] == 3 and len(out["secs"]) == 2 and out["blocks"][0]["sec"] == "s1"

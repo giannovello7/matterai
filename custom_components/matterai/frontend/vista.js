@@ -153,8 +153,56 @@
   ];
   /** Un diseño viejo (columna del plano + 2 columnas, «media columna», resumen que se iba arriba solo) al formato v2,
    *  sin que cambie cómo se ve. No modifica el original. */
+  /* ───────── Secciones (diseño v3) ─────────
+     Un dashboard es una lista de SECCIONES; cada una tiene un ancho (w, en doceavos de la pantalla: 3, 4, 6, 8, 9 o 12) y
+     sus tarjetas, que se acomodan solas en filas según su ancho (span, en cuartos de la sección). Las secciones se
+     reparten en renglones mientras entren (12 por renglón); en el celular va una debajo de la otra. No hay columnas ni
+     bandas que administrar: es el modelo de «secciones» de Home Assistant.
+     Datos: el diseño lleva secs: [{ id, title, w }] y cada tarjeta dice a qué sección pertenece (sec). */
+  const SEC_W = [3, 4, 6, 8, 9, 12];
+  const snapW = (w) => SEC_W.reduce((a, x) => (Math.abs(x - w) < Math.abs(a - w) ? x : a), 12);
+  /** Pasa un diseño de columnas y bandas (v2) a secciones (v3). Lo que ya es v3 queda igual. */
+  function toSections(L0, kind) {
+    if (!L0) return L0;
+    if (Array.isArray(L0.secs) && L0.secs.length) return L0;
+    const L = migrateLayout(L0, kind), blocks = (L.blocks || []).map((b) => Object.assign({}, b));
+    const secs = [], out = [];
+    const add = (id, w, list) => { if (!list.length) return; secs.push({ id, title: '', w }); list.forEach((b) => { b.sec = id; delete b.col; delete b.zone; delete b.fill; out.push(b); }); };
+    if (kind === 'tablet') {
+      const cols = Array.isArray(L.cols) && L.cols.length ? L.cols.slice(0, 4) : [0, 1, 1], side = L.side !== false;
+      const W = colWidths(cols, side), colOf = (b) => Math.max(0, Math.min(cols.length - 1, +b.col || 0));
+      // (se agrupa todo antes de tocar las tarjetas: «add» les saca la columna y la banda)
+      const top = blocks.filter((b) => b.zone === 'top'), bottom = blocks.filter((b) => b.zone === 'bottom');
+      const used = cols.map((_, i) => blocks.filter((b) => !b.zone && colOf(b) === i));
+      add('top', 12, top);
+      // anchos: la del costado en % de la pantalla; las demás se reparten el resto según su peso
+      const sidePct = side ? W[0] : 0, rest = W.slice(side ? 1 : 0), tot = rest.reduce((a, x) => a + x, 0) || 1;
+      const pct = cols.map((_, i) => (side && i === 0 ? sidePct : ((100 - sidePct) * W[i]) / tot));
+      const live = cols.map((_, i) => i).filter((i) => used[i].length);
+      const sum = live.reduce((a, i) => a + pct[i], 0) || 1;
+      let left = 12;
+      live.forEach((i, k) => { const w = k === live.length - 1 ? Math.max(3, left) : Math.max(3, Math.min(left - 3 * (live.length - 1 - k), Math.round((pct[i] / sum) * 12))); left -= w; add(`c${i}`, live.length === 1 ? 12 : w, used[i]); });
+      add('bottom', 12, bottom);
+    } else add('s1', 12, blocks);
+    if (!secs.length) secs.push({ id: 's1', title: '', w: 12 });
+    const res = Object.assign({}, L, { v: 3, secs, blocks: out });
+    delete res.cols; delete res.side;
+    return res;
+  }
+  /** Las secciones en renglones (12 por renglón). En el celular, una por renglón; con la tablet parada, más anchas. */
+  function secRows(secs, kind, vertical) {
+    if (kind !== 'tablet') return secs.map((x, i) => [Object.assign({ i }, x, { w: 12 })]);
+    const rows = []; let cur = [], sum = 0;
+    secs.forEach((x, i) => {
+      const w = Math.max(3, Math.min(12, vertical ? (x.w >= 8 ? 12 : Math.max(6, +x.w || 12)) : +x.w || 12));
+      if (sum + w > 12 && cur.length) { rows.push(cur); cur = []; sum = 0; }
+      cur.push(Object.assign({ i }, x, { w })); sum += w;
+    });
+    if (cur.length) rows.push(cur);
+    return rows;
+  }
   function migrateLayout(L, kind) {
-    if (!L || L.v === 2) return L;
+    if (!L || L.v >= 2) return L;
     const out = Object.assign({}, L, { v: 2 });
     out.blocks = (L.blocks || []).map((b0) => {
       const b = Object.assign({}, b0);
@@ -402,7 +450,7 @@
         d.header = v.header || null; d.dock = v.dock || null; d.theme = v.theme || null; d.style = mine; d.bg = null;
         return d;
       }
-      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null, style: v.style || null, bg: v.bg || null, v: v.v, cols: v.cols, side: v.side };
+      if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null, style: v.style || null, bg: v.bg || null, v: v.v, cols: v.cols, side: v.side, secs: v.secs };
       const cfg = card() && card()._config;
       const d = defaults(kind(), m, v, (hass() || {}).states, cfg && cfg.floorplan);
       if (v.plan) d.plan = v.plan;
@@ -1048,18 +1096,18 @@
     }
     function colHTML(list, m) { return colParts(list, m).map((x) => x.html).join(''); }
     /** Dibuja una columna cambiando sólo las tarjetas que cambiaron (una luz que se prende no corta el video de la cámara). */
-    function setCol(sel, list, m, tail) {
-      const parts = colParts(list, m), html = parts.map((x) => x.html).join('') + (tail || '');
+    function setCol(sel, list, m, tail, head) {
+      const parts = colParts(list, m), html = (head || '') + parts.map((x) => x.html).join('') + (tail || '');
       const e = X.el.querySelector(sel);
       if (!e || X.cache[sel] === html) return;
-      const sig = `${parts.map((x) => x.key).join('|')}#${tail || ''}`;
+      const sig = `${head || ''}#${parts.map((x) => x.key).join('|')}#${tail || ''}`, h0 = head ? 1 : 0;
       const real = e.children && typeof document !== 'undefined' && document.createElement;
-      if (real && X.colSig[sel] === sig && e.children.length === parts.length + (tail ? 1 : 0)) {
+      if (real && X.colSig[sel] === sig && e.children.length === parts.length + (tail ? 1 : 0) + h0) {
         parts.forEach((x, i) => {
           const k = `${sel}|${x.key}`;
           if (X.partCache[k] === x.html) return;
           const tpl = document.createElement('template'); tpl.innerHTML = x.html;
-          const nu = tpl.content.firstElementChild; if (nu && !keepLive(e.children[i], nu)) e.children[i].replaceWith(nu);
+          const nu = tpl.content.firstElementChild; if (nu && !keepLive(e.children[i + h0], nu)) e.children[i + h0].replaceWith(nu);
         });
       } else e.innerHTML = html;
       X.cache[sel] = html; X.colSig[sel] = sig;
@@ -1138,7 +1186,10 @@
       const parentLook = ctx.embed && typeof document !== 'undefined' && document.documentElement && document.documentElement.dataset ? document.documentElement.dataset.look : '';
       const st = ctx.embed && STYLES.includes(parentLook) ? parentLook : STYLES.includes(L.style) ? L.style : 'matterai', bgx = bgCSS(L.bg, light);
       // el estilo llega a todo: ventanas de la tarjeta (ambientes, paneles, música, actividad) y de la app (equipos, cámaras)
-      if (!ctx.embed && !editing()) {
+      // (en el editor también, porque la vista previa vive en su propia página: así el ambiente abierto, los paneles y las
+      // ventanas se ven con el estilo del dashboard y no siempre oscuros)
+      const inPreview = typeof document !== 'undefined' && document.documentElement && document.documentElement.classList && typeof document.documentElement.classList.contains === 'function' && document.documentElement.classList.contains('mae-ed');
+      if (!ctx.embed && (!editing() || inPreview)) {
         try { if (document.documentElement && document.documentElement.dataset) document.documentElement.dataset.look = st; } catch (_) { /* fuera del navegador */ }
         const cd = card(); if (cd && cd.setAttribute && (!cd.getAttribute || cd.getAttribute('look') !== st)) cd.setAttribute('look', st);
       }
@@ -1150,8 +1201,10 @@
         return;
       }
       const cols = K === 'tablet' ? (Array.isArray(L.cols) && L.cols.length ? L.cols.slice(0, 4) : [0, 1, 1]) : [1];
-      const side = K === 'tablet' && L.side !== false, nCol = cols.length;
-      const sig = `${K}|${vertical}|${editing()}|${light}|${st}|${bgx ? 1 : 0}|${side}|${cols.join(',')}`;
+      const secs = Array.isArray(L.secs) && L.secs.length ? L.secs : null;
+      const rows = secs ? secRows(secs, K, vertical) : null;
+      const side = !secs && K === 'tablet' && L.side !== false, nCol = cols.length;
+      const sig = `${K}|${vertical}|${editing()}|${light}|${st}|${bgx ? 1 : 0}|${secs ? `S${rows.map((r) => r.map((x) => `${x.id}:${x.w}`).join(',')).join('/')}` : `${side}|${cols.join(',')}`}`;
       if (X.el.style && X.el.style.setProperty) { if (bgx) X.el.style.setProperty('--v-bgx', bgx); else X.el.style.removeProperty('--v-bgx'); }
       if (X.shell !== sig) {
         X.shell = sig; X.cache = {}; X.colSig = {}; X.partCache = {};
@@ -1163,7 +1216,17 @@
         const inner = ids.map((i, k) => (k ? gut(i - 1) : '') + colDiv(i)).join('');
         const sideW = side ? ` style="--side:${W[0]}%"` : '';
         X.tabletHTML = `<div class="v-tab"${sideW}>${side ? `<div class="v-c0 v-side" id="v-c0" data-col="0"></div>${gut('side')}` : ''}<div class="v-main"><header class="v-head" id="v-head"></header><div class="v-top" id="v-top" data-zone="top"></div><div class="v-cols">${inner}</div><div class="v-bot" id="v-bot" data-zone="bottom"></div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>`;
-        X.el.innerHTML = K === 'tablet'
+        // Secciones: cada renglón es un «v-cols» y cada sección un «v-col» (así los estilos prearmados valen igual). Si el
+        // primer o el último renglón tiene una sola sección de lado a lado, hace de banda de arriba o de abajo.
+        const secHTML = secs ? rows.map((r, ri) => {
+          const band = rows.length > 1 && r.length === 1 && r[0].w >= 12 && (ri === 0 || ri === rows.length - 1) ? (ri === 0 ? 'v-top' : 'v-bot') : '';
+          const one = (x, cls, sty) => `<div class="${cls} v-sec" id="v-s${x.i}" data-sec="${esc(x.id)}" data-secb="${esc(x.id)}"${sty}></div>`;
+          return band ? one(r[0], band, '') : `<div class="v-cols v-srow">${r.map((x) => one(x, 'v-col', ` style="flex:${x.w} 1 0"`)).join('')}</div>`;
+        }).join('') + (editing() && ctx.edit.onSec ? '<button class="v-eadd v-secadd" data-secadd>+ Agregar sección</button>' : '') : '';
+        if (secs) X.tabletHTML = `<div class="v-tab"><div class="v-main"><header class="v-head" id="v-head"></header><div class="v-secs" id="v-secs">${secHTML}</div><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-dock" id="v-dock"></nav></div></div>`;
+        X.el.innerHTML = secs && K !== 'tablet'
+          ? `<header class="v-head" id="v-head"></header><div class="v-secs" id="v-secs">${secHTML}</div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`
+          : K === 'tablet'
           ? `${X.tabletHTML}${shared()}`
           : `<header class="v-head" id="v-head"></header><div id="v-c1"></div><button class="v-allb" data-scr="casa" id="v-allb"></button><div class="v-bottom"><div class="v-player hide" id="v-player" data-k="player"></div><nav class="v-nav" id="v-nav"></nav></div>${shared()}`;
         // si había una ventana abierta (por ejemplo el ambiente en el editor), sigue abierta después de rearmar la pantalla
@@ -1171,7 +1234,24 @@
       }
       set('#v-head', head(m, K === 'phone'));
       const bl = L.blocks;
-      if (K === 'tablet') {
+      if (secs) {
+        const known = new Set(secs.map((x) => x.id));
+        secs.forEach((x, i) => {
+          const list = bl.filter((b) => (known.has(b.sec) ? b.sec : secs[0].id) === x.id);
+          // en el editor: la barra de la sección (se arrastra, ⋮ para el título, el ancho y borrar); usando el dashboard, su título
+          const head = editing() && ctx.edit.onSec
+            ? `<div class="v-sbar" data-secbar="${esc(x.id)}"><i class="v-sgrip">${ic('dots')}${ic('dots')}</i><b>${esc(x.title || `Sección ${i + 1}`)}</b><button data-sact="${esc(x.id)}" title="Título, ancho y borrar" aria-label="Opciones de la sección">${ic('edit')}</button>${K === 'tablet' ? `<span class="v-srsz" data-srsz="${esc(x.id)}" title="Arrastrá para cambiar el ancho de la sección"><i></i></span>` : ''}</div>`
+            : (x.title ? `<h3 class="v-sech">${esc(x.title)}</h3>` : '');
+          setCol(`#v-s${i}`, list, m, addSlot(0, `sec:${x.id}`), head);
+          const ce = X.el.querySelector(`#v-s${i}`); if (ce && ce.classList) ce.classList.toggle('v-empty', !list.length && !editing());
+        });
+        if (K === 'tablet') { fit(vertical); const p = drawPlayer(); set('#v-dock', dockHTML(m, p)); } else {
+          if (X.el.style && X.el.style.setProperty) { if (editing() && ctx.edit.viewH) X.el.style.setProperty('--vh', `${ctx.edit.viewH}px`); else X.el.style.removeProperty('--vh'); }
+          set('#v-allb', `${ic('grid')}Toda la casa`);
+          { const ab = X.el.querySelector('#v-allb'); if (ab && ab.classList) ab.classList.toggle('off', ((L.header || {}).casa) === false); }
+          const p = drawPlayer(); set('#v-nav', dockHTML(m, p));
+        }
+      } else if (K === 'tablet') {
         // bandas de lado a lado (arriba y abajo) y cada columna con sus tarjetas, en el orden de la lista
         const colOf = (b) => Math.max(0, Math.min(nCol - 1, +b.col || 0));
         setCol('#v-top', bl.filter((b) => b.zone === 'top'), m, editing() ? addSlot(1, 'top') : '');
@@ -1446,6 +1526,9 @@
         const ela = t.closest('[data-elact]'); if (ela && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, ela.dataset.elact, ctx.edit.el);
         if (t.closest('[data-eladd]') && b && ctx.edit.onElem) return ctx.edit.onElem(b.dataset.block, 'add');
         const add = t.closest('[data-eadd]'); if (add && ctx.edit.onAdd) return ctx.edit.onAdd(+add.dataset.eadd, add.dataset.ezone || null);
+        if (t.closest('[data-secadd]') && ctx.edit.onSec) return ctx.edit.onSec('add');
+        { const sa = t.closest('[data-sact]'); if (sa && ctx.edit.onSec) return ctx.edit.onSec('menu', sa.dataset.sact); }
+        if (t.closest('.v-sbar')) return undefined; // la barra de la sección: sólo se arrastra
         if (t.closest('[data-eins]') && b && ctx.edit.onAdd) return ctx.edit.onAdd(null, null, { target: b.dataset.block, after: false });
         // lo que se toca adentro de la tarjeta: un ambiente, un dato del resumen, un botón
         let sub = null;
@@ -1657,6 +1740,25 @@
     });
     /* ── editor: arrastrar y soltar, uno solo para todo (tarjetas, lo de adentro de cada tarjeta y los equipos del ambiente).
        Con el puntero (mouse y dedo): se agarra, aparece una copia que sigue el dedo y una línea marca dónde va a caer. */
+    /* Ancho de una sección: se arrastra la manija de su barra; va de a pasos (un cuarto, un tercio, la mitad…). */
+    let secRz = null;
+    el.addEventListener('pointerdown', (e) => {
+      const h = editing() && ctx.edit.onSec && e.target.closest && e.target.closest('[data-srsz]'); if (!h) return;
+      e.preventDefault(); e.stopPropagation();
+      const sec = h.closest('[data-sec]'), box = X.el.querySelector('.v-main') || X.el;
+      secRz = { h, sec, id: h.dataset.srsz, box, w: null };
+      sec.classList.add('rsz');
+      try { h.setPointerCapture(e.pointerId); } catch (_) { /* navegador viejo */ }
+    }, true);
+    el.addEventListener('pointermove', (e) => {
+      const d = secRz; if (!d) return;
+      const br = d.box.getBoundingClientRect(), sr = d.sec.getBoundingClientRect();
+      d.w = snapW(Math.max(3, Math.min(12, ((e.clientX - sr.left) / (br.width || 1)) * 12)));
+      d.sec.dataset.w = { 3: '¼', 4: '⅓', 6: '½', 8: '⅔', 9: '¾', 12: 'Completo' }[d.w];
+    });
+    const endSecRz = () => { const d = secRz; secRz = null; if (!d) return; d.sec.classList.remove('rsz'); delete d.sec.dataset.w; X.held = true; setTimeout(() => { X.held = false; }, 0); if (d.w) ctx.edit.onSec('w', d.id, d.w); };
+    el.addEventListener('pointerup', endSecRz);
+    el.addEventListener('pointercancel', endSecRz);
     let dnd = null;
     const DRAG_MIN = 6, LONG_MS = 380;
     const ghostOf = (node) => {
@@ -1703,9 +1805,11 @@
       // Como en Lovelace: agarrando de cualquier parte se mueve la TARJETA. Lo de adentro (un botón, una escena) sólo se
       // reordena arrastrando cuando esa tarjeta es la que se está editando (antes, agarrar un botón no movía nada).
       const mine = blk && ctx.edit.selected === blk.dataset.block;
-      if (dk && ctx.edit.onDock) { kind0 = 'dock'; node = dk; } else if (it && it.dataset.el !== 'cam' && blk && mine) { kind0 = 'el'; node = it; } else if (ri && (!blk || mine)) { kind0 = 'ri'; node = ri; } else if (blk) { kind0 = 'card'; node = blk; }
+      const sb = !blk && ctx.edit.onSec && t.closest && t.closest('.v-sbar');
+      if (sb && !t.closest('button,[data-srsz]')) { kind0 = 'sec'; node = sb.parentNode; }
+      else if (dk && ctx.edit.onDock) { kind0 = 'dock'; node = dk; } else if (it && it.dataset.el !== 'cam' && blk && mine) { kind0 = 'el'; node = it; } else if (ri && (!blk || mine)) { kind0 = 'ri'; node = ri; } else if (blk) { kind0 = 'card'; node = blk; }
       if (!node) return;
-      dnd = { kind: kind0, node, sel: kind0 === 'el' ? '[data-el]' : kind0 === 'ri' ? '[data-ri]' : kind0 === 'dock' ? '[data-dkk]' : '[data-block]', x0: e.clientX, y0: e.clientY, on: false, block: blk && blk.dataset.block, pid: e.pointerId };
+      dnd = { kind: kind0, node, sel: kind0 === 'el' ? '[data-el]' : kind0 === 'ri' ? '[data-ri]' : kind0 === 'dock' ? '[data-dkk]' : kind0 === 'sec' ? '[data-sec]' : '[data-block]', x0: e.clientX, y0: e.clientY, on: false, block: blk && blk.dataset.block, pid: e.pointerId };
       // con el dedo: hay que mantenerla apretada un momento (si se mueve antes, es para desplazar la pantalla)
       if (e.pointerType === 'touch') {
         const d0 = dnd; d0.touch = true; d0.armed = false;
@@ -1714,7 +1818,7 @@
     }, true);
     /* Dónde cae una tarjeta: se mira la columna o banda bajo el puntero (aunque esté en un hueco, debajo de la última
        tarjeta o la columna esté vacía) y, adentro, la tarjeta más cercana: antes o después, o a su lado si es angosta. */
-    const AREAS = '[data-col], #v-c1, .v-top, .v-bot, .v-embed'; // (#v-c1 sin data-col: la única columna del celular)
+    const AREAS = '[data-secb], [data-col], #v-c1, .v-top, .v-bot, .v-embed'; // (#v-c1 sin data-col: la única columna del celular)
     const markArea = (area) => { X.el.querySelectorAll('.dropin').forEach((n) => { if (n !== area) n.classList.remove('dropin'); }); if (area) area.classList.add('dropin'); };
     const cardDrop = (x, y) => {
       const scope = dnd.node.closest('#v-sheet') || X.el;
@@ -1722,11 +1826,11 @@
       const rc = (n) => n.getBoundingClientRect();
       let area = areas.find((n) => { const r = rc(n); return x >= r.left && x <= r.right && y >= r.top && y <= r.bottom; });
       if (!area) { // fuera de todas: la columna que está en esa vertical (arriba o abajo del puntero)
-        const inX = areas.filter((n) => { const r = rc(n); return n.matches('[data-col],#v-c1,.v-embed') && x >= r.left && x <= r.right; });
+        const inX = areas.filter((n) => { const r = rc(n); return n.matches('[data-secb],[data-col],#v-c1,.v-embed') && x >= r.left && x <= r.right; });
         area = inX.sort((p, q) => { const d = (n) => { const r = rc(n); return y < r.top ? r.top - y : y - r.bottom; }; return d(p) - d(q); })[0];
       }
       if (!area) return null;
-      const where = area.dataset.zone ? { zone: area.dataset.zone } : { col: +area.dataset.col || 0 };
+      const where = area.dataset.secb ? { sec: area.dataset.secb } : area.dataset.zone ? { zone: area.dataset.zone } : { col: +area.dataset.col || 0 };
       const kids = Array.from(area.querySelectorAll(':scope > [data-block], :scope > .v-row4 > [data-block]')).filter((n) => n !== dnd.node);
       if (!kids.length) { const r = rc(area); return { area, drop: where, rect: { left: r.left + 6, top: r.top + 8, width: r.width - 12, height: 0 }, edge: 'top' }; }
       const vd = (n) => { const r = rc(n); return y < r.top ? r.top - y : y > r.bottom ? y - r.bottom : 0; };
@@ -1757,6 +1861,17 @@
       }
       const n = under(x, y);
       if (!n || !n.closest) { hideLine(); return; }
+      if (dnd.kind === 'sec') {
+        // una sección entera: antes o después de otra (al costado si comparten renglón)
+        const tgt = n.closest('[data-sec]');
+        if (tgt && tgt !== dnd.node) {
+          const r = tgt.getBoundingClientRect(), row = tgt.parentNode && tgt.parentNode.classList && tgt.parentNode.classList.contains('v-srow') && tgt.parentNode.children.length > 1;
+          const after = row ? x > r.left + r.width / 2 : y > r.top + Math.min(r.height, 160) / 2;
+          dnd.drop = { from: dnd.node.dataset.sec, to: tgt.dataset.sec, after };
+          showLine(r, row ? (after ? 'right' : 'left') : (after ? 'bottom' : 'top')); return;
+        }
+        hideLine(); return;
+      }
       if (dnd.kind === 'dock') {
         const tgt = n.closest('[data-dkk]');
         if (tgt && tgt !== dnd.node) {
@@ -1812,6 +1927,7 @@
       else if (d.kind === 'el' && ctx.edit.onElem && d.drop.from !== d.drop.to) ctx.edit.onElem(d.block, 'move', d.drop);
       else if (d.kind === 'ri' && ctx.edit.onRoom && d.drop.from !== d.drop.to) ctx.edit.onRoom('move', d.drop);
       else if (d.kind === 'dock' && ctx.edit.onDock) ctx.edit.onDock(d.drop.from, d.drop.to, d.drop.after);
+      else if (d.kind === 'sec' && ctx.edit.onSec) ctx.edit.onSec('move', d.drop.from, d.drop);
       else render();
     };
     el.addEventListener('pointerup', () => endDnd(true));
@@ -1857,5 +1973,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, migrateLayout, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
+  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, migrateLayout, toSections, SEC_W, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
 })(typeof window !== 'undefined' ? window : globalThis);
