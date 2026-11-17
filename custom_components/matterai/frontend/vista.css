@@ -986,3 +986,236 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 /* el botón de ancho en la barrita de la tarjeta (cada toque cambia: ¼, ½, ¾, completo) */
 .vista.editing .v-b .v-ecard .v-ewbtn{width:auto;min-width:30px;padding:0 8px;font:700 13px/1 system-ui,sans-serif;color:#1b1408;background:var(--warm)}
 .vista.editing .v-b .v-ecard .v-ewbtn:hover{filter:brightness(1.08)}
+
+/* ═════════════════ ESTILOS NUEVOS (2026-11-17): vidrio líquido, relieve, editorial, plastilina y neo-brutal ═════════════════
+   Cada uno con su versión oscura (la de siempre) y clara (.light). Mismas piezas que los otros: tarjetas, chips, encendidos,
+   llaves, barra de abajo, ventanitas (.v-sin/.v-min) y la versión adentro de un ambiente (.embed). */
+
+/* ───────── VIDRIO LÍQUIDO — vidrio transparente con reflejos, sobre un fondo vivo ───────── */
+.vista.st-liquid{--f-display:-apple-system,BlinkMacSystemFont,"SF Pro Display","SF Pro Text","Segoe UI Variable Display","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
+  --bg:#101522;--card:rgba(255,255,255,.07);--card2:rgba(255,255,255,.14);--line:rgba(255,255,255,.18);--fg:#fff;--muted:rgba(255,255,255,.7);--off:rgba(255,255,255,.2);
+  --warm:#ffd27a;--warm-s:rgba(255,210,122,.22);--cool:#9fe3ff;--cool-s:rgba(159,227,255,.2);--green:#7ff0b2;--red:#ff8f87;--red-s:rgba(255,143,135,.2);
+  --lq-hi:inset 1.5px 1.5px 0 rgba(255,255,255,.55),inset -1px -1px 0 rgba(255,255,255,.16),inset 0 0 0 1px rgba(255,255,255,.1),0 12px 34px rgba(0,0,0,.22);
+  --v-env:radial-gradient(60% 50% at 12% 8%,#ff7a59 0,transparent 62%),radial-gradient(55% 55% at 92% 22%,#7b5cff 0,transparent 62%),radial-gradient(70% 60% at 30% 100%,#00b4a0 0,transparent 62%),radial-gradient(50% 45% at 85% 90%,#ffb800 0,transparent 60%),#101522;
+  background:transparent!important;isolation:isolate;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+.vista.st-liquid::before{content:"";position:fixed;inset:-56px;z-index:-1;pointer-events:none;background:var(--v-env);filter:blur(10px) saturate(1.25)}
+.vista.st-liquid.has-bg::before{background:var(--v-bgx);background-size:cover;background-position:center;filter:saturate(1.15)}
+.vista.st-liquid :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dev,.v-svi,.v-ct){
+  background:linear-gradient(135deg,rgba(255,255,255,.2),rgba(255,255,255,.05) 45%,rgba(255,255,255,.1))!important;border:0!important;border-radius:26px!important;box-shadow:var(--lq-hi)!important;
+  -webkit-backdrop-filter:blur(14px) saturate(1.7);backdrop-filter:blur(14px) saturate(1.7)}
+.vista.st-liquid :is(.v-chip,.v-sq,.v-chp){background:rgba(255,255,255,.12)!important;border:0!important;border-radius:999px!important;box-shadow:inset 1px 1px 0 rgba(255,255,255,.5),inset 0 0 0 1px rgba(255,255,255,.12)!important}
+.vista.st-liquid h3{margin:22px 8px 10px;text-transform:none;letter-spacing:-.01em;font-size:17px;font-weight:600;color:var(--fg);text-shadow:0 1px 8px rgba(0,0,0,.25)}
+.vista.st-liquid :is(.v-when b,.v-greet b){font-weight:600;letter-spacing:-.03em;text-shadow:0 2px 14px rgba(0,0,0,.25)}
+.vista.st-liquid .v-bic{background:rgba(255,255,255,.18)!important;color:#fff!important;border-radius:50%!important;box-shadow:inset 1px 1px 0 rgba(255,255,255,.45)}
+.vista.st-liquid :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on){background:linear-gradient(135deg,rgba(255,255,255,.62),rgba(255,255,255,.32))!important;color:#121826!important;
+  box-shadow:inset 1.5px 1.5px 0 #fff,inset 0 0 0 1px rgba(255,255,255,.5),0 0 26px rgba(255,236,190,.35),0 12px 30px rgba(0,0,0,.2)!important}
+.vista.st-liquid :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) .v-tx span{color:rgba(18,24,38,.62)!important}
+.vista.st-liquid :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) :is(.v-bic,.v-tic){background:#ffcf5c!important;color:#3a2600!important}
+.vista.st-liquid :is(.v-msw,.v-pw){background:rgba(255,255,255,.2)}
+.vista.st-liquid :is(.v-msw.on,.v-pw.on){background:linear-gradient(90deg,#34c77b,#7ff0b2)!important}
+.vista.st-liquid .v-modes button{background:rgba(255,255,255,.12)!important;border-radius:999px!important}.vista.st-liquid .v-modes button.on{background:rgba(255,255,255,.85)!important;color:#121826!important}
+.vista.st-liquid .v-dring .d1{stroke:#fff!important}.vista.st-liquid .v-dring .d0{stroke:rgba(255,255,255,.18)}
+.vista.st-liquid :is(.v-nav,.v-dock){width:max-content;max-width:calc(100% - 28px);margin-left:auto;margin-right:auto;border:0!important;border-radius:999px!important;padding:7px 10px;gap:6px;
+  background:linear-gradient(135deg,rgba(255,255,255,.24),rgba(255,255,255,.08))!important;box-shadow:var(--lq-hi)!important;-webkit-backdrop-filter:blur(20px) saturate(1.8);backdrop-filter:blur(20px) saturate(1.8)}
+.vista.st-liquid .v-nav{margin-bottom:calc(max(env(safe-area-inset-bottom,0px),var(--sb,0px)) + 10px)}
+.vista.st-liquid :is(.v-nav,.v-dock) button{color:rgba(255,255,255,.82);border-radius:999px!important}
+.vista.st-liquid :is(.v-nav,.v-dock) button.on{background:rgba(255,255,255,.88)!important;color:#121826!important}
+.vista.st-liquid :is(.v-nav,.v-dock) .v-mic{background:rgba(255,255,255,.25)!important;color:#fff!important;box-shadow:inset 1px 1px 0 rgba(255,255,255,.5)}
+.vista.st-liquid :is(.v-sin,.v-min){background:rgba(40,44,60,.62)!important;border:0!important;border-radius:30px!important;box-shadow:var(--lq-hi),0 30px 70px rgba(0,0,0,.4)!important;-webkit-backdrop-filter:blur(30px) saturate(1.8);backdrop-filter:blur(30px) saturate(1.8)}
+.vista.st-liquid.embed{background:transparent!important}.vista.st-liquid.embed::before{display:none}
+.vista.st-liquid.light{--fg:#141a28;--muted:rgba(20,26,40,.62);--off:rgba(20,26,40,.16);--line:rgba(255,255,255,.7);--warm:#c97a00;--warm-s:rgba(201,122,0,.16);--cool:#0a6fc2;--green:#1f9d5c;--red:#d2453b;
+  --lq-hi:inset 1.5px 1.5px 0 rgba(255,255,255,.95),inset -1px -1px 0 rgba(255,255,255,.4),inset 0 0 0 1px rgba(255,255,255,.45),0 12px 30px rgba(40,50,80,.14)}
+.vista.st-liquid.light{--v-env:radial-gradient(60% 50% at 12% 8%,#ffc2ae 0,transparent 62%),radial-gradient(55% 55% at 92% 22%,#c9bcff 0,transparent 62%),radial-gradient(70% 60% at 30% 100%,#a6ece2 0,transparent 62%),radial-gradient(50% 45% at 85% 90%,#ffe39a 0,transparent 60%),#eef1f8}
+.vista.st-liquid.light::before{filter:blur(10px) saturate(1.05)}
+.vista.st-liquid.light .v-dring .d1{stroke:#141a28!important}.vista.st-liquid.light .v-dring .d0{stroke:rgba(20,26,40,.12)}
+.vista.st-liquid.light .v-modes button.on{background:#141a28!important;color:#fff!important}
+.vista.st-liquid.light :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dev,.v-svi,.v-ct){background:linear-gradient(135deg,rgba(255,255,255,.62),rgba(255,255,255,.26) 45%,rgba(255,255,255,.4))!important}
+.vista.st-liquid.light :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on){background:linear-gradient(135deg,#fff,rgba(255,255,255,.8))!important}
+.vista.st-liquid.light :is(.v-bic,.v-nav button,.v-dock button){color:#141a28!important}
+.vista.st-liquid.light .v-bic{background:rgba(255,255,255,.55)!important}
+.vista.st-liquid.light :is(.v-nav,.v-dock) button.on{background:#141a28!important;color:#fff!important}
+.vista.st-liquid.light h3,.vista.st-liquid.light :is(.v-when b,.v-greet b){text-shadow:none}
+.vista.st-liquid.light :is(.v-sin,.v-min){background:rgba(255,255,255,.72)!important}
+
+/* ───────── RELIEVE — botones con volumen y textura, como un equipo de verdad (skeuomorphic) ───────── */
+.vista.st-relieve{--f-display:"Helvetica Neue","Segoe UI",Roboto,system-ui,sans-serif;--f-mono:var(--f-display);
+  --bg:#26282c;--card:#33363b;--card2:#3d4046;--line:rgba(0,0,0,.45);--fg:#eceae4;--muted:#9c9a93;--off:#1b1c1f;
+  --warm:#ffb23e;--warm-s:rgba(255,178,62,.18);--cool:#6fc3ff;--cool-s:rgba(111,195,255,.16);--green:#5fe08a;--red:#ff6b5b;--red-s:rgba(255,107,91,.18);
+  --rl-up:inset 0 1px 0 rgba(255,255,255,.14),inset 0 -1px 0 rgba(0,0,0,.4),0 1px 0 rgba(0,0,0,.6),0 6px 14px rgba(0,0,0,.42);
+  --rl-in:inset 0 2px 6px rgba(0,0,0,.6),inset 0 -1px 0 rgba(255,255,255,.06),0 1px 0 rgba(255,255,255,.07);
+  background:radial-gradient(120% 80% at 50% 0%,#34373c 0,#1f2124 70%)!important;
+  background-image:repeating-linear-gradient(0deg,rgba(255,255,255,.012) 0 2px,transparent 2px 4px),radial-gradient(120% 80% at 50% 0%,#34373c 0,#1f2124 70%)!important}
+.vista.st-relieve.has-bg{background:transparent!important}.vista.st-relieve.has-bg::before{filter:brightness(.45) saturate(.6)}
+.vista.st-relieve :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dev,.v-svi,.v-ct){
+  background:linear-gradient(180deg,#3c3f45 0%,#2e3135 100%)!important;border:1px solid rgba(0,0,0,.55)!important;border-radius:14px!important;box-shadow:var(--rl-up)!important}
+.vista.st-relieve :is(.v-chip,.v-sq,.v-chp){background:linear-gradient(180deg,#3c3f45,#2c2e32)!important;border:1px solid rgba(0,0,0,.55)!important;border-radius:999px!important;box-shadow:var(--rl-up)!important}
+.vista.st-relieve h3{margin:22px 6px 10px;text-transform:uppercase;letter-spacing:.14em;font-size:11px;font-weight:700;color:#8d8b85;text-shadow:0 -1px 0 rgba(0,0,0,.7)}
+.vista.st-relieve :is(.v-when b,.v-clock b,.v-kpi .v,.v-dmid b){font-family:"DS-Digital","Share Tech Mono",ui-monospace,Menlo,Consolas,monospace;color:#ffcf7a;text-shadow:0 0 10px rgba(255,178,62,.55)}
+.vista.st-relieve .v-bic{background:linear-gradient(180deg,#2a2c30,#3a3d42)!important;border-radius:50%!important;box-shadow:var(--rl-in)!important;color:#b9b6ae!important}
+/* encendido: el botón queda hundido y la luz (el ícono) prendida en ámbar */
+.vista.st-relieve :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on){background:linear-gradient(180deg,#2a2c30,#33363b)!important;box-shadow:var(--rl-in)!important}
+.vista.st-relieve :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) :is(.v-bic,.v-tic){color:#ffb23e!important;filter:drop-shadow(0 0 6px rgba(255,178,62,.8))}
+.vista.st-relieve :is(.v-room,.v-tile,.v-btn,.v-mtile,.v-scene,.v-dev,.v-chp):active{box-shadow:var(--rl-in)!important}
+.vista.st-relieve :is(.v-msw,.v-pw){background:#17181a;box-shadow:inset 0 2px 4px rgba(0,0,0,.8)}
+.vista.st-relieve :is(.v-msw,.v-pw)::after{background:linear-gradient(180deg,#f0eee8,#b5b2aa)!important;box-shadow:0 2px 4px rgba(0,0,0,.6)}
+.vista.st-relieve :is(.v-msw.on,.v-pw.on){background:linear-gradient(180deg,#2d8a4f,#4fd182)!important}
+.vista.st-relieve .v-modes button{background:linear-gradient(180deg,#3c3f45,#2c2e32)!important;border:1px solid rgba(0,0,0,.55)!important;box-shadow:var(--rl-up);border-radius:10px!important}
+.vista.st-relieve .v-modes button.on{background:linear-gradient(180deg,#26282b,#303236)!important;box-shadow:var(--rl-in);color:#ffb23e!important}
+.vista.st-relieve .v-dring .d1{stroke:#ffb23e!important;filter:drop-shadow(0 0 4px rgba(255,178,62,.7))}.vista.st-relieve .v-dring .d0{stroke:#17181a}
+.vista.st-relieve :is(.v-nav,.v-dock){background:linear-gradient(180deg,#34373c,#222427)!important;border:0!important;border-top:1px solid rgba(255,255,255,.08)!important;box-shadow:0 -6px 18px rgba(0,0,0,.4)}
+.vista.st-relieve :is(.v-nav,.v-dock) button{color:#8d8b85}
+.vista.st-relieve :is(.v-nav,.v-dock) button.on{color:#ffb23e!important;background:transparent!important;text-shadow:0 0 8px rgba(255,178,62,.6)}
+.vista.st-relieve :is(.v-nav,.v-dock) .v-mic{background:linear-gradient(180deg,#ff8a3d,#d4570f)!important;color:#fff!important;box-shadow:var(--rl-up)}
+.vista.st-relieve :is(.v-sin,.v-min){background:linear-gradient(180deg,#3a3d42,#2a2c30)!important;border:1px solid rgba(0,0,0,.6)!important;border-radius:16px!important;box-shadow:var(--rl-up),0 30px 70px rgba(0,0,0,.5)!important}
+.vista.st-relieve.embed{background:transparent!important}
+.vista.st-relieve.light{--card:#eceae5;--card2:#e2dfd8;--line:rgba(0,0,0,.18);--fg:#2b2a27;--muted:#77746c;--off:#cfcbc2;--warm:#d97a00;
+  --rl-up:inset 0 1px 0 #fff,inset 0 -1px 0 rgba(0,0,0,.12),0 1px 0 rgba(0,0,0,.18),0 6px 14px rgba(0,0,0,.14);
+  --rl-in:inset 0 2px 6px rgba(0,0,0,.22),inset 0 -1px 0 rgba(255,255,255,.7),0 1px 0 rgba(255,255,255,.9);
+  background-image:repeating-linear-gradient(0deg,rgba(0,0,0,.012) 0 2px,transparent 2px 4px),radial-gradient(120% 80% at 50% 0%,#f3f1ec 0,#d8d4cb 75%)!important}
+.vista.st-relieve.light :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dev,.v-svi,.v-ct,.v-chip,.v-sq,.v-chp,.v-modes button){background:linear-gradient(180deg,#f7f6f2,#e1ded7)!important;border-color:rgba(0,0,0,.16)!important}
+.vista.st-relieve.light :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on,.v-modes button.on){background:linear-gradient(180deg,#dcd8d0,#e9e6df)!important}
+.vista.st-relieve.light .v-bic{background:linear-gradient(180deg,#dcd8d0,#efede8)!important;color:#5d5a53!important}
+.vista.st-relieve.light h3{color:#77746c;text-shadow:0 1px 0 #fff}
+.vista.st-relieve.light :is(.v-when b,.v-clock b,.v-kpi .v,.v-dmid b){color:#2b2a27;text-shadow:none}
+.vista.st-relieve.light :is(.v-msw,.v-pw){background:#bdb8ae;box-shadow:inset 0 2px 4px rgba(0,0,0,.3)}
+.vista.st-relieve.light :is(.v-nav,.v-dock){background:linear-gradient(180deg,#f3f1ec,#dcd8d0)!important;border-top-color:#fff!important;box-shadow:0 -4px 14px rgba(0,0,0,.1)}
+.vista.st-relieve.light :is(.v-sin,.v-min){background:linear-gradient(180deg,#f7f6f2,#e4e1da)!important}
+
+/* ───────── EDITORIAL — estilo suizo: grilla, letra grande en negrita, blanco y negro con un rojo ───────── */
+.vista.st-suizo{--f-display:"Helvetica Neue",Helvetica,Arial,"Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
+  --bg:#0d0d0d;--card:#0d0d0d;--card2:#1a1a1a;--line:#f2f0eb;--fg:#f2f0eb;--muted:#9a978f;--off:#2a2a2a;
+  --warm:#ff2a1a;--warm-s:rgba(255,42,26,.16);--cool:#f2f0eb;--cool-s:rgba(242,240,235,.1);--green:#f2f0eb;--red:#ff2a1a;--red-s:rgba(255,42,26,.16);letter-spacing:-.01em}
+.vista.st-suizo:not(.has-bg){background:var(--bg)}
+.vista.st-suizo.has-bg::before{filter:grayscale(1) brightness(.3) contrast(1.1)}
+.vista.st-suizo :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dev,.v-svi,.v-ct){background:var(--card)!important;border:0!important;border-top:2px solid var(--line)!important;border-radius:0!important;box-shadow:none!important}
+.vista.st-suizo :is(.v-chip,.v-sq,.v-chp){background:transparent!important;border:1.5px solid var(--line)!important;border-radius:0!important;box-shadow:none!important;font-weight:700}
+.vista.st-suizo h3{text-transform:none;letter-spacing:-.02em;font-weight:800;color:var(--fg)}
+.vista.st-suizo .v-b>h3{margin:30px 2px 12px;letter-spacing:-.03em;font-size:26px;line-height:1}
+.vista.st-suizo .v-b>h3::after{content:"";display:block;width:28px;height:4px;margin-top:8px;background:var(--warm)}
+.vista.st-suizo :is(.v-when b,.v-greet b,.v-clock b){font-weight:800;letter-spacing:-.05em}
+.vista.st-suizo .v-when b{font-size:46px!important;line-height:.95}
+.vista.st-suizo :is(.v-kpi .v,.v-dmid b){font-weight:800;letter-spacing:-.04em}
+.vista.st-suizo :is(.v-tile b,.v-room b,.v-btn .v-tx b,.v-dev>b){font-weight:700;letter-spacing:-.02em}
+.vista.st-suizo .v-tx span{text-transform:uppercase;letter-spacing:.08em;font-size:10.5px;color:var(--muted)}
+.vista.st-suizo .v-bic{background:transparent!important;border-radius:0!important;color:var(--fg)!important}
+.vista.st-suizo svg.i{stroke-width:2.2}
+/* encendido: el bloque se invierte; el ícono en rojo */
+.vista.st-suizo :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on){background:var(--fg)!important;color:var(--bg)!important;border-top-color:var(--warm)!important}
+.vista.st-suizo :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) .v-tx span{color:var(--bg)!important;opacity:.6}
+.vista.st-suizo :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) :is(.v-bic,.v-tic){color:var(--warm)!important}
+.vista.st-suizo :is(.v-msw,.v-pw){background:var(--off);border-radius:0!important}
+.vista.st-suizo :is(.v-msw,.v-pw)::after{border-radius:0!important}
+.vista.st-suizo :is(.v-msw.on,.v-pw.on){background:var(--warm)!important}
+.vista.st-suizo .v-modes button{background:transparent!important;border:1.5px solid var(--line)!important;border-radius:0!important;font-weight:700}
+.vista.st-suizo .v-modes button.on{background:var(--fg)!important;color:var(--bg)!important}
+.vista.st-suizo .v-dring .d1{stroke:var(--warm)!important;stroke-linecap:butt}.vista.st-suizo .v-dring .d0{stroke:var(--off)}
+.vista.st-suizo :is(.v-nav,.v-dock){background:var(--bg)!important;border:0!important;border-top:2px solid var(--line)!important;border-radius:0!important;box-shadow:none!important}
+.vista.st-suizo :is(.v-nav,.v-dock) button{color:var(--muted);font-weight:700;border-radius:0!important}
+.vista.st-suizo :is(.v-nav,.v-dock) button.on{color:var(--fg)!important;background:transparent!important;box-shadow:inset 0 3px 0 var(--warm)}
+.vista.st-suizo :is(.v-nav,.v-dock) .v-mic{background:var(--warm)!important;color:#fff!important;border-radius:0!important;box-shadow:none}
+.vista.st-suizo :is(.v-sin,.v-min){background:var(--bg)!important;border:2px solid var(--line)!important;border-radius:0!important;box-shadow:12px 12px 0 rgba(0,0,0,.35)!important}
+.vista.st-suizo .v-cam,.vista.st-suizo .v-imgc{filter:none}
+.vista.st-suizo.embed{background:transparent!important}
+.vista.st-suizo.light{--bg:#f2f0eb;--card:#f2f0eb;--card2:#e6e3dc;--line:#111;--fg:#111;--muted:#6b6862;--off:#d4d0c7;--warm:#e3170a;--warm-s:rgba(227,23,10,.12)}
+.vista.st-suizo.light.has-bg::before{filter:grayscale(1) brightness(1.4) contrast(.8)}
+
+/* ───────── PLASTILINA — claymorphism: formas infladas y suaves en colores pastel ───────── */
+.vista.st-clay{--f-display:ui-rounded,"SF Pro Rounded","Nunito","Varela Round","Segoe UI",system-ui,sans-serif;--f-mono:var(--f-display);
+  --bg:#2b2440;--card:#3b3258;--card2:#463c68;--line:rgba(255,255,255,.08);--fg:#f6f1ff;--muted:#b6abd6;--off:#251f38;
+  --warm:#ffb38a;--warm-s:rgba(255,179,138,.2);--cool:#8fd8ff;--cool-s:rgba(143,216,255,.18);--green:#8ef0c0;--red:#ff9aa8;--red-s:rgba(255,154,168,.2);
+  --cl-sh:inset 6px 6px 14px rgba(255,255,255,.1),inset -6px -6px 14px rgba(0,0,0,.28),0 14px 28px rgba(10,6,24,.45);
+  background:radial-gradient(70% 50% at 10% 0%,#3d3266 0,transparent 70%),radial-gradient(60% 50% at 100% 100%,#40284f 0,transparent 70%),#2b2440!important}
+.vista.st-clay.has-bg{background:transparent!important}.vista.st-clay.has-bg::before{filter:saturate(.8) brightness(.6)}
+.vista.st-clay :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dev,.v-svi,.v-ct){background:var(--card)!important;border:0!important;border-radius:30px!important;box-shadow:var(--cl-sh)!important}
+.vista.st-clay :is(.v-chip,.v-sq,.v-chp){background:var(--card)!important;border:0!important;border-radius:999px!important;box-shadow:var(--cl-sh)!important}
+.vista.st-clay h3{margin:24px 10px 12px;text-transform:none;letter-spacing:0;font-size:17px;font-weight:800;color:var(--fg)}
+.vista.st-clay :is(.v-when b,.v-greet b,.v-kpi .v,.v-dmid b){font-weight:800;letter-spacing:-.02em}
+.vista.st-clay :is(.v-tile b,.v-room b,.v-btn .v-tx b,.v-dev>b){font-weight:700}
+.vista.st-clay .v-bic{border-radius:40%!important;color:#2b2440!important;background:#b8a6ff!important;box-shadow:inset 3px 3px 6px rgba(255,255,255,.5),inset -3px -3px 6px rgba(0,0,0,.15)!important}
+/* cada tarjeta con su color pastel en el ícono (como juguetes) */
+.vista.st-clay :is(.v-tiles,.v-btns,.v-devs,.v-rooms)>:nth-child(4n+2) .v-bic{background:#8fd8ff!important}
+.vista.st-clay :is(.v-tiles,.v-btns,.v-devs,.v-rooms)>:nth-child(4n+3) .v-bic{background:#ffb38a!important}
+.vista.st-clay :is(.v-tiles,.v-btns,.v-devs,.v-rooms)>:nth-child(4n+4) .v-bic{background:#8ef0c0!important}
+.vista.st-clay :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on){background:linear-gradient(145deg,#ffd27e,#ffaf6b)!important;color:#3a2300!important;
+  box-shadow:inset 6px 6px 14px rgba(255,255,255,.45),inset -6px -6px 14px rgba(180,90,20,.35),0 14px 28px rgba(255,160,80,.3)!important}
+.vista.st-clay :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) .v-tx span{color:rgba(58,35,0,.65)!important}
+.vista.st-clay :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) .v-bic{background:#fff6dc!important;color:#c86a00!important}
+.vista.st-clay :is(.v-room,.v-tile,.v-btn,.v-mtile,.v-scene,.v-dev,.v-chp):active{transform:scale(.96)}
+.vista.st-clay :is(.v-msw,.v-pw){background:var(--off);box-shadow:inset 3px 3px 6px rgba(0,0,0,.35)}
+.vista.st-clay :is(.v-msw.on,.v-pw.on){background:#8ef0c0!important}
+.vista.st-clay .v-modes button{background:var(--card2)!important;border-radius:18px!important;box-shadow:var(--cl-sh)}.vista.st-clay .v-modes button.on{background:#b8a6ff!important;color:#2b2440!important}
+.vista.st-clay .v-dring .d1{stroke:#ffb38a!important}.vista.st-clay .v-dring .d0{stroke:var(--off)}
+.vista.st-clay :is(.v-nav,.v-dock){width:max-content;max-width:calc(100% - 28px);margin-left:auto;margin-right:auto;padding:8px 12px;gap:8px;border:0!important;border-radius:999px!important;background:var(--card)!important;box-shadow:var(--cl-sh)!important}
+.vista.st-clay .v-nav{margin-bottom:calc(max(env(safe-area-inset-bottom,0px),var(--sb,0px)) + 10px)}
+.vista.st-clay :is(.v-nav,.v-dock) button{color:var(--muted);border-radius:999px!important}
+.vista.st-clay :is(.v-nav,.v-dock) button.on{background:#b8a6ff!important;color:#2b2440!important}
+.vista.st-clay :is(.v-nav,.v-dock) .v-mic{background:#ffb38a!important;color:#3a2300!important;box-shadow:inset 3px 3px 6px rgba(255,255,255,.5),inset -3px -3px 6px rgba(0,0,0,.15)}
+.vista.st-clay :is(.v-sin,.v-min){background:var(--card)!important;border:0!important;border-radius:34px!important;box-shadow:var(--cl-sh),0 30px 70px rgba(0,0,0,.4)!important}
+.vista.st-clay.embed{background:transparent!important}
+.vista.st-clay.light{--card:#fdf8ff;--card2:#f1e9fb;--line:rgba(80,60,120,.08);--fg:#3a2f55;--muted:#8a7fa6;--off:#e3daf0;--warm:#ff8a5c;
+  --cl-sh:inset 6px 6px 14px rgba(255,255,255,.9),inset -6px -6px 14px rgba(150,120,200,.18),0 14px 28px rgba(150,120,200,.25);
+  background:radial-gradient(70% 50% at 10% 0%,#ffe1ec 0,transparent 70%),radial-gradient(60% 50% at 100% 100%,#d9ecff 0,transparent 70%),#efe6fb!important}
+.vista.st-clay.light .v-bic{color:#3a2f55!important}
+.vista.st-clay.light :is(.v-msw,.v-pw){box-shadow:inset 3px 3px 6px rgba(150,120,200,.3)}
+
+/* ───────── NEO-BRUTAL — bloques de colores fuertes, bordes negros gruesos y sombras duras ───────── */
+.vista.st-brutal{--f-display:"Arial Black","Archivo Black","Helvetica Neue",Arial,system-ui,sans-serif;--f-mono:ui-monospace,"JetBrains Mono",Menlo,Consolas,monospace;
+  --bg:#141414;--card:#202020;--card2:#2b2b2b;--line:#f4f1e8;--fg:#f4f1e8;--muted:#b9b5aa;--off:#3a3a3a;--ink:#f4f1e8;
+  --warm:#ffd23f;--warm-s:rgba(255,210,63,.2);--cool:#4dd6ff;--cool-s:rgba(77,214,255,.18);--green:#3dff9a;--red:#ff5c8a;--red-s:rgba(255,92,138,.2);
+  --br-sh:5px 5px 0 var(--ink)}
+.vista.st-brutal:not(.has-bg){background:var(--bg)}
+.vista.st-brutal.has-bg::before{filter:contrast(1.2) saturate(1.3) brightness(.5)}
+.vista.st-brutal :is(.v-card,.v-kpi,.v-room,.v-tile,.v-player,.v-imgc,.v-cam,.v-scene,.v-btn,.v-alarm,.v-mtile,.v-dev,.v-svi,.v-ct){background:var(--card)!important;border:3px solid var(--ink)!important;border-radius:8px!important;box-shadow:var(--br-sh)!important}
+.vista.st-brutal :is(.v-chip,.v-sq,.v-chp){background:var(--card)!important;border:2.5px solid var(--ink)!important;border-radius:6px!important;box-shadow:3px 3px 0 var(--ink)!important;font-weight:800}
+.vista.st-brutal h3{margin:26px 4px 12px;text-transform:uppercase;letter-spacing:.02em;font-size:15px;font-weight:900;color:var(--fg)}
+.vista.st-brutal .v-b>h3:not(:empty){display:inline-block;background:var(--warm);color:#111;padding:3px 10px;border:2.5px solid var(--ink);box-shadow:3px 3px 0 var(--ink)}
+.vista.st-brutal :is(.v-when b,.v-greet b,.v-kpi .v,.v-dmid b,.v-clock b){font-weight:900;letter-spacing:-.03em}
+.vista.st-brutal :is(.v-tile b,.v-room b,.v-btn .v-tx b,.v-dev>b){font-weight:900;text-transform:uppercase;letter-spacing:.01em}
+.vista.st-brutal .v-tx span{font-family:var(--f-mono);font-size:11px}
+.vista.st-brutal .v-bic{background:var(--cool)!important;color:#111!important;border:2.5px solid var(--ink)!important;border-radius:6px!important}
+.vista.st-brutal svg.i{stroke-width:2.4}
+/* cada tarjeta con su color (como stickers) */
+.vista.st-brutal :is(.v-tiles,.v-btns,.v-devs,.v-rooms)>:nth-child(4n+2) .v-bic{background:var(--red)!important}
+.vista.st-brutal :is(.v-tiles,.v-btns,.v-devs,.v-rooms)>:nth-child(4n+3) .v-bic{background:var(--green)!important}
+.vista.st-brutal :is(.v-tiles,.v-btns,.v-devs,.v-rooms)>:nth-child(4n+4) .v-bic{background:#b98cff!important}
+/* encendido: amarillo fuerte; al tocar, la tarjeta «baja» y se come la sombra */
+.vista.st-brutal :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on){background:var(--warm)!important;color:#111!important}
+.vista.st-brutal :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) .v-tx span{color:#111!important;opacity:.7}
+.vista.st-brutal :is(.v-btn.on,.v-tile.on,.v-tile.lit,.v-room.on,.v-mtile.on,.v-dev.on) .v-bic{background:#fff!important}
+.vista.st-brutal :is(.v-room,.v-tile,.v-btn,.v-mtile,.v-scene,.v-dev,.v-chp):active{transform:translate(4px,4px);box-shadow:1px 1px 0 var(--ink)!important}
+.vista.st-brutal :is(.v-msw,.v-pw){background:var(--off);border:2.5px solid var(--ink);border-radius:6px!important}
+.vista.st-brutal :is(.v-msw,.v-pw)::after{border-radius:3px!important;background:var(--ink)!important}
+.vista.st-brutal :is(.v-msw.on,.v-pw.on){background:var(--green)!important}
+.vista.st-brutal :is(.v-msw.on,.v-pw.on)::after{background:#111!important}
+.vista.st-brutal .v-modes button{background:var(--card2)!important;border:2.5px solid var(--ink)!important;border-radius:6px!important;font-weight:800}
+.vista.st-brutal .v-modes button.on{background:var(--warm)!important;color:#111!important;box-shadow:3px 3px 0 var(--ink)}
+.vista.st-brutal .v-dring .d1{stroke:var(--warm)!important;stroke-linecap:butt}.vista.st-brutal .v-dring .d0{stroke:var(--off)}
+.vista.st-brutal :is(.v-nav,.v-dock){background:var(--card)!important;border:0!important;border-top:3px solid var(--ink)!important;border-radius:0!important;box-shadow:none!important}
+.vista.st-brutal :is(.v-nav,.v-dock) button{color:var(--fg);font-weight:900;border-radius:6px!important}
+.vista.st-brutal :is(.v-nav,.v-dock) button.on{background:var(--warm)!important;color:#111!important;border:2.5px solid var(--ink)!important;box-shadow:3px 3px 0 var(--ink)}
+.vista.st-brutal :is(.v-nav,.v-dock) .v-mic{background:var(--red)!important;color:#111!important;border:2.5px solid var(--ink)!important;border-radius:6px!important;box-shadow:3px 3px 0 var(--ink)}
+.vista.st-brutal :is(.v-sin,.v-min){background:var(--card)!important;border:3px solid var(--ink)!important;border-radius:10px!important;box-shadow:8px 8px 0 var(--ink)!important}
+.vista.st-brutal.embed{background:transparent!important}
+.vista.st-brutal.light{--bg:#fff4d6;--card:#fff;--card2:#fff8e6;--line:#111;--fg:#111;--muted:#4a4a4a;--off:#e9e1c8;--ink:#111;--warm:#ffd23f;--cool:#4dd6ff;--green:#3ddc84;--red:#ff5c8a}
+.vista.st-brutal.light.has-bg::before{filter:contrast(1.1) saturate(1.2) brightness(1.1)}
+
+/* los grupos de tarjetas de la tablet (el recuadro que junta cámaras, botones, equipos) según cada estilo nuevo */
+.vista.st-suizo.k-tablet .v-b:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis),.vista.st-brutal.k-tablet .v-b:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:transparent!important;border:0!important;padding:0!important;box-shadow:none!important}
+.vista.st-relieve.k-tablet .v-b:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:rgba(0,0,0,.16)!important;border:0!important;border-radius:18px!important;box-shadow:inset 0 2px 8px rgba(0,0,0,.45),0 1px 0 rgba(255,255,255,.06)!important}
+.vista.st-relieve.light.k-tablet .v-b:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:rgba(0,0,0,.05)!important;box-shadow:inset 0 2px 8px rgba(0,0,0,.14),0 1px 0 #fff!important}
+.vista.st-clay.k-tablet .v-b:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:rgba(255,255,255,.04)!important;border:0!important;border-radius:34px!important;box-shadow:inset 4px 4px 10px rgba(0,0,0,.18),inset -4px -4px 10px rgba(255,255,255,.04)!important}
+.vista.st-clay.light.k-tablet .v-b:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:rgba(255,255,255,.35)!important;box-shadow:inset 4px 4px 10px rgba(150,120,200,.14),inset -4px -4px 10px rgba(255,255,255,.8)!important}
+.vista.st-liquid.k-tablet .v-b:is(.t-rooms,.t-scenes,.t-buttons,.t-camera,.t-featured,.t-kpis){background:rgba(255,255,255,.04)!important;border:0!important;border-radius:32px!important;box-shadow:inset 1px 1px 0 rgba(255,255,255,.3),inset 0 0 0 1px rgba(255,255,255,.08)!important}
+/* equipos prendidos: que el ícono y el «Prendido» se lean sobre el color del encendido */
+.vista.st-clay .v-dev.on .v-devic{color:#c86a00!important}.vista.st-clay .v-dev.on .v-devb span{color:rgba(58,35,0,.65)!important}
+.vista.st-brutal .v-dev.on .v-devic{color:#111!important}.vista.st-brutal .v-dev.on .v-devb span{color:#111!important;opacity:.75}
+.vista.st-liquid .v-dev.on .v-devic{color:#e39a00!important}.vista.st-liquid .v-dev.on .v-devb span{color:rgba(18,24,38,.6)!important}
+.vista.st-suizo .v-dev.on .v-devb span{color:var(--bg)!important;opacity:.6}
+.vista.st-relieve .v-dev.on .v-devic{filter:drop-shadow(0 0 8px rgba(255,178,62,.8))}
+/* los equipos ocupan todo el ancho del grupo (sin el recuadro, sobraba una columna vacía) */
+.vista:is(.st-suizo,.st-brutal) .v-devs{grid-template-columns:repeat(auto-fit,minmax(min(100%,140px),1fr))}
+.vista.st-suizo .v-card h3{font-size:15px;margin-bottom:8px}
+
+/* en claro, los valores de arriba (Alarma, Portón, Luces) en negro: el amarillo y el verde no se leen sobre blanco */
+.vista.st-brutal.light .v-kpi .v{color:#111!important}
+.vista.st-clay.light{--green:#1f9d6a;--cool:#2f7fc0;--red:#e0485c}

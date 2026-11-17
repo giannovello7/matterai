@@ -191,7 +191,7 @@ HEADER = vol.Schema({
 
 
 # estilos prearmados y degradés de fondo (las mismas claves que app/vista.js)
-STYLES = ("matterai", "apple", "cristal", "vision", "control4", "savant")
+STYLES = ("matterai", "apple", "cristal", "vision", "control4", "savant", "liquid", "relieve", "suizo", "clay", "brutal")
 GRADIENTS = ("aurora", "atardecer", "oceano", "bosque", "noche", "arena", "nube", "calido", "violeta")
 
 BG = vol.Schema({

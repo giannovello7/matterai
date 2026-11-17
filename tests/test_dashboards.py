@@ -591,3 +591,11 @@ async def test_dashboard_en_la_app_de_home_assistant(hass, hass_ws_client, hass_
             break
     assert ok
     assert got and got["id"] == t["id"] and got["kind"] == "tablet"
+
+
+def test_estilos_nuevos_se_aceptan():
+    from custom_components.matterai import view_schema as vs
+
+    for st in ("liquid", "relieve", "suizo", "clay", "brutal"):
+        assert st in vs.STYLES
+

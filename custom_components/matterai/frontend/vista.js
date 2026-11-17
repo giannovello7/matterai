@@ -234,6 +234,11 @@
     ['vision', 'Vidrio', 'Ventanas de vidrio esmerilado sobre el entorno y la barra flotando'],
     ['control4', 'Panel', 'Panel táctil oscuro: íconos grandes, acento celeste y barra de lado a lado'],
     ['savant', 'Elegante', 'Negro y champagne, minimalista, letra fina espaciada'],
+    ['liquid', 'Vidrio líquido', 'Vidrio transparente con reflejos y bordes que brillan, sobre un fondo vivo'],
+    ['relieve', 'Relieve', 'Botones con volumen que se hunden al prenderse y una lucecita ámbar, como un equipo de verdad'],
+    ['suizo', 'Editorial', 'Blanco y negro con un rojo, letra grande en negrita y líneas finas, como una revista'],
+    ['clay', 'Plastilina', 'Formas infladas y suaves, colores pastel, como juguetes'],
+    ['brutal', 'Neo-brutal', 'Bloques de colores fuertes, bordes negros gruesos y sombras duras'],
   ];
   const STYLES = STYLE_LIST.map((x) => x[0]);
   /** Anchos de las columnas de la tablet a partir de layout.cols (pesos relativos). Con columna al costado, W[0] es su

@@ -194,6 +194,11 @@
   .stp-vision .sw{background:linear-gradient(160deg,#8d735d,#5a4636)}.stp-vision .sw i{background:rgba(255,255,255,.3);border-radius:8px}.stp-vision .sw i:first-child{background:#d4f05a}
   .stp-control4 .sw{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.stp-control4 .sw i{background:rgba(48,51,66,.95);border-left:3px solid #4c9bff;border-radius:3px}
   .stp-savant .sw{background:#050505}.stp-savant .sw i{background:#151515;border-radius:2px}.stp-savant .sw i:first-child{background:#c9a96e}
+  .stp-liquid .sw{background:radial-gradient(70% 70% at 15% 15%,#ff7a59,transparent 65%),radial-gradient(70% 70% at 90% 30%,#7b5cff,transparent 65%),radial-gradient(80% 70% at 40% 100%,#00b4a0,transparent 65%),#101522}.stp-liquid .sw i{background:linear-gradient(135deg,rgba(255,255,255,.45),rgba(255,255,255,.1));border-radius:9px;box-shadow:inset 1px 1px 0 rgba(255,255,255,.7)}
+  .stp-relieve .sw{background:linear-gradient(180deg,#34373c,#1f2124)}.stp-relieve .sw i{background:linear-gradient(180deg,#45484e,#2e3135);border-radius:5px;box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 2px 3px rgba(0,0,0,.6)}.stp-relieve .sw i:first-child{box-shadow:inset 0 2px 4px rgba(0,0,0,.7);background:#2a2c30;border-bottom:3px solid #ffb23e}
+  .stp-suizo .sw{background:#f2f0eb}.stp-suizo .sw i{background:transparent;border-top:3px solid #111;border-radius:0}.stp-suizo .sw i:first-child{background:#e3170a;border-top-color:#e3170a}
+  .stp-clay .sw{background:#efe6fb}.stp-clay .sw i{background:#fdf8ff;border-radius:12px;box-shadow:inset 2px 2px 4px #fff,inset -2px -2px 4px rgba(150,120,200,.25),0 3px 6px rgba(150,120,200,.3)}.stp-clay .sw i:first-child{background:#ffc38a}
+  .stp-brutal .sw{background:#fff4d6}.stp-brutal .sw i{background:#4dd6ff;border:2px solid #111;border-radius:3px;box-shadow:2px 2px 0 #111}.stp-brutal .sw i:first-child{background:#ffd23f}.stp-brutal .sw i:last-child{background:#ff5c8a}
   .tpc{border:1px solid rgba(160,175,200,.18);border-radius:14px;padding:10px 12px;margin-top:8px;background:#1e242e}
   .tpt{display:flex;gap:12px;align-items:center}.tpt b{display:block;font-size:14px}.tpt small{display:block;color:#8f99ab;font-size:12px;line-height:1.35}
   .tpb{display:flex;gap:8px;justify-content:flex-end;margin-top:8px}
