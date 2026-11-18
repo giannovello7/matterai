@@ -45,6 +45,17 @@ _LOGGER = logging.getLogger(__name__)
 PLATFORMS = ["switch", "button", "binary_sensor", "cover"]
 
 
+def _app_entities(hass: HomeAssistant) -> list[str] | None:
+    """Los equipos elegidos para la app MatterAI (panel → Dispositivos), o None si no hay selección."""
+    try:
+        from .. import selection  # noqa: PLC0415
+        sel = selection.get(hass)
+        allowed = sel.allowed() if sel else None
+    except Exception:  # noqa: BLE001 - sin la página Dispositivos, como siempre
+        return None
+    return sorted(allowed) if allowed is not None else None
+
+
 def _manager(hass: HomeAssistant) -> RuleManager:
     manager = hass.data.get(DOMAIN)
     if manager is None:
@@ -212,6 +223,7 @@ def ws_subscribe(hass: HomeAssistant, connection, msg: dict) -> None:
                     "rules": manager.as_list(),
                     "settings": manager.settings,
                     "is_admin": connection.user.is_admin,
+                    "app_entities": _app_entities(hass),
                 },
             )
         )

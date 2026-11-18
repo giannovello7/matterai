@@ -1397,7 +1397,7 @@ class MatterAIEscenasCard extends HTMLElement {
   _subscribe() {
     this._err = null;
     this._unsub = this._hass.connection.subscribeMessage((msg) => {
-      this._rules = msg.rules; this._isAdmin = msg.is_admin; this._settings = msg.settings || { hidden: [] };
+      this._rules = msg.rules; this._isAdmin = msg.is_admin; this._settings = msg.settings || { hidden: [] }; this._appEnts = msg.app_entities || null;
       try {
         const pid = new URLSearchParams(window.location.search).get('portero');
         if (pid && this._rules.some((r) => r.id === pid) && !window.__maeDoorOpened) {
@@ -1472,8 +1472,10 @@ class MatterAIEscenasCard extends HTMLElement {
     const tabs = [['scene', 'Escenas', scenes.length], ['auto', 'Automáticas', autos.length], ['smart', 'Inteligentes', smart.length]];
     if (this._config.reminders !== false) tabs.push(['rem', '🔔 Recordatorios', rems.filter((r) => r.kind === 'reminder' && (r.pending || r.next_at)).length]);
     if (timers.length) tabs.push(['timer', 'Temporizadores', timers.length]);
+    if (!this._adm) { const toff = new Set(this._settings?.tabs_off || []); for (let i = tabs.length - 1; i >= 0; i--) if (toff.has(tabs[i][0]) && tabs.length > 1) tabs.splice(i, 1); }
     let tab = this._tab || this._config.default_tab || (scenes.length ? 'scene' : smart.length ? 'smart' : 'auto');
     if (tab === 'timer' && !timers.length) tab = 'scene';
+    if (!tabs.some((x) => x[0] === tab)) tab = tabs[0][0];
     const gear = this._isAdmin && !inOverlay && this._config.panel ? '<span class="sp"></span><button class="ib" data-a="settings" title="Equipos visibles"><ha-icon icon="mdi:cog-outline"></ha-icon></button>' : '';
     const tabsHtml = `<div class="tabs">${tabs.map(([id, l, n]) => `<button class="tab ${tab === id ? 'on' : ''}" data-a="tab" data-v="${id}">${l}${n ? ` · ${n}` : ''}</button>`).join('')}${gear}</div>`;
     let content = '';
@@ -1564,7 +1566,7 @@ class MatterAIEscenasCard extends HTMLElement {
 
   _agendaHtml() {
     const h = this._hass;
-    const hidden = new Set(this._settings?.hidden || []);
+    const hidden = this._hiddenSet();
     const cals = Object.keys(h.states).filter((e) => dom(e) === 'calendar' && !hidden.has(e));
     if (!cals.length) return '';
     const a = this._agenda;
@@ -1788,28 +1790,49 @@ class MatterAIEscenasCard extends HTMLElement {
       return !(reg && (reg.hidden || reg.entity_category));
     });
   }
+  /** ¿Se ve este equipo con lo que está marcando el instalador ahora (todavía sin guardar)? */
+  _ovSees(eid) {
+    const o = this._ov;
+    if (o.entsMode === 'pick') return o.shown.includes(eid);
+    if (o.hidden.includes(eid)) return false;
+    if (o.entsMode === 'app' && Array.isArray(this._appEnts)) return this._appEnts.includes(eid);
+    return true;
+  }
+  _sgKey(eid) { return this._ov.sgroup === 'dom' ? dom(eid) : (areaName(this._hass, eid) || '~'); }
+  _sgLabel(k) { return this._ov.sgroup === 'dom' ? dlabel(k) : k === '~' ? 'Sin ambiente' : k; }
   _settingsListHtml() {
-    const h = this._hass; const o = this._ov; const hidden = new Set(o.hidden);
-    const q = (o.ssearch || '').toLowerCase();
+    const h = this._hass; const o = this._ov; const hidden = { has: (e) => !this._ovSees(e) };
+    const q = (o.ssearch || '').toLowerCase(), open = new Set(o.sopen || []);
     const groups = {};
     for (const eid of this._settingsCandidates()) {
       const n = fname(h, eid); const a = areaName(h, eid);
       if (q && !`${n} ${a} ${eid} ${dlabel(dom(eid))}`.toLowerCase().includes(q)) continue;
-      (groups[dom(eid)] ||= []).push({ eid, n, a });
+      if (o.entsMode === 'app' && Array.isArray(this._appEnts) && !this._appEnts.includes(eid) && !q) continue; // fuera de la app: no se listan
+      (groups[this._sgKey(eid)] ||= []).push({ eid, n, a: o.sgroup === 'dom' ? a : dlabel(dom(eid)) });
     }
-    const keys = Object.keys(groups).sort((x, y) => dlabel(x).localeCompare(dlabel(y)));
+    const keys = Object.keys(groups).sort((x, y) => (x === '~') - (y === '~') || this._sgLabel(x).localeCompare(this._sgLabel(y)));
     if (!keys.length) return '<div class="slist"><div class="empty">No se encontraron equipos</div></div>';
     return `<div class="slist">${keys.map((d) => {
       const list = groups[d].sort((x, y) => x.n.localeCompare(y.n));
-      const vis = list.filter((x) => !hidden.has(x.eid)).length;
-      return `<div class="grp" style="display:flex;align-items:center;gap:8px"><span style="flex:1">${esc(dlabel(d))} · ${vis}/${list.length}</span>
-        <button class="chip" style="padding:5px 10px;font-size:12px" data-a="sgrp" data-v="${d}" data-on="1">Todos</button><button class="chip" style="padding:5px 10px;font-size:12px" data-a="sgrp" data-v="${d}" data-on="0">Ninguno</button></div>
-        <div class="card">${list.map(({ eid, n, a }) => {
+      const vis = list.filter((x) => !hidden.has(x.eid)).length, isOpen = q || open.has(d);
+      return `<div class="grp" style="display:flex;align-items:center;gap:8px"><button class="chip" style="flex:1;justify-content:flex-start;text-align:left;background:none;border:0;padding:4px 0;font:inherit;color:inherit;text-transform:inherit;letter-spacing:inherit" data-a="sopen" data-v="${esc(d)}">${isOpen ? '▾' : '▸'} ${esc(this._sgLabel(d))} · ${vis}/${list.length}</button>
+        <button class="chip" style="padding:5px 10px;font-size:12px" data-a="sgrp" data-v="${esc(d)}" data-on="1">Todos</button><button class="chip" style="padding:5px 10px;font-size:12px" data-a="sgrp" data-v="${esc(d)}" data-on="0">Ninguno</button></div>
+        ${isOpen ? `<div class="card">${list.map(({ eid, n, a }) => {
           const on = !hidden.has(eid);
           return `<button class="item" data-a="stoggle" data-v="${esc(eid)}"><ha-icon icon="${entIcon(h, eid)}" style="color:var(--mae-sub)"></ha-icon><div class="tx"><div class="t1">${esc(n)}</div><div class="t2">${esc(a || eid)}</div></div><span class="check ${on ? 'on' : ''}">${on ? '<ha-icon icon="mdi:check"></ha-icon>' : ''}</span></button>`;
-        }).join('')}</div>`;
+        }).join('')}</div>` : ''}`;
     }).join('')}</div>`;
   }
+  /** Qué equipos se usan al armar (3 formas, las elige el instalador):
+   *  «app» = los mismos que la app MatterAI (página Dispositivos del panel) · «pick» = sólo los que marca · «hide» = todos menos los que saca. */
+  _entOk(eid) {
+    const s = this._settings || {}, mode = s.ents_mode || 'hide';
+    if (mode === 'pick') return (s.shown || []).includes(eid);
+    if ((s.hidden || []).includes(eid)) return false;
+    if (mode === 'app' && Array.isArray(this._appEnts)) return this._appEnts.includes(eid) || dom(eid) === 'sun' || dom(eid) === 'tts';
+    return true;
+  }
+  _hiddenSet() { return { has: (e) => !this._entOk(e) }; }
   /** ¿Se muestra como instalador? (un admin puede mirar «como el cliente») */
   get _adm() { return this._isAdmin && !this._asClient; }
   _optOff() { return this._adm ? new Set() : new Set(this._settings?.opt_off || []); }
@@ -1844,8 +1867,12 @@ class MatterAIEscenasCard extends HTMLElement {
         <div class="card" style="margin-top:10px">${row('ooff', 'ideas', !oo.has('ideas'), 'Ideas para empezar', 'Las automatizaciones de ejemplo de «Armar la mía»')}</div>
         <div class="sec"><div><div class="h">Al armar una automatización</div><div class="s">Qué opciones le aparecen en «Si… / Sólo si… / Entonces…»</div></div></div>
         ${opts}
-        <div class="sec"><div><div class="h">Equipos visibles</div></div></div>
-        <div class="note" style="margin-top:6px">Elegí qué equipos puede usar el cliente al armar escenas y automatizaciones. Los desmarcados no aparecen en las listas (lo que ya está creado sigue funcionando). Sólo vos, como administrador, ves esta pantalla.</div>
+        <div class="sec"><div><div class="h">Pestañas que ve el cliente</div><div class="s">Las que apagues no le aparecen (lo que tengan adentro sigue funcionando)</div></div></div>
+        <div class="card">${[['scene', 'Escenas'], ['auto', 'Automáticas'], ['smart', 'Inteligentes'], ['rem', 'Recordatorios'], ['timer', 'Temporizadores']].map(([k, l]) => row('toff', k, !(o.tabsOff || []).includes(k), l)).join('')}</div>
+        <div class="sec"><div><div class="h">Equipos que puede usar</div><div class="s">Al armar escenas y automatizaciones. Lo que ya está creado sigue funcionando.</div></div></div>
+        <div class="seg" style="margin:8px 0 6px">${[['app', 'Los de la app'], ['pick', 'Sólo los que marco'], ['hide', 'Todos menos los que saco']].map(([k, l]) => `<button class="${(o.entsMode || 'hide') === k ? 'on' : ''}" data-a="smode" data-v="${k}">${l}</button>`).join('')}</div>
+        <div class="note" style="margin-top:6px">${o.entsMode === 'app' ? (Array.isArray(this._appEnts) ? `Usa los mismos equipos que elegiste para la app MatterAI (panel MatterAI → Dispositivos): <b>${this._appEnts.length}</b>. Abajo podés sacar alguno más.` : 'Todavía no elegiste los equipos de la app (panel MatterAI → Dispositivos): por ahora se ven todos.') : o.entsMode === 'pick' ? 'Arranca vacío: marcá sólo lo que el cliente va a usar (lo más práctico en casas con muchas entidades). Usá «Todos» en cada ambiente.' : 'Se ven todos los equipos de Home Assistant menos los que desmarques.'}</div>
+        <div class="seg" style="margin:10px 0 0">${[['area', 'Por ambiente'], ['dom', 'Por tipo']].map(([k, l]) => `<button class="${(o.sgroup || 'area') === k ? 'on' : ''}" data-a="sgby" data-v="${k}">${l}</button>`).join('')}</div>
         <div class="search" style="margin-top:12px"><input type="text" placeholder="Buscar por nombre, ambiente o tipo…" value="${esc(this._ov.ssearch || '')}" data-a="ssearch"></div>
         ${this._settingsListHtml()}
       </div></div></div>`;
@@ -3160,7 +3187,7 @@ class MatterAIEscenasCard extends HTMLElement {
   }
 
   _pickerCandidates(p, ignoreType) {
-    const h = this._hass; const hidden = new Set(this._settings?.hidden || []);
+    const h = this._hass; const hidden = this._hiddenSet();
     const q = (p.search || '').toLowerCase();
     const out = [];
     for (const eid of Object.keys(h.states)) {
@@ -3438,21 +3465,29 @@ class MatterAIEscenasCard extends HTMLElement {
       case 'tab': this._tab = ds.v; this._render(); return;
       case 'create': this._nav({ page: 'create' }); return;
       case 'openhome': if (this._rules) this._openOv({ page: 'home' }); return;
-      case 'settings': this._nav({ page: 'settings', hidden: [...(this._settings?.hidden || [])], clientOff: [...(this._settings?.client_off || [])], optOff: [...(this._settings?.opt_off || [])], ssearch: '' }); return;
+      case 'settings': { const s0 = this._settings || {}; this._nav({ page: 'settings', hidden: [...(s0.hidden || [])], clientOff: [...(s0.client_off || [])], optOff: [...(s0.opt_off || [])], tabsOff: [...(s0.tabs_off || [])], entsMode: s0.ents_mode || (Array.isArray(this._appEnts) ? 'app' : 'hide'), shown: [...(s0.shown || [])], sgroup: 'area', sopen: [], ssearch: '' }); return; }
+      case 'toff': { o.tabsOff = o.tabsOff || []; const i = o.tabsOff.indexOf(ds.v); if (i >= 0) o.tabsOff.splice(i, 1); else o.tabsOff.push(ds.v); this._renderOv(); return; }
+      case 'smode': o.entsMode = ds.v; this._renderOv(); return;
+      case 'sgby': o.sgroup = ds.v; o.sopen = []; this._renderOv(); return;
+      case 'sopen': { o.sopen = o.sopen || []; const i = o.sopen.indexOf(ds.v); if (i >= 0) o.sopen.splice(i, 1); else o.sopen.push(ds.v); this._renderOv(); return; }
       case 'ooff': { o.optOff = o.optOff || []; const i = o.optOff.indexOf(ds.v); if (i >= 0) o.optOff.splice(i, 1); else o.optOff.push(ds.v); this._renderOv(); return; }
       case 'sprof': { const P = this._profile(ds.v); o.clientOff = P.client_off; o.optOff = P.opt_off; this._renderOv(); this._toast(`Perfil «${PROFILES[ds.v].name}»: revisá y tocá Guardar`); return; }
       case 'asclient': this._asClient = true; this._nav({ page: 'create' }); this._toast('Así lo ve el cliente. Volvé con «Ver como instalador»'); return;
       case 'asadmin': this._asClient = false; this._renderOv(); return;
       case 'coff': { const i = o.clientOff.indexOf(ds.v); if (i >= 0) o.clientOff.splice(i, 1); else o.clientOff.push(ds.v); this._renderOv(); return; }
-      case 'stoggle': { const i = o.hidden.indexOf(ds.v); if (i >= 0) o.hidden.splice(i, 1); else o.hidden.push(ds.v); this._renderOv(); return; }
+      case 'stoggle': {
+        if (o.entsMode === 'pick') { const i = o.shown.indexOf(ds.v); if (i >= 0) o.shown.splice(i, 1); else o.shown.push(ds.v); this._renderOv(); return; }
+        const i = o.hidden.indexOf(ds.v); if (i >= 0) o.hidden.splice(i, 1); else o.hidden.push(ds.v); this._renderOv(); return;
+      }
       case 'sgrp': {
-        const ents = this._settingsCandidates().filter((e) => dom(e) === ds.v);
+        const ents = this._settingsCandidates().filter((e) => this._sgKey(e) === ds.v);
+        if (o.entsMode === 'pick') { const sh = new Set(o.shown); ents.forEach((e) => (ds.on === '1' ? sh.add(e) : sh.delete(e))); o.shown = [...sh]; this._renderOv(); return; }
         const set = new Set(o.hidden);
         ents.forEach((e) => (ds.on === '1' ? set.delete(e) : set.add(e)));
         o.hidden = [...set]; this._renderOv(); return;
       }
       case 'ssave':
-        try { await this._ws('set_settings', { settings: { hidden: o.hidden, client_off: o.clientOff || [], opt_off: o.optOff || [] } }); this._settings = Object.assign({}, this._settings, { hidden: o.hidden, client_off: o.clientOff || [], opt_off: o.optOff || [] }); this._toast('Guardado ✓'); this._back(); } catch (err) { this._toast(err.message, true); }
+        try { const ns = { hidden: o.hidden, client_off: o.clientOff || [], opt_off: o.optOff || [], tabs_off: o.tabsOff || [], ents_mode: o.entsMode || 'hide', shown: o.shown || [] }; await this._ws('set_settings', { settings: ns }); this._settings = Object.assign({}, this._settings, ns); this._toast('Guardado ✓'); this._back(); } catch (err) { this._toast(err.message, true); }
         return;
       case 'edit': {
         const r = (this._rules || []).find((x) => x.id === ds.id); if (!r) return;
@@ -3583,7 +3618,7 @@ class MatterAIEscenasCard extends HTMLElement {
       }
       case 'remdel': try { await this._ws('delete', { rule_id: ds.id }); } catch (err) { this._toast(err.message, true); } return;
       case 'wpreset': {
-        const hidden = new Set(this._settings?.hidden || []);
+        const hidden = this._hiddenSet();
         const st = h.states; const dc = (e) => st[e]?.attributes?.device_class;
         const pick = {
           open: (e) => (dom(e) === 'binary_sensor' && ['door', 'window', 'garage_door', 'opening'].includes(dc(e))) || (dom(e) === 'cover' && ['garage', 'gate', 'door'].includes(dc(e))) || dom(e) === 'lock',

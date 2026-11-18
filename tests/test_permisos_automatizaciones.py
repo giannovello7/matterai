@@ -66,3 +66,12 @@ async def test_tipos_apagados(hass) -> None:
     assert m.settings["client_off"] == ["auto"]
     with pytest.raises(InvalidRule, match="no habilitó este tipo"):
         await m.async_save(_auto("time"), CLIENT)
+
+
+async def test_pestanas_y_equipos(hass) -> None:
+    m = await _manager(hass)
+    m.set_settings({"tabs_off": ["smart", "nada"], "ents_mode": "pick", "shown": ["light.living", 3]})
+    assert m.settings["tabs_off"] == ["smart"]
+    assert m.settings["ents_mode"] == "pick" and m.settings["shown"] == ["light.living"]
+    m.set_settings({"ents_mode": "cualquiera"})  # un modo que no existe no se guarda
+    assert m.settings["ents_mode"] == "pick"

@@ -553,6 +553,17 @@ class RuleManager:
         if isinstance(opt, list):
             # opciones de «Si… / Sólo si… / Entonces…» y las ideas de ejemplo que el cliente no ve (2.34)
             self.settings["opt_off"] = sorted({str(k)[:40] for k in opt if isinstance(k, str)})[:80]
+        tabs = settings.get("tabs_off")
+        if isinstance(tabs, list):
+            # pestañas de la tarjeta que el cliente no ve (2.34)
+            self.settings["tabs_off"] = sorted({k for k in tabs if k in ("scene", "auto", "smart", "rem", "timer")})
+        mode = settings.get("ents_mode")
+        if mode in ("app", "pick", "hide"):
+            # qué equipos usa al armar: los de la app MatterAI, sólo los marcados, o todos menos los ocultos
+            self.settings["ents_mode"] = mode
+        shown = settings.get("shown")
+        if isinstance(shown, list):
+            self.settings["shown"] = sorted({str(e) for e in shown if isinstance(e, str)})[:3000]
         self._save()
         self._changed()
 
@@ -587,7 +598,7 @@ class RuleManager:
         await self.async_stop_all()
         self.rules = {r["id"]: r for r in clean}
         if isinstance(settings, dict):
-            self.settings.update({k: v for k, v in settings.items() if k in ("hidden", "client_off", "opt_off")})
+            self.settings.update({k: v for k, v in settings.items() if k in ("hidden", "client_off", "opt_off", "tabs_off", "ents_mode", "shown")})
         self._save()
         await self.async_start_all()
         return len(clean)
