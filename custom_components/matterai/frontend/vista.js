@@ -980,7 +980,7 @@
           }
           return `<div class="v-clock" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || 'sun')}${esc(Math.round(Number(w.attributes.temperature)))}°</button>` : ''}</div>`;
         }
-        case 'plan': return planHTML(m, c.zoom, c.hint !== false);
+        case 'plan': return planHTML(m, c.zoom, c.hint !== false, c.floors_pos);
         case 'weather': {
           const w = (c.entity && st(c.entity)) || m.weather;
           if (!w) return editing() ? `${t}<p class="v-empty">La casa no tiene clima: agregá una integración del clima (Met.no).</p>` : '';
@@ -1158,8 +1158,11 @@
       return Math.max(0, Math.min(n - 1, +i || 0));
     }
     function curFloor(plan) { return floorsOf(plan)[floorIdx(plan)] || plan; }
-    function planHTML(m, zoom, hint = true) {
+    function planHTML(m, zoom, hint = true, fpos = 'below') {
       const P0 = X.layout.plan, fl = floorsOf(P0), fi = floorIdx(P0), p = fl[fi] || P0, sz = ['s', 'm', 'xl'].includes(zoom) ? ` sz-${zoom}` : '';
+      const FP = ['below', 'above', 'side', 'bl', 'br', 'tl', 'tr'].includes(fpos) ? fpos : 'below', out = FP === 'below' || FP === 'above';
+      fpos = FP;
+      const floorsBar = fl.length > 1 ? `<div class="v-floors f-${FP}">${fl.map((f, i) => { const on = (f.zones || []).some((z) => (z.lights || []).some((id) => (st(id) || {}).state === 'on')); return `<button data-floor="${i}" class="${i === fi ? 'on' : ''}" aria-label="${esc(floorName(P0, i))}">${esc(floorName(P0, i))}${on ? '<i></i>' : ''}</button>`; }).join('')}</div>` : '';
       if (!p || !p.image) return editing() ? '<div class="v-plan empty"><p>Subí el render de la casa en «Plano» para verlo acá.</p></div>' : '';
       const off = img(p.image), on = img(p.image_on || p.image), day = p.image_day ? img(p.image_day) : '';
       const isDay = day && !isNight();
@@ -1169,14 +1172,14 @@
       X.zonePolys = zones;
       const zoneOn = (z) => (z.lights || []).filter((id) => (st(id) || {}).state === 'on').length;
       const cen = (z) => { const P = z.pin || [z.poly.reduce((a, q) => a + q[0], 0) / z.poly.length, z.poly.reduce((a, q) => a + q[1], 0) / z.poly.length]; return P; };
-      return `<div class="v-plan${sz}" style="aspect-ratio:${ar};--ar:${ar}"><svg viewBox="0 0 1000 ${(1000 / ar).toFixed(0)}" preserveAspectRatio="none">
+      return `${fl.length > 1 && fpos === 'above' ? floorsBar : ''}<div class="v-plan${sz}" style="aspect-ratio:${ar};--ar:${ar}"><svg viewBox="0 0 1000 ${(1000 / ar).toFixed(0)}" preserveAspectRatio="none">
         <defs>${zones.map((z, i) => `<mask id="vz${i}" maskUnits="userSpaceOnUse"><polygon points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}" fill="#fff"/></mask>`).join('')}</defs>
         <image href="${esc(isDay ? day : off)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" data-planimg="1"/>
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
         ${zones.map((z, i) => `<polygon class="v-hit${editing() && ctx.edit.pz === i && ctx.edit.selected === X.curB ? ' zsel' : ''}" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
         </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}" data-zpin="1"${z.pin ? ' data-man="1"' : ''}>${pinIcons(z, n, m)}<b>${esc(z.name)}</b></span>`; }).join('')}
         ${hint ? '<span class="v-ptag">Tocá un ambiente para prender o apagar · tocá su nombre para ver todo</span>' : ''}
-        ${fl.length > 1 ? `<div class="v-floors">${fl.map((f, i) => { const on = (f.zones || []).some((z) => (z.lights || []).some((id) => (st(id) || {}).state === 'on')); return `<button data-floor="${i}" class="${i === fi ? 'on' : ''}" aria-label="${esc(floorName(P0, i))}">${esc(floorName(P0, i))}${on ? '<i></i>' : ''}</button>`; }).join('')}</div>` : ''}</div>${elAdd('Dibujar un ambiente en el plano')}`;
+        ${fl.length > 1 && !out ? floorsBar : ''}</div>${fl.length > 1 && fpos === 'below' ? floorsBar : ''}${elAdd('Dibujar un ambiente en el plano')}`;
     }
 
     /* ───────── avisos de la casa (campanita) ───────── */

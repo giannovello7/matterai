@@ -107,7 +107,8 @@ CFG = vol.Schema({
     vol.Optional("zoom"): vol.Any(None, vol.In(["s", "m", "xl"])),                         # tamaño del plano (2.23.1)
     vol.Optional("bell"): bool,                                                            # tarjeta de saludo: campanita y menú (2.34)
     vol.Optional("menu"): bool,
-    vol.Optional("hint"): bool,                                                            # plano: el cartel de ayuda (2.34.2)
+    vol.Optional("hint"): bool,
+    vol.Optional("floors_pos"): vol.Any(None, vol.In(["below", "above", "side", "bl", "br", "tl", "tr"])),  # plano: dónde van los botones de los pisos                                                            # plano: el cartel de ayuda (2.34.2)
 }, extra=vol.REMOVE_EXTRA)
 
 COND = vol.Schema({

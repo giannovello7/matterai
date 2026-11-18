@@ -1402,6 +1402,7 @@
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
         case 'plan':
           hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
+          if (b.type === 'plan' && (((this.v.plan || {}).floors) || []).length) hs += `<div class="fld"><span>Botones de los pisos</span><span class="eseg wrap">${[['below', 'Afuera, abajo'], ['above', 'Afuera, arriba'], ['bl', 'Esquina ↙'], ['br', 'Esquina ↘'], ['tl', 'Esquina ↖'], ['tr', 'Esquina ↗'], ['side', 'Al costado']].map(([k, l]) => `<button data-fpos="${k}" class="${(c.floors_pos || 'below') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           if (b.type === 'plan') hs += `<label class="chk"><input type="checkbox" data-fb="cfg.hint" ${c.hint !== false ? 'checked' : ''}> Mostrar el cartel de ayuda («Tocá un ambiente para prender o apagar…»)</label>`;
           h += '<p class="hint">El plano se arma en «Plano e imágenes» (en ⋯, arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
@@ -2002,6 +2003,7 @@
       const hset = (fn) => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); fn(H); l.header = Object.keys(H).length ? H : null; });
       W.querySelectorAll('#edr [data-hcard]').forEach((x) => { x.onclick = () => this.headerOff(true); });
       W.querySelectorAll('#edr [data-hoff]').forEach((x) => { x.onclick = () => this.headerOff(false); });
+      W.querySelectorAll('#edr [data-fpos]').forEach((x) => { x.onclick = () => { const b0 = this.selBlock(); if (b0) this.change(() => { b0.cfg = b0.cfg || {}; if (x.dataset.fpos === 'below') delete b0.cfg.floors_pos; else b0.cfg.floors_pos = x.dataset.fpos; }); }; });
       W.querySelectorAll('#edr [data-gopt]').forEach((x) => { x.onchange = () => { const b0 = this.selBlock(); if (b0) this.change(() => { b0.cfg = b0.cfg || {}; if (x.checked) delete b0.cfg[x.dataset.gopt]; else b0.cfg[x.dataset.gopt] = false; }); }; });
       W.querySelectorAll('#edr [data-hgreet]').forEach((x) => { x.onchange = () => hset((H) => { if (x.checked) H.greet = true; else { delete H.greet; delete H.name; } }); });
       W.querySelectorAll('#edr [data-hname]').forEach((x) => { x.onchange = () => hset((H) => { const v = x.value.trim().slice(0, 30); if (v) H.name = v; else delete H.name; }); });
