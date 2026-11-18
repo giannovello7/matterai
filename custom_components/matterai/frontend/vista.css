@@ -169,7 +169,7 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .v-sheet{position:fixed;inset:0;z-index:18;background:rgba(8,10,14,.55);display:none;align-items:flex-end;justify-content:center}
 .v-sheet.show{display:flex}
 .k-tablet .v-sheet{align-items:center}
-.v-sin{width:100%;max-width:640px;max-height:88vh;overflow:auto;background:var(--card);border-radius:24px 24px 0 0;border-top:1px solid var(--line);padding:8px 16px calc(env(safe-area-inset-bottom,0px) + 24px)}
+.v-sin{width:100%;max-width:640px;max-height:min(88vh,calc(100vh - env(safe-area-inset-top,0px) - 10px));overflow:auto;background:var(--card);border-radius:24px 24px 0 0;border-top:1px solid var(--line);padding:8px 16px calc(env(safe-area-inset-bottom,0px) + 24px)}
 .k-tablet .v-sin{max-width:460px;border-radius:24px;border:1px solid var(--line)}
 .v-grab{width:38px;height:4px;border-radius:4px;background:var(--off);margin:6px auto 14px}
 .v-sh{display:flex;align-items:center;gap:10px;margin-bottom:14px}.v-sh>div{flex:1}.v-sh h2{margin:0;font-size:20px}.v-sh small{display:block;color:var(--muted);font-size:12px}
@@ -183,7 +183,7 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .v-opt{display:flex!important;align-items:center;gap:12px;width:100%;padding:14px!important;border-radius:14px;background:var(--card2)!important;font-weight:600}
 .v-opt.w{background:var(--warm)!important;color:#1b1408!important}.v-opt.ghost{background:none!important;border:1px solid var(--line)!important}
 .v-note{color:var(--muted);font-size:12px;margin-top:12px}
-.v-menu{position:fixed;inset:0;z-index:19;background:rgba(8,10,14,.55);display:none;align-items:center;justify-content:center;padding:22px}
+.v-menu{position:fixed;inset:0;z-index:19;background:rgba(8,10,14,.55);display:none;align-items:center;justify-content:center;padding:calc(22px + env(safe-area-inset-top,0px)) 22px calc(22px + env(safe-area-inset-bottom,0px))}
 .v-menu.show{display:flex}
 .v-min{width:100%;max-width:420px;background:var(--card);border:1px solid var(--line);border-radius:20px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.5)}
 .v-min .t{padding:16px 18px 4px;font-weight:700;font-size:16px}.v-min p{margin:0;padding:0 18px 12px;color:var(--muted);font-size:12.5px}

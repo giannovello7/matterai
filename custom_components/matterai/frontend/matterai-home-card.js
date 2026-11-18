@@ -856,6 +856,10 @@
   .actv{position:absolute;inset:0;overflow:auto;overscroll-behavior:contain;background:rgba(8,10,20,.97);-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px);
     transform:translateY(24px);opacity:0;transition:transform .4s cubic-bezier(.2,.9,.2,1),opacity .3s;color:var(--txt);font-family:inherit}
   .actv-wrap.open .actv{transform:none;opacity:1}
+  /* iPhone (app web): la barra de arriba (hora, batería) va encima de la página; las ventanas a pantalla completa
+     (música, actividad…) arrancan debajo de ella. En Android y en Home Assistant ese margen es 0. */
+  @media (max-width:899px){.actv{border-top:env(safe-area-inset-top,0px) solid #05060d}.sheet{max-height:min(90vh,calc(100vh - env(safe-area-inset-top,0px) - 10px))!important}}
+  .sheet-wrap.rpage .sheet{max-height:none!important}
   @media (min-width:900px){.actv{inset:4vh auto 4vh 50%;width:min(860px,94vw);transform:translate(-50%,24px);border-radius:30px;border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 90px rgba(0,0,0,.55)}
     .actv-wrap.open .actv{transform:translate(-50%,0)}}
   .act-h{position:sticky;top:0;z-index:2;padding:18px 20px 14px;background:linear-gradient(rgba(8,10,20,.99) 82%,rgba(8,10,20,0))}
