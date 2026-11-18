@@ -781,7 +781,7 @@
   .sheet-wrap.open{pointer-events:auto}.sheet-wrap.open .backdrop{opacity:1}.sheet-wrap.open .sheet{transform:none}
   .camcard.own{position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#0b0e12}.camcard.own>*{position:absolute;inset:0;width:100%;height:100%}
   /* el ambiente como página completa (el instalador lo elige en el editor) */
-  .sheet-wrap.rpage .sheet{left:0!important;right:0!important;top:0!important;bottom:0!important;width:auto!important;max-width:none!important;max-height:none!important;border-radius:0!important;border:0!important;box-shadow:none!important;opacity:1!important;transform:translateX(100%)!important;padding:max(14px,max(env(safe-area-inset-top,0px),var(--ios-top,0px))) clamp(16px,4vw,48px) 30px!important}
+  .sheet-wrap.rpage .sheet{left:0!important;right:0!important;top:0!important;bottom:0!important;width:auto!important;max-width:none!important;max-height:none!important;border-radius:0!important;border:0!important;box-shadow:none!important;opacity:1!important;transform:translateX(100%)!important;padding:max(14px,var(--ios-top,0px)) clamp(16px,4vw,48px) 30px!important}
   .sheet.rcards>#sheetdyn{position:sticky;top:-10px;z-index:6;margin:-10px -20px 0;padding:10px 20px 2px;background:inherit;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
   .sheet-wrap.rpage.open .sheet{transform:none!important}.sheet-wrap.rpage .grab{display:none!important}
   .sheet-wrap.rpage :is(.rcbox,.camcard.own){max-width:960px}
@@ -859,7 +859,7 @@
   .actv-wrap.open .actv{transform:none;opacity:1}
   /* iPhone (app web): la barra de arriba (hora, batería) va encima de la página; las ventanas a pantalla completa
      (música, actividad…) arrancan debajo de ella. En Android y en Home Assistant ese margen es 0. */
-  @media (max-width:899px){.actv{border-top:max(env(safe-area-inset-top,0px),var(--ios-top,0px)) solid #05060d}:host([theme]) .actv,:host .actv{border-top-color:#0b0d16!important}:host([theme]) .actv.mus,:host .actv.mus{border-top-color:#070912!important}.actv.mus .mu-main>.mu-head,.actv.mus .mu-main .mu-head:first-child{position:sticky;top:0;z-index:4;margin:0 -16px;padding-left:16px;padding-right:16px;background:var(--mu-bg,#070912)}.sheet{max-height:min(90vh,calc(100vh - max(env(safe-area-inset-top,0px),var(--ios-top,0px)) - 10px))!important}}
+  @media (max-width:899px){.actv{border-top:var(--ios-top,0px) solid #05060d}:host([theme]) .actv,:host .actv{border-top-color:#0b0d16!important}:host([theme]) .actv.mus,:host .actv.mus{border-top-color:#070912!important}.actv.mus .mu-main>.mu-head,.actv.mus .mu-main .mu-head:first-child{position:sticky;top:0;z-index:4;margin:0 -16px;padding-left:16px;padding-right:16px;background:var(--mu-bg,#070912)}.sheet{max-height:min(90vh,calc(100vh - var(--ios-top,0px) - 10px))!important}}
   .sheet-wrap.rpage .sheet{max-height:none!important}
   @media (min-width:900px){.actv{inset:4vh auto 4vh 50%;width:min(860px,94vw);transform:translate(-50%,24px);border-radius:30px;border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 90px rgba(0,0,0,.55)}
     .actv-wrap.open .actv{transform:translate(-50%,0)}}
