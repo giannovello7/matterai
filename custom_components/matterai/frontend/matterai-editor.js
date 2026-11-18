@@ -38,8 +38,10 @@
     scenes: ['scene', 'script'], routines: ['automation'], any: null,
   };
   /* Tarjetas con elementos adentro: [singular, plural, dominios que se ofrecen al agregar] */
+  /** ¿La tarjeta muestra datos del resumen? (la de Datos y el panel de «Reloj y clima») */
+  const isKpi = (b) => !!b && (b.type === 'kpis' || (b.type === 'clock' && (b.cfg || {}).style === 'panel'));
   const ELEM = {
-    kpis: ['dato', 'Datos', null], scenes: ['escena', 'Escenas', ['scene', 'script']], routines: ['rutina', 'Rutinas', ['automation', 'script']],
+    kpis: ['dato', 'Datos', null], clock: ['dato', 'Datos del panel', null], scenes: ['escena', 'Escenas', ['scene', 'script']], routines: ['rutina', 'Rutinas', ['automation', 'script']],
     covers: ['cortina', 'Cortinas', ['cover']], lights: ['luz', 'Luces', ['light', 'switch']], buttons: ['botón', 'Botones', null],
     rooms: ['ambiente', 'Ambientes', null], camera: ['botón', 'Botones', null], featured: [null, null, null],
   };
@@ -1341,7 +1343,13 @@
           hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           h += '<p class="hint">El plano se arma en «Plano e imágenes» (en ⋯, arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
-        case 'clock': hs += this.styleSeg(c, [['', 'Hora grande'], ['tiles', 'Día y hora en dos cuadros'], ['panel', 'Panel: nombre, hora, clima y 3 datos']], ''); break;
+        case 'clock':
+          hs += this.styleSeg(c, [['', 'Hora grande'], ['tiles', 'Día y hora en dos cuadros'], ['panel', 'Panel: nombre, hora, clima y datos'], ['greet', 'Saludo («Buenas tardes»)']], '');
+          if (c.style === 'panel') h += '<p class="hint">El nombre de arriba es el título de la tarjeta (vacío: el del instalador). Tocar la hora abre la agenda; el clima, el pronóstico.</p>' + this.elemSection(b) + '<p class="hint">Hasta 6 datos. Cada uno puede ser un resumen (luces, aires, consumo…) o un equipo cualquiera (un portón, un sensor).</p>';
+          else if (c.style === 'greet') h += `<p class="hint">El saludo cambia solo (Buen día, Buenas tardes, Buenas noches) y dice cómo está la casa. El nombre del saludo se pone en la parte de arriba.</p>
+            <label class="chk"><input type="checkbox" data-gopt="bell" ${c.bell === false ? '' : 'checked'}> Campanita de avisos</label><label class="chk"><input type="checkbox" data-gopt="menu" ${c.menu === false ? '' : 'checked'}> Botón de menú</label>`;
+          else h += '<p class="hint">Tocar la hora abre la agenda; tocar el clima, el pronóstico. En Aspecto: también como panel con datos o como saludo.</p>';
+          break;
         case 'music': hs += this.styleSeg(c, [['', 'Barra'], ['card', 'Tarjeta con controles']], ''); break;
         case 'weather': hs += this.styleSeg(c, [['', 'Fila'], ['tile', 'Cuadro']], ''); h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
         case 'climate':
@@ -1417,7 +1425,7 @@
     isAuto(b) {
       const c = b.cfg || {};
       if (b.type === 'rooms') return !(c.rooms && c.rooms.length);
-      if (['kpis', 'scenes', 'routines', 'covers', 'lights'].includes(b.type)) return !!c.auto || !((c.items && c.items.length) || (c.entities && c.entities.length));
+      if (isKpi(b) || ['scenes', 'routines', 'covers', 'lights'].includes(b.type)) return !!c.auto || !((c.items && c.items.length) || (c.entities && c.entities.length));
       return false;
     }
     /** Automática → armada a mano con lo mismo que se está viendo (nada cambia en la pantalla). */
@@ -1425,7 +1433,7 @@
       const c = b.cfg = b.cfg || {};
       const shown = this.vista && this.vista.shown ? this.vista.shown(b.id) : null;
       if (b.type === 'rooms') { if (!(c.rooms && c.rooms.length)) c.rooms = (shown || (this.model() || { rooms: [] }).rooms.slice(0, 4).map((x) => x.name)).slice(0, 24); c.auto = false; return; }
-      if (b.type === 'kpis') { if (c.auto || !(c.items && c.items.length)) { c.auto = false; c.items = null; this.fromAuto(b); if (shown && shown.length) c.items = clone(shown); } c.auto = false; return; }
+      if (isKpi(b)) { if (c.auto || !(c.items && c.items.length)) { c.auto = false; c.items = null; this.fromAuto(b); if (shown && shown.length) c.items = clone(shown); } c.auto = false; return; }
       if (!['scenes', 'routines', 'covers', 'lights'].includes(b.type)) return;
       if (!(c.items && c.items.length) || c.auto) {
         const base = !c.auto && c.entities && c.entities.length ? c.entities.map((e) => ({ entity: e })) : (shown || []);
@@ -1442,7 +1450,7 @@
     elemLabel(b, x) {
       if (b.type === 'rooms') return String(x);
       if (!x) return '';
-      if (b.type === 'kpis') return x.name || (x.kind === 'entity' ? this.fname(x.entity) : ((KPI_KINDS.find((k) => k[0] === x.kind) || [, x.kind])[1]));
+      if (isKpi(b)) return x.name || (x.kind === 'entity' ? this.fname(x.entity) : ((KPI_KINDS.find((k) => k[0] === x.kind) || [, x.kind])[1]));
       return x.name || (x.entity ? this.fname(x.entity) : 'Botón');
     }
     /** Ordenar arrastrando una fila: de la posición «from» a la de «to». */
@@ -1474,7 +1482,7 @@
     elemAdd(b) {
       const E = ELEM[b.type]; if (!E) return;
       const addItem = (it) => this.change(() => { this.materialize(b); const L = this.elemList(b); L.push(it); this.el = L.length - 1; });
-      if (b.type === 'kpis') return addItem({ kind: 'lights' });
+      if (isKpi(b)) return addItem({ kind: 'lights' });
       if (b.type === 'buttons' || b.type === 'camera') return addItem({ tap: { type: 'toggle' } });
       if (b.type === 'rooms') return this.roomAddDlg(b);
       return this.openCB(null, E[2], (eid) => {
@@ -1504,7 +1512,7 @@
       const sub = (x) => {
         if (b.type === 'rooms') { const r = m && m.rooms.find((y) => y.name === x); return r ? `${r.count || 0} equipos` : 'no existe en la casa'; }
         if (x && x.entity) return `${x.entity}${this.states()[x.entity] ? '' : ' · no existe'}`;
-        if (b.type === 'kpis') return 'dato del resumen';
+        if (isKpi(b)) return 'dato del resumen';
         return x && x.tap ? (ACTION_TYPES.find((a) => a[0] === x.tap.type) || [, ''])[1] : '';
       };
       return `<h4>${esc(E[1])}</h4>
@@ -1512,7 +1520,7 @@
         <div class="elist">${L.map((x, i) => `<div class="elr" draggable="true" data-sr="el" data-i="${i}" data-elpick="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="tx"><b>${esc(this.elemLabel(b, x))}</b><small>${esc(sub(x))}</small></span>
           <button data-elpick2="${i}" title="Editar">✎</button><button data-elact2="del" data-i="${i}" title="Sacar">✕</button></div>`).join('') || `<p class="hint">Todavía no hay ${esc(E[1].toLowerCase())}.</p>`}</div>
         <button class="eb sm addb" data-eladd2>+ Agregar ${esc(E[0])}</button>
-        ${!auto && ['kpis', 'scenes', 'routines', 'covers', 'lights', 'rooms'].includes(b.type) ? '<button class="eb sm" data-toauto title="Que la app vuelva a elegir sola">Volver a automático</button>' : ''}`;
+        ${!auto && (isKpi(b) || ['scenes', 'routines', 'covers', 'lights', 'rooms'].includes(b.type)) ? '<button class="eb sm" data-toauto title="Que la app vuelva a elegir sola">Volver a automático</button>' : ''}`;
     }
     /** Campos de la cámara (la cámara principal, el botón grande y las demás cámaras). */
     camFields(b, opts) {
@@ -1541,7 +1549,7 @@
       if (x == null) { this.el = null; return `${back}</div><p class="hint">Ese elemento ya no está.</p>`; }
       let f = '';
       switch (b.type) {
-        case 'kpis': f = this.itemFields(b, i, { kpi: true }); break;
+        case 'kpis': case 'clock': f = this.itemFields(b, i, { kpi: true }); break;
         case 'buttons': case 'camera': f = this.itemFields(b, i, { hold: true }); break;
         case 'scenes': f = this.itemFields(b, i, { doms: ['mae_scene', 'scene', 'script'], tap: false }); break;
         case 'routines': f = this.itemFields(b, i, { doms: ['mae_routine', 'automation', 'script'], tap: false, icon: false, mode: true }); break;
@@ -1561,7 +1569,25 @@
         <h4>Saludo</h4>
         <label class="chk"><input type="checkbox" data-hgreet ${H.greet ? 'checked' : ''}> Saludo en vez de la hora («Buenas tardes» y cómo está la casa)</label>
         ${H.greet ? `<label class="fld"><span>Nombre para el saludo (opcional)</span><input data-hname value="${esc(H.name || '')}" maxlength="30" placeholder="Ej: Ana"></label>` : ''}
-        <p class="hint">Vale para ${this.K === 'tablet' ? 'la tablet' : 'el celular'} de este dashboard. Si sacás el menú, las opciones siguen en la barra de abajo (si tiene «Menú»).</p>`;
+        <p class="hint">Vale para ${this.K === 'tablet' ? 'la tablet' : 'el celular'} de este dashboard. Si sacás el menú, las opciones siguen en la barra de abajo (si tiene «Menú»).</p>
+        <h4>Ancho y lugar</h4><p class="hint" style="margin-top:0">La parte de arriba ocupa siempre todo el ancho. Para hacerla más angosta o ponerla en otro lado, pasala a una tarjeta: queda en la primera sección y se mueve y se agranda como cualquiera.</p>
+        <div class="elnav"><button class="eb sm pri" data-hcard>Pasarla a una tarjeta</button><button class="eb sm warn" data-hoff>Sacar la parte de arriba</button></div>`;
+    }
+    /** Saca la parte de arriba; con «card», la pone como tarjeta (saludo o reloj) arriba de todo en la primera sección. */
+    headerOff(card) {
+      const l = this.lay(), H = Object.assign({}, l.header || {}), wasGreet = !!H.greet, w = H.weather !== false, cl = H.clock !== false;
+      if (card && !this.roomFor(1)) return;
+      this.change(() => {
+        Object.assign(H, { clock: false, weather: false, bell: false, menu: false }); delete H.greet;
+        l.header = H;
+        if (!card) return;
+        const S = this.secs(), nb = { id: this.newId('clock'), type: 'clock', cfg: wasGreet || !cl ? { style: 'greet' } : {} };
+        if (S && S.length) nb.sec = S[0].id;
+        if (!wasGreet && cl && !w) nb.cfg = {};
+        const B = this.blocks(), j = S && S.length ? B.findIndex((x) => this.secOf(x) === S[0].id) : 0;
+        B.splice(j < 0 ? 0 : j, 0, nb); this.sel = nb.id; this.zone = null;
+      });
+      this.toast(card ? 'Listo: ahora es una tarjeta. Cambiale el ancho con la manija o arrastrala · Ctrl+Z para deshacer' : 'Parte de arriba oculta. Para volver a mostrarla, tocá la barrita de arriba · Ctrl+Z para deshacer');
     }
     dockKeys() { const l = this.lay(); return (l.dock && l.dock.length ? l.dock : window.MaeVista.DOCK_DEF[this.K]).slice(); }
     dockEditor() {
@@ -1807,7 +1833,7 @@
       }); });
       W.querySelectorAll('#edr [data-fj]').forEach((x) => { x.onchange = () => { let val = null; try { val = x.value.trim() ? JSON.parse(x.value) : null; } catch (_) { this.toast('Los datos tienen que ser JSON, por ejemplo {"entity_id": "script.riego"}'); return; } this.change(() => this.setPath(b, x.dataset.fj, val)); }; });
       W.querySelectorAll('#edr [data-v]').forEach((x) => { x.onchange = () => this.change(() => { this.v[x.dataset.v] = x.value; }); });
-      W.querySelectorAll('#edr [data-iadd]').forEach((x) => { x.onclick = () => this.change(() => { b.cfg.items = b.cfg.items || []; b.cfg.items.push(b.type === 'kpis' ? { kind: 'lights' } : { tap: { type: 'toggle' } }); }); });
+      W.querySelectorAll('#edr [data-iadd]').forEach((x) => { x.onclick = () => this.change(() => { b.cfg.items = b.cfg.items || []; b.cfg.items.push(isKpi(b) ? { kind: 'lights' } : { tap: { type: 'toggle' } }); }); });
       W.querySelectorAll('#edr [data-idel]').forEach((x) => { x.onclick = () => this.change(() => b.cfg.items.splice(+x.dataset.idel, 1)); });
       W.querySelectorAll('#edr [data-imv]').forEach((x) => { x.onclick = () => this.change(() => { const i = +x.dataset.imv, j = i + +x.dataset.d, L = b.cfg.items; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; }); });
       W.querySelectorAll('#edr [data-mk]').forEach((x) => { x.onchange = () => this.change(() => { const k = x.dataset.mk, m0 = this.model();
@@ -1874,6 +1900,9 @@
       const back = () => { this.zone = null; this.pz = null; this.drawProps(); this.syncPreview(); this.bind(); };
       W.querySelectorAll('#edr [data-zback],#edr [data-pzback]').forEach((x) => { x.onclick = back; });
       const hset = (fn) => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); fn(H); l.header = Object.keys(H).length ? H : null; });
+      W.querySelectorAll('#edr [data-hcard]').forEach((x) => { x.onclick = () => this.headerOff(true); });
+      W.querySelectorAll('#edr [data-hoff]').forEach((x) => { x.onclick = () => this.headerOff(false); });
+      W.querySelectorAll('#edr [data-gopt]').forEach((x) => { x.onchange = () => { const b0 = this.selBlock(); if (b0) this.change(() => { b0.cfg = b0.cfg || {}; if (x.checked) delete b0.cfg[x.dataset.gopt]; else b0.cfg[x.dataset.gopt] = false; }); }; });
       W.querySelectorAll('#edr [data-hgreet]').forEach((x) => { x.onchange = () => hset((H) => { if (x.checked) H.greet = true; else { delete H.greet; delete H.name; } }); });
       W.querySelectorAll('#edr [data-hname]').forEach((x) => { x.onchange = () => hset((H) => { const v = x.value.trim().slice(0, 30); if (v) H.name = v; else delete H.name; }); });
       W.querySelectorAll('#edr [data-hd]').forEach((x) => { x.onchange = () => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); if (x.checked) delete H[x.dataset.hd]; else H[x.dataset.hd] = false; l.header = Object.keys(H).length ? H : null; }); });
@@ -1924,7 +1953,7 @@
     /** «Automático» → manual: arranca con lo que la app está mostrando (así se puede cambiar lo que ya está). */
     fromAuto(b) {
       const c = b.cfg = b.cfg || {}, m = this.model(), S = this.pickStates();
-      if (b.type === 'kpis' && !(c.items && c.items.length)) {
+      if (isKpi(b) && !(c.items && c.items.length)) {
         const shown = this.vista && this.vista._test && this.vista._test.X.kpiItems && this.vista._test.X.kpiItems[b.id];
         c.items = clone(shown && shown.length ? shown : [{ kind: 'lights' }, { kind: 'temp' }, { kind: 'alarm' }]);
       }
@@ -2104,7 +2133,7 @@
         const c = b.cfg = b.cfg || {};
         ['entity', 'gate'].forEach((k) => { if (c[k] && !has(c[k])) delete c[k]; });
         if (Array.isArray(c.entities)) c.entities = c.entities.filter(has);
-        if (Array.isArray(c.items)) c.items = c.items.filter((x) => !x || !x.entity || has(x.entity) || (b.type === 'kpis' && x.kind !== 'entity'));
+        if (Array.isArray(c.items)) c.items = c.items.filter((x) => !x || !x.entity || has(x.entity) || (isKpi(b) && x.kind !== 'entity'));
         if (Array.isArray(c.rooms)) c.rooms = c.rooms.filter((n) => rooms.has(n));
         if (Array.isArray(b.show)) { b.show = b.show.filter((q) => !q.entity || has(q.entity)); if (!b.show.length) delete b.show; }
         const empty = (k) => !(Array.isArray(c[k]) && c[k].length);

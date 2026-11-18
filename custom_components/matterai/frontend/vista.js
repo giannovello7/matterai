@@ -67,7 +67,7 @@
     music: { name: 'Música', desc: 'Lo que está sonando, con sus controles', kinds: ['phone', 'tablet'] },
     lock: { name: 'Cerradura', desc: 'Abrir o cerrar, con su estado', kinds: ['phone', 'tablet'] },
     plan: { name: 'Plano', desc: 'El render de la casa que se ilumina', kinds: ['tablet', 'phone'] },
-    clock: { name: 'Reloj y clima', desc: 'Hora, fecha y clima grandes', kinds: ['tablet'] },
+    clock: { name: 'Reloj y clima', desc: 'Hora, fecha y clima grandes; también el panel con datos y el saludo', kinds: ['phone', 'tablet'] },
     weather: { name: 'Clima', desc: 'Temperatura, cielo, humedad y viento', kinds: ['phone', 'tablet'] },
     climate: { name: 'Aire / termostato', desc: 'Temperatura con − y +, modo y prender', kinds: ['phone', 'tablet'] },
     covers: { name: 'Cortinas', desc: 'Subir, parar y bajar, con su posición', kinds: ['phone', 'tablet'] },
@@ -933,13 +933,18 @@
           const d = new Date(), w = m.weather;
           if (c.style === 'panel') {
             const cf = card() && card()._config, brand = b.title || (cf && cf.installer) || 'MatterAI', ns = notes(m).length;
-            const items = [{ kind: 'lights' }, { kind: 'acs' }, m.power ? { kind: 'power' } : { kind: 'temp' }];
-            X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items;
+            const own = (c.items || []).filter((x) => x && (x.kind !== 'entity' || st(x.entity))).slice(0, 6);
+            const items = !c.auto && own.length ? own : [{ kind: 'lights' }, { kind: 'acs' }, m.power ? { kind: 'power' } : { kind: 'temp' }];
+            X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items; X.shown[b.id] = items;
             const A = w ? w.attributes || {} : {};
             return `<div class="v-card v-pnl"><div class="v-pnlh"><b>${esc(brand)}</b><button class="v-pnlc" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }))}</span></button>
               <button class="v-sq v-pnlb" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button></div>
               ${w ? `<button class="v-pnlw" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}<b>${esc(Math.round(Number(A.temperature)))}°</b><span>${esc(WX_TXT[w.state] || '')}${A.humidity != null ? `<br>Humedad ${esc(Math.round(Number(A.humidity)))} %` : ''}</span></button>` : ''}
-              <div class="v-kpis n3">${items.map((it, i) => kpi(m, it, i)).join('')}</div></div>`;
+              <div class="v-kpis ${items.length === 4 ? 'n2' : items.length < 4 ? `n${items.length}` : ''}">${items.map((it, i) => kpi(m, it, i)).join('')}</div></div>`;
+          }
+          if (c.style === 'greet') { // el saludo de arriba hecho tarjeta: se mueve y se le cambia el ancho como a cualquiera
+            const H = (X.layout && X.layout.header) || {};
+            return `<div class="v-card v-grc">${greetHTML(m, H.name)}<span class="v-hsp"></span>${c.bell === false ? '' : bellHTML(m)}${c.menu === false ? '' : `<button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`}</div>`;
           }
           if (c.style === 'tiles') {
             return `<div class="v-ctiles" data-scr="agenda"><div class="v-ct"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long' }))}</span></div><div class="v-ct"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { month: 'long' }))}</span></div></div>`;
@@ -1154,15 +1159,21 @@
 
     /* ───────── dibujo ───────── */
     function set(sel, html) { if (X.cache[sel] === html) return; X.cache[sel] = html; const e = X.el.querySelector(sel); if (e) e.innerHTML = html; }
+    function greetHTML(m, name) {
+      const hr = new Date().getHours(), hi = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches', ns = notes(m).length;
+      const S = (hass() || {}).states || {}, ae = (card() && card()._config && card()._config.app_entities) || null;
+      const lit = Object.keys(S).filter((x) => x.startsWith('light.') && S[x].state === 'on' && (!ae || ae.includes(x))).length;
+      const how = ns ? `${ns} aviso${ns === 1 ? '' : 's'} para revisar` : 'Todo funcionando bien';
+      return `<button class="v-greet" data-scr="avisos"><b>${esc(hi)}${name ? `, ${esc(name)}` : ''}</b><span>${esc(how)}${lit ? ` · ${lit} luz${lit === 1 ? '' : 'es'} prendida${lit === 1 ? '' : 's'}` : ''}</span></button>`;
+    }
+    function bellHTML(m) { const ns = notes(m).length; return `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>`; }
     function head(m, compact) {
       const d = new Date(), w = m.weather, ns = notes(m).length, H = (X.layout && X.layout.header) || {};
       const on = (k) => H[k] !== false;
+      // sin nada arriba: en la app no se ve; en el editor queda una barrita para volver a mostrarla
+      if (!H.greet && ['clock', 'weather', 'bell', 'menu'].every((k) => H[k] === false)) return editing() ? '<span class="v-hoff">Parte de arriba oculta · tocá acá para volver a mostrarla</span>' : '';
       if (H.greet) {
-        const hr = d.getHours(), hi = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches';
-        const S = (hass() || {}).states || {}, ae = (card() && card()._config && card()._config.app_entities) || null;
-        const lit = Object.keys(S).filter((x) => x.startsWith('light.') && S[x].state === 'on' && (!ae || ae.includes(x))).length;
-        const how = ns ? `${ns} aviso${ns === 1 ? '' : 's'} para revisar` : 'Todo funcionando bien';
-        const greet = `<button class="v-greet" data-scr="avisos"><b>${esc(hi)}${H.name ? `, ${esc(H.name)}` : ''}</b><span>${esc(how)}${lit ? ` · ${lit} luz${lit === 1 ? '' : 'es'} prendida${lit === 1 ? '' : 's'}` : ''}</span></button>`;
+        const greet = greetHTML(m, H.name);
         return `${greet}<span class="v-hsp"></span>
         ${on('bell') ? `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>` : ''}
         ${on('menu') ? `<button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>` : ''}`;
@@ -1358,7 +1369,7 @@
         if (X.sheet) { const sh = X.el.querySelector('#v-sheet'); if (sh && sh.classList) sh.classList.add('show'); }
       }
       set('#v-head', head(m, K === 'phone'));
-      { const H = L.header || {}; if (X.el.classList) X.el.classList.toggle('nohead', ['clock', 'weather', 'bell', 'menu'].every((k) => H[k] === false) && !H.greet); }
+      { const H = L.header || {}; if (X.el.classList) X.el.classList.toggle('nohead', !editing() && ['clock', 'weather', 'bell', 'menu'].every((k) => H[k] === false) && !H.greet); }
       const bl = L.blocks;
       if (secs) {
         const known = new Set(secs.map((x) => x.id));

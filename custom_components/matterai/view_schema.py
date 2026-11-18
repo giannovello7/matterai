@@ -105,6 +105,8 @@ CFG = vol.Schema({
     vol.Optional("tap"): ACTION,                                                          # acción de la tarjeta
     vol.Optional("video"): vol.Any(None, vol.In(["live", "photo"])),                      # cámara: video en vivo o foto
     vol.Optional("zoom"): vol.Any(None, vol.In(["s", "m", "xl"])),                         # tamaño del plano (2.23.1)
+    vol.Optional("bell"): bool,                                                            # tarjeta de saludo: campanita y menú (2.34)
+    vol.Optional("menu"): bool,
 }, extra=vol.REMOVE_EXTRA)
 
 COND = vol.Schema({
@@ -150,7 +152,7 @@ ZONE = vol.Schema({
 }, extra=vol.REMOVE_EXTRA)
 
 
-CARD_STYLES = ("list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers", "services", "devices", "tile", "card", "bars", "panel")
+CARD_STYLES = ("list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers", "services", "devices", "tile", "card", "bars", "panel", "greet")
 
 
 def _card_style(v: Any) -> str | None:
