@@ -779,6 +779,11 @@
     background:rgba(14,16,28,.92);border:1px solid rgba(255,255,255,.1);border-bottom:0;-webkit-backdrop-filter:blur(30px) saturate(1.4);backdrop-filter:blur(30px) saturate(1.4);
     transform:translateY(105%);transition:transform .45s cubic-bezier(.2,.9,.2,1);color:var(--txt);font-family:inherit;box-shadow:0 -30px 80px rgba(0,0,0,.5)}
   .sheet-wrap.open{pointer-events:auto}.sheet-wrap.open .backdrop{opacity:1}.sheet-wrap.open .sheet{transform:none}
+  .camcard.own{position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#0b0e12}.camcard.own>*{position:absolute;inset:0;width:100%;height:100%}
+  /* el ambiente como página completa (el instalador lo elige en el editor) */
+  .sheet-wrap.rpage .sheet{left:0!important;right:0!important;top:0!important;bottom:0!important;width:auto!important;max-width:none!important;max-height:none!important;border-radius:0!important;border:0!important;box-shadow:none!important;opacity:1!important;transform:translateX(100%)!important;padding:max(14px,env(safe-area-inset-top)) clamp(16px,4vw,48px) 30px!important}
+  .sheet-wrap.rpage.open .sheet{transform:none!important}.sheet-wrap.rpage .grab{display:none!important}
+  .sheet-wrap.rpage :is(.rcbox,.camcard.own){max-width:960px}
   .grab{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.18);margin:0 auto 14px}
   .sh-head{display:flex;align-items:center;gap:14px;padding-bottom:18px;position:sticky;top:-10px;z-index:2;background:linear-gradient(rgba(14,16,28,.96) 75%,transparent);padding-top:6px}
   .ri.big{width:56px;height:56px;border-radius:20px}.ri.big .ic{width:28px;height:28px}
@@ -840,6 +845,9 @@
   .pos{height:4px;border-radius:4px;background:rgba(255,255,255,.08);margin-top:7px;overflow:hidden}.pos i{display:block;height:100%;background:linear-gradient(90deg,#7c9cff,#3ee6c4)}
   .art{background:#20253a center/cover}
   .sh-cams{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .rcbox{position:relative}.rcnav{position:absolute;left:50%;top:10px;transform:translateX(-50%);display:flex;align-items:center;gap:6px;background:rgba(10,12,16,.55);color:#fff;border-radius:99px;padding:3px 6px;font-size:13px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+  .rcnav button{all:unset;cursor:pointer;width:24px;height:24px;display:grid;place-items:center;font-size:18px;line-height:1;border-radius:50%}.rcnav button:hover{background:rgba(255,255,255,.15)}
+  .rcl{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.rcc{display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:99px;background:rgba(255,255,255,.07);font-size:12.5px}.rcc svg{width:14px;height:14px}.rcc.on{background:rgba(255,255,255,.16)}
   .hint{margin:24px 0 0;text-align:center;font-size:12px;color:var(--mut);opacity:.75}
 
   /* Actividad (registro por tiempos) */
@@ -1561,6 +1569,7 @@
           const id = String(rc.id || slug(rc.name) || `room${i}`);
           const r = byId[id] || newRoom(id, rc.name, rc.icon);
           if (rc.cameras_position) r.camPos = rc.cameras_position; // top · after (por defecto) · end
+          r.open = rc.open === 'page' ? 'page' : 'sheet'; // cómo se abre: ventana (lo de siempre) o página completa (2.34)
           r.ord = r.ord || {}; // orden que eligió el instalador: los bloques de la ventana salen en ese orden
           (rc.entities || []).forEach((x) => {
             const eid = entOf(x);
@@ -1894,7 +1903,7 @@
     _openPanel(kind) {
       this._panel = kind; this._panelOpt = null;
       this._room = null;
-      this._els.sheet.innerHTML = '<div id="sheetdyn"></div><div id="sheetcam"></div>'; this._els.sheetdyn2 = null;
+      this._els.sheet.innerHTML = '<div id="sheetdyn"></div><div id="sheetcam"></div>'; this._els.sheetdyn2 = null; this._els.sheetwrap.classList.remove('rpage');
       this._els.sheetdyn = this._els.sheet.querySelector('#sheetdyn');
       this._els.sheetcam = this._els.sheet.querySelector('#sheetcam');
       this._cache.sheetdyn = null;
@@ -2714,6 +2723,7 @@
       const rr = this._m && this._m.byId && this._m.byId[id];
       if (rr && typeof this.roomExtra === 'function') { try { this.roomExtra(rr, this._els.sheet.querySelector('#sheettop'), this._els.sheet.querySelector('#sheetbot')); } catch (_) { /* sin tarjetas extra */ } }
       this._els.sheet.scrollTop = 0;
+      this._els.sheetwrap.classList.toggle('rpage', !!(rr && rr.open === 'page'));
       this._els.sheetwrap.classList.add('open');
       this._haptic('light');
     }
@@ -2756,18 +2766,34 @@
       const host = this._els.sheetcam;
       if (!host) return;
       if (!r.cams.length) { if (host.firstChild) host.innerHTML = ''; this._roomCamEl = null; this._roomCamKey = null; return; }
+      // la tarjeta de cámaras de MatterAI (camaras.js): en la app y en el dashboard de Home Assistant
+      const own = typeof window !== 'undefined' && typeof window.__maeLiveCam === 'function' && typeof customElements !== 'undefined' && customElements.get('mae-cam');
+      if (own) {
+        const k2 = `${r.id}|own|${r.cams.join(',')}`;
+        if (this._roomCamKey === k2 && this._roomCamEl) { this._roomCamEl.hass = this._hass; return; }
+        const el = window.__maeLiveCam(r.cams);
+        if (el) {
+          this._roomCamKey = k2; this._roomCamEl = el;
+          host.innerHTML = `<div class="blk"><div class="blk-h"><h4>${ic('cam')}Cámaras</h4></div><div class="camcard own"></div></div>`;
+          host.querySelector('.camcard').appendChild(el);
+          return;
+        }
+      }
       const TAG = 'advanced-camera-card';
       if (this._camInline() && !customElements.get(TAG)) this._ensureCamCard();
       const inline = this._camInline() && customElements.get(TAG);
       const key = `${r.id}|${inline ? 'card' : 'tiles'}|${r.cams.join(',')}`;
-      if (this._roomCamKey === key) {
+      if (this._roomCamKey === key || (!inline && this._roomCamKey === `${key}|${(((this._rcI || 0) % r.cams.length) + r.cams.length) % r.cams.length}`)) {
         if (this._roomCamEl) this._roomCamEl.hass = this._hass;
         return;
       }
       this._roomCamKey = key; this._roomCamEl = null;
       const head = `<div class="blk"><div class="blk-h"><h4>${ic('cam')}Cámaras</h4></div>`;
       if (!inline) {
-        host.innerHTML = `${head}<div class="sh-cams">${r.cams.map((id) => this._cam(id, 0, r.cams.length > 2)).join('')}</div></div>`;
+        const n = r.cams.length, ci = (((this._rcI || 0) % n) + n) % n, cur = r.cams[ci];
+        this._roomCamKey = `${key}|${ci}`;
+        host.innerHTML = `${head}<div class="rcbox">${this._cam(cur, 0, n > 2)}${n > 1 ? `<div class="rcnav"><button data-action="rcam" data-d="-1" aria-label="Cámara anterior">‹</button><b>${esc(this._name(cur))}</b><button data-action="rcam" data-d="1" aria-label="Cámara siguiente">›</button></div>` : ''}</div>
+          ${n > 1 ? `<div class="rcl">${r.cams.map((id, j) => `<span class="rcc ${j === ci ? 'on' : ''}" data-eid="${id}">${ic('cam')}${esc(this._name(id))}</span>`).join('')}</div>` : ''}</div>`;
         // Si la tarjeta de cámaras termina de cargar, se reemplazan las miniaturas.
         if (this._camInline()) customElements.whenDefined(TAG).then(() => { if (this._room === r.id) { this._roomCamKey = null; this._schedule(); } });
         return;
@@ -4516,6 +4542,7 @@
       if (a && a.startsWith('m_')) { if (this._mus && !(this._musSwiped && Date.now() - this._musSwiped < 350)) this._musAction(a.slice(2), d, t); return; }
       switch (a) {
         case 'room': this._openRoom(d.id); break;
+        case 'rcam': { this._rcI = (this._rcI || 0) + (+d.d || 1); const rr = this._m && this._m.byId[this._room]; if (rr) this._mountRoomCam(rr); break; }
         case 'panel': this._openPanel(d.v); break;
         // Agenda
         case 'agmonth': if (this._ag) {

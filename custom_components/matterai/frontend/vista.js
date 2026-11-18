@@ -1602,6 +1602,7 @@
         }
       }
       if (X.sheet === 'roomedit' && ctx.edit && ctx.edit.room) h = roomEditHTML(ctx.edit.room);
+      { const ws = X.el.querySelector('#v-sheet'); if (ws && ws.classList) ws.classList.toggle('rpage', X.sheet === 'roomedit' && !!(ctx.edit && ctx.edit.room && ctx.edit.room.open === 'page')); }
       if (X.sheet === 'rutinas') {
         const b = (X.layout.blocks || []).find((y) => y.id === X.sheetArg), list = b ? routineList(b.cfg || {}, 200) : [];
         const on = list.filter((x) => (st(x.entity) || {}).state === 'on').length;
@@ -1612,25 +1613,31 @@
     }
     /** Editor: el ambiente por dentro, con sus equipos en orden; se ordenan, sacan y agregan acá mismo. */
     function roomEditHTML(R) {
-      const L = R.entities || [];
+      const L0 = R.entities || [], isCam = (x) => String(x && typeof x === 'object' ? x.entity : x).startsWith('camera.');
+      // como en la app: las cámaras van juntas en su recuadro, arriba de todo, después de los equipos (lo normal) o al final
+      const L = R.cameras_position === 'top' ? [...L0.filter(isCam), ...L0.filter((x) => !isCam(x))] : [...L0.filter((x) => !isCam(x)), ...L0.filter(isCam)];
+      const idx = new Map(); L0.forEach((x, i) => idx.set(x, i));
       // como en la app: las entidades seguidas del mismo tipo forman un bloque (Cámaras, Iluminación, Equipos…)
       const KIND = { camera: ['cam', 'cam', 'Cámaras'], light: ['light', 'bulb', 'Iluminación'], climate: ['clim', 'snow', 'Climatización'], fan: ['clim', 'snow', 'Climatización'],
         cover: ['cover', 'curt', 'Cortinas y aberturas'], media_player: ['media', 'music', 'Multimedia'], switch: ['switch', 'plug', 'Equipos'], input_boolean: ['switch', 'plug', 'Equipos'],
         lock: ['lock', 'lock', 'Cerraduras'], scene: ['act', 'spark', 'Acciones'], script: ['act', 'spark', 'Acciones'], button: ['act', 'spark', 'Acciones'], input_button: ['act', 'spark', 'Acciones'] };
       const kindOf = (id) => KIND[String(id).split('.')[0]] || ['sens', 'door', 'Sensores'];
       const groups = [];
-      L.forEach((x, i) => {
-        const id = x && typeof x === 'object' ? x.entity : x, k = kindOf(id), g = groups[groups.length - 1];
+      L.forEach((x) => {
+        const i = idx.get(x), id = x && typeof x === 'object' ? x.entity : x, k = kindOf(id), g = groups[groups.length - 1];
         if (g && g.k[0] === k[0]) g.items.push([x, id, i]); else groups.push({ k, items: [[x, id, i]] });
       });
       const tools = (i) => `<span class="v-ret"><button data-rme="del" data-i="${i}" title="Sacar del ambiente">${ic('x')}</button></span>`;
       const tile = ([x, id, i]) => {
         const s0 = st(id), s = s0 ? entState(id) : { on: false, txt: 'No existe en la casa' }, nm = (x && x.name) || fname(id);
-        if (id.startsWith('camera.')) return `<div class="v-rcam" data-ri="${i}"><img alt="" src="${esc(camSrc(id))}"><span class="v-rcn">${esc(nm)}</span>${tools(i)}</div>`;
-        return `<div class="v-rer ${s.on ? 'on' : ''}" data-ri="${i}"><span class="v-bic">${ic(defIcon(id))}</span><span class="v-tx"><b>${esc(nm)}</b><span>${esc(s.txt)}</span></span>${tools(i)}</div>`;
+        return `<div class="v-rer ${s.on ? 'on' : ''} ${ctx.edit && ctx.edit.roomEl === i ? 'rsel' : ''}" data-ri="${i}"><span class="v-bic">${ic(defIcon(id))}</span><span class="v-tx"><b>${esc(nm)}</b><span>${esc(s.txt)}</span></span>${tools(i)}</div>`;
       };
-      const body = groups.map((g) => `<div class="v-rblk"><h4>${ic(g.k[1])}${g.k[2]}</h4><div class="${g.k[0] === 'cam' || g.k[0] === 'cover' || g.k[0] === 'clim' || g.k[0] === 'media' ? 'v-rlist' : 'v-rgrid'}">${g.items.map(tile).join('')}</div></div>`).join('');
-      return `<div class="v-grab"></div><div class="v-sh"><span class="v-ric on">${ic(roomIc(R))}</span><div><h2>${esc(R.name)}</h2><small>${L.length} equipo${L.length === 1 ? '' : 's'} · arrastralos para ordenarlos</small></div><button class="v-x" data-rme="close" aria-label="Cerrar">${ic('x')}</button></div>
+      // las cámaras: un solo recuadro, como la tarjeta de cámaras de MatterAI (se pasan con ‹ ›), y abajo cuáles tiene
+      const camBox = (items) => { const [x0, id0] = items[0], n0 = (x0 && x0.name) || fname(id0);
+        return `<div class="v-rcamc"><div class="v-rcam" data-ri="${items[0][2]}"><img alt="" src="${esc(camSrc(id0))}"><span class="v-rcnav">${items.length > 1 ? `<i>${ic('chev')}</i>` : ''}<b>${esc(n0)}</b>${items.length > 1 ? `<i>${ic('chev')}</i>` : ''}</span>${items.length > 1 ? `<span class="v-rcdots">${items.map((y, j) => `<b class="${j ? '' : 'on'}"></b>`).join('')}</span>` : ''}</div>
+          <div class="v-rcl">${items.map(([x, id, i]) => `<span class="v-rcc" data-ri="${i}">${ic('cam')}${esc((x && x.name) || fname(id))}${tools(i)}</span>`).join('')}</div></div>`; };
+      const body = groups.map((g) => `<div class="v-rblk"><h4>${ic(g.k[1])}${g.k[2]}</h4>${g.k[0] === 'cam' ? camBox(g.items) : `<div class="${g.k[0] === 'cover' || g.k[0] === 'clim' || g.k[0] === 'media' ? 'v-rlist' : 'v-rgrid'}">${g.items.map(tile).join('')}</div>`}</div>`).join('');
+      return `<div class="v-grab"></div><div class="v-sh"><span class="v-ric on">${ic(roomIc(R))}</span><div><h2>${esc(R.name)}</h2><small>${L.length} equipo${L.length === 1 ? '' : 's'} · tocá uno para editarlo, arrastralo para ordenarlo${R.open === 'page' ? ' · se abre como página' : ''}</small></div><button class="v-x" data-rme="close" aria-label="Cerrar">${ic('x')}</button></div>
         ${body || '<p class="v-empty">Todavía no tiene equipos.</p>'}
         <button class="v-eadd" data-radd>+ Agregar un equipo</button>${R.dirty ? `<button class="v-rsave" data-rme="save">Guardar ambiente</button>` : ''}`;
     }
@@ -1668,6 +1675,7 @@
         // el ambiente abierto por dentro (se edita acá mismo)
         const re = t.closest('[data-rme]'); if (re && ctx.edit.onRoom) return ctx.edit.onRoom(re.dataset.rme, +re.dataset.i);
         if (t.closest('[data-radd]') && ctx.edit.onRoom) return ctx.edit.onRoom('add');
+        { const ri = t.closest('#v-sheet [data-ri]'); if (ri && ctx.edit.onRoom) return ctx.edit.onRoom('pick', +ri.dataset.ri); }
         if (t.closest('#v-sheet')) { if (t.id === 'v-sheet' && ctx.edit.onRoom) ctx.edit.onRoom('close'); return; }
         if (t.closest('#v-head')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'header' });
         if (t.closest('#v-allb')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'allb' });
@@ -1770,7 +1778,7 @@
     function onDown(e) {
       if (editing()) return;
       X.held = false; // un toque nuevo: lo de antes (deslizar la cámara, mantener) ya no se come este toque
-      const cv = e.target.closest('.v-cam'); swipe = cv ? { x: e.clientX, y: e.clientY, el: cv } : null;
+      const cv = e.target.closest('.v-cam'); swipe = cv && !e.target.closest('[data-live]') ? { x: e.clientX, y: e.clientY, el: cv } : null; // el visor en vivo maneja sus gestos (zoom, mover, deslizar)
       const r = e.target.closest('[data-room],[data-zone],[data-it]'); if (!r) return;
       if (e.target.closest('button') && !e.target.closest('[data-it]')) return; // el interruptor de un ambiente no abre el menú de fijar
       X.held = false; clearTimeout(holdT);

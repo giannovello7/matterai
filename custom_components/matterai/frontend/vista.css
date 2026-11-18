@@ -236,6 +236,15 @@ html.mae-light.with-inicio,html.mae-light body.with-inicio,html.mae-light body.w
 .v-rgrid .v-rer .v-tx{padding-right:24px}
 .v-rcam{position:relative;border-radius:16px;overflow:hidden;background:#0b0e12;aspect-ratio:16/9}.v-rcam img{width:100%;height:100%;object-fit:cover;display:block}
 .v-rcn{position:absolute;left:10px;bottom:8px;font-weight:700;font-size:13px;text-shadow:0 1px 3px rgba(0,0,0,.8);color:#fff}
+.v-rcamc{display:flex;flex-direction:column;gap:8px}.v-rcnav{position:absolute;left:50%;top:10px;transform:translateX(-50%);display:flex;align-items:center;gap:8px;background:rgba(10,12,16,.55);color:#fff;border-radius:99px;padding:4px 10px;font-size:13px;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.v-rcnav i{display:flex;width:16px;height:16px;opacity:.85}.v-rcnav i:first-child{transform:rotate(180deg)}.v-rcnav i svg{width:16px;height:16px}
+.v-rcdots{position:absolute;left:0;right:0;bottom:10px;display:flex;justify-content:center;gap:5px}.v-rcdots b{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.45)}.v-rcdots b.on{background:#fff}
+.v-rcl{display:flex;flex-wrap:wrap;gap:6px}.v-rcc{display:inline-flex;align-items:center;gap:6px;padding:5px 6px 5px 10px;border-radius:99px;background:rgba(255,255,255,.07);font-size:12.5px;cursor:grab}.v-rcc svg{width:14px;height:14px}.v-rcc .v-ret{position:static;background:none}
+.v-rer.rsel,.v-rcc.rsel{outline:2px solid var(--warm);outline-offset:1px}
+/* el ambiente como página completa (en vez de ventana) */
+.vista .v-sheet.rpage{align-items:stretch;justify-content:stretch;background:var(--bg,#0e1116)}
+.vista .v-sheet.rpage .v-sin{max-width:none!important;width:100%!important;max-height:none!important;height:100%!important;border-radius:0!important;border:0!important;box-shadow:none!important;padding:14px clamp(16px,4vw,40px) 30px!important}
+.vista .v-sheet.rpage .v-grab{display:none}
 .v-rcam .v-ret{position:absolute;top:6px;right:6px;background:rgba(10,12,16,.7);border-radius:10px}.v-rcam .v-ret button{color:#fff}
 .v-rsave{display:block;width:100%;margin-top:4px;padding:13px!important;border-radius:14px;background:var(--warm)!important;color:#1b1408!important;font-weight:700!important;text-align:center!important}
 .vista.editing .v-b [data-el],.vista.editing .v-b .v-ehandle,.vista.editing .v-b .v-ehandle *,.vista.editing .v-b .v-eltool,.vista.editing .v-b .v-eltool *,.vista.editing .v-b .v-eladd{pointer-events:auto}

@@ -978,7 +978,8 @@
         onRows: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; if (n) bb.h = n; else delete bb.h; }); },
         onSpan: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
         onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
-        room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null,
+        roomEl: R && this.rme != null ? this.rme : null,
+        room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], open: R.open, cameras_position: R.cameras_position, dirty: this.roomDirty() } : null,
         roomPage: R ? Object.assign({ name: R.name }, Editor.roomPageOf(R.cards || [])) : null };
     }
     /** Tocar algo en la pantalla del medio: la tarjeta, y si fue un ambiente, se abre por dentro para editarlo. */
@@ -1071,6 +1072,7 @@
         if (sig !== this.pcRoomSig) { this.pcRoomSig = sig; pc.setConfig(Object.assign({}, this.cfg, { rooms: list, camera_inline: false })); pc.hass = this.p._hass || this.hass; }
         const m = pc.model && pc.model(), r = m && m.rooms.find((x) => x.name === d.name);
         if (r && (pc._room !== r.id || !this.pcRoomOn)) { pc.openRoom(r.id); }
+        if (pc._els && pc._els.sheetwrap) pc._els.sheetwrap.classList.toggle('rpage', d.open === 'page'); // ventana o página completa
         this.pcRoomOn = true;
         this.roomDrag(pc);
       } catch (_) { /* si algo falla, queda la pantalla como estaba */ }
@@ -1078,13 +1080,24 @@
     /** En el ambiente abierto en la pantalla del medio, cada equipo se arrastra a su lugar (como en Home Assistant). */
     roomDrag(pc) {
       const sheet = pc && pc._els && pc._els.sheet; if (!sheet) return;
-      const mark = () => sheet.querySelectorAll('[data-eid]').forEach((x) => { if (!x.draggable) { x.draggable = true; x.style.cursor = 'grab'; } });
+      const idOf = (x) => (typeof x === 'string' ? x : x && x.entity);
+      const top = (x) => !(x.parentElement && x.parentElement.closest('[data-eid]'));
+      const selId = () => { const R = this.rdraft, x = R && this.rme != null ? (R.entities || [])[this.rme] : null; return x == null ? null : (typeof x === 'string' ? x : x.entity); };
+      const mark = () => { const s = selId(); sheet.querySelectorAll('[data-eid]').forEach((x) => { if (!top(x)) return; if (!x.draggable) { x.draggable = true; x.style.cursor = 'grab'; } const on = s && x.dataset.eid === s; if (on !== (x.dataset.msel === '1')) { x.dataset.msel = on ? '1' : ''; x.style.outline = on ? '2px solid #f2b766' : ''; x.style.outlineOffset = on ? '2px' : ''; } }); };
       mark();
       if (sheet._maeDrag) return;
       sheet._maeDrag = true;
+      // en el editor, tocar un equipo lo abre en el panel (como una tarjeta), en vez de prenderlo
+      const eat = (e) => { if (this.rdraft && e.target.closest && e.target.closest('[data-eid]')) e.stopPropagation(); };
+      sheet.addEventListener('pointerdown', eat, true); sheet.addEventListener('pointerup', eat, true);
+      sheet.addEventListener('click', (e) => {
+        const R = this.rdraft, it = R && e.target.closest && e.target.closest('[data-eid]'); if (!it) return;
+        e.stopPropagation(); e.preventDefault();
+        const i = (R.entities || []).findIndex((x) => idOf(x) === it.dataset.eid); if (i < 0) return;
+        this.rme = i; this.rtab = 'cfg'; this.drawProps(); this.bind(); mark();
+      }, true);
       // la tarjeta vuelve a dibujar el ambiente con cada cambio de la casa: se marcan otra vez
       try { new (sheet.ownerDocument.defaultView.MutationObserver)(() => { if (this.rdraft) mark(); }).observe(sheet, { childList: true, subtree: true }); } catch (_) { /* sin observador */ }
-      const idOf = (x) => (typeof x === 'string' ? x : x && x.entity);
       let from = null;
       const clear = () => sheet.querySelectorAll('.mae-dropb,.mae-dragging').forEach((x) => { x.classList.remove('mae-dropb', 'mae-dragging'); x.style.outline = ''; x.style.opacity = ''; });
       sheet.addEventListener('dragstart', (e) => {
@@ -1110,7 +1123,7 @@
       const R = this.rdraft; if (!R) return false;
       if (R._orig == null) return true;
       const o = this.roomsCfg().find((x) => x.name === R._orig) || {};
-      return JSON.stringify([o.name, o.icon || '', o.entities || []]) !== JSON.stringify([R.name, R.icon || '', R.entities || []])
+      return JSON.stringify([o.name, o.icon || '', o.entities || [], o.open || '', o.cameras_position || '']) !== JSON.stringify([R.name, R.icon || '', R.entities || [], R.open || '', R.cameras_position || ''])
         || JSON.stringify(R.cards || []) !== (R._origCards || '[]') || !!R.local !== !!R._origLocal;
     }
     ensureDraft() {
@@ -1129,10 +1142,11 @@
       const R = this.rdraft; if (!R) return;
       const L = R.entities = R.entities || [];
       const redraw = () => { this.drawProps(); this.syncPreview(); this.bind(); };
-      if (a === 'close') { this.roomEd = null; this.rdraft = null; return redraw(); }
+      if (a === 'close') { this.roomEd = null; this.rdraft = null; this.rme = null; return redraw(); }
+      if (a === 'pick') { this.rme = i; this.rtab = 'cfg'; return redraw(); }
       if (a === 'move' && i && typeof i === 'object') { this.reorder('room', i.from, i.to); return undefined; }
       if (a === 'save') return this.saveRoom(false);
-      if (a === 'del') { L.splice(i, 1); return redraw(); }
+      if (a === 'del') { L.splice(i, 1); this.rme = null; return redraw(); }
       if (a === 'up' || a === 'down') { const j = i + (a === 'up' ? -1 : 1); if (j < 0 || j >= L.length) return undefined; [L[i], L[j]] = [L[j], L[i]]; return redraw(); }
       if (a === 'add') {
         return this.openCB(null, ROOM_DOMAINS, (id) => {
@@ -1642,22 +1656,44 @@
       const R = this.rdraft, eid = (x) => (x && typeof x === 'object' ? x.entity : x), ICONS = window.MaeVista.ICONS;
       const manual = Array.isArray(this.cfg.rooms) && this.cfg.rooms.length;
       const b = this.selBlock(), inCard = b && b.type === 'rooms' && R._orig && ((b.cfg && b.cfg.rooms) || []).includes(R._orig);
-      return `<div class="crumb"><button class="eb sm" data-rx="back">‹ Ambientes</button><span>› ${esc(R.name)}</span></div>
-        <p class="hint" style="margin-top:0">Lo ves abierto en la pantalla: así lo ve el cliente. Ordená los equipos arrastrándolos (acá o en la pantalla).</p>
+      // un equipo del ambiente, abierto (como un elemento de una tarjeta)
+      const L0 = R.entities || [];
+      if (this.rme != null && L0[this.rme] == null) this.rme = null;
+      if (this.rme != null) {
+        const x = L0[this.rme], id = eid(x), d = id.split('.')[0], s0 = this.states()[id];
+        return `<div class="crumb"><button class="eb sm" data-rmback>‹ ${esc(R.name)}</button><span>› ${esc((x && x.name) || this.fname(id))}</span></div>
+          <h4>${esc(DOM_NAME[d] || d)}</h4>
+          <label class="fld"><span>Nombre en este ambiente (vacío: el del equipo, «${esc(this.fname(id))}»)</span><input data-rmn value="${esc((x && x.name) || '')}" maxlength="40"></label>
+          <p class="hint">${esc(id)}${s0 ? ` · ahora: ${esc(this.stateTxt(id))}` : ' · no existe en la casa'}</p>
+          ${d === 'camera' ? '<p class="hint">Las cámaras del ambiente se ven juntas en la tarjeta de cámaras de MatterAI (se pasan deslizando o con ‹ ›). Dónde va ese recuadro se elige en Aspecto.</p>' : ''}
+          <div class="elnav"><button class="eb sm" data-rmmv="-1" ${this.rme ? '' : 'disabled'}>↑ Antes</button><button class="eb sm" data-rmmv="1" ${this.rme < L0.length - 1 ? '' : 'disabled'}>↓ Después</button><button class="eb sm warn" data-rdel="${this.rme}">Sacar del ambiente</button></div>`;
+      }
+      const rtab = this.rtab === 'lay' ? 'lay' : 'cfg', hasCam = L0.some((x) => eid(x).startsWith('camera.'));
+      const tabs = `<div class="tabs">${[['cfg', 'Contenido'], ['lay', 'Aspecto']].map(([k, l]) => `<button data-rtab="${k}" class="${rtab === k ? 'on' : ''}">${l}</button>`).join('')}</div>`;
+      const crumb = `<div class="crumb"><button class="eb sm" data-rx="back">‹ Ambientes</button><span>› ${esc(R.name)}</span></div>`;
+      if (rtab === 'lay') {
+        return `${crumb}${tabs}
+          <div class="fld"><span>Se abre como</span><span class="eseg"><button data-ropen="sheet" class="${R.open === 'page' ? '' : 'on'}">Ventana</button><button data-ropen="page" class="${R.open === 'page' ? 'on' : ''}">Página completa</button></span></div>
+          <p class="hint" style="margin-top:-4px">${R.open === 'page' ? 'Ocupa toda la pantalla, como una página nueva; se vuelve con la ✕.' : 'Una ventana encima del inicio (lo de siempre).'}</p>
+          ${hasCam ? `<div class="fld"><span>Cámaras</span><span class="eseg wrap">${[['top', 'Arriba de todo'], ['after', 'Después de los equipos'], ['end', 'Al final']].map(([k, l]) => `<button data-rcpos="${k}" class="${(R.cameras_position || 'after') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>` : ''}
+          <label class="fld"><span>Ícono</span><select data-rn="icon"><option value="">Automático</option>${ICONS.map((n) => `<option ${R.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
+          <label class="chk"><input type="checkbox" data-rlocal ${R.local ? 'checked' : ''}> Tarjetas propias de este ambiente sólo en este dashboard (los demás siguen con las de la casa)</label>
+          <p class="hint">Los ambientes son de la casa: cómo se abre y dónde van las cámaras vale para todos los dashboards y la app.</p>`;
+      }
+      return `${crumb}${tabs}
+        <p class="hint" style="margin-top:0">Lo ves abierto en la pantalla: así lo ve el cliente. Tocá un equipo para editarlo y arrastralo para ordenarlo (acá o en la pantalla).</p>
         ${manual ? '' : '<div class="warnbox">Hoy los ambientes salen solos de las Áreas de Home Assistant. Al guardar, quedan armados a mano (con lo mismo que se ve ahora) y desde ahí se editan acá.</div>'}
         ${inCard ? '<button class="eb sm" data-rx="unpin" style="margin-bottom:10px">Sacarlo de esta tarjeta (sigue en «Toda la casa»)</button>' : ''}
         <label class="fld"><span>Nombre</span><input data-rn="name" value="${esc(R.name)}" maxlength="40"></label>
-        <label class="fld"><span>Ícono</span><select data-rn="icon"><option value="">Automático</option>${ICONS.map((n) => `<option ${R.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
         <h4>Equipos (arrastralos para ordenarlos)</h4>
-        ${(R.entities || []).map((x, i) => { const id = eid(x), d = id.split('.')[0]; return `<div class="rme" draggable="true" data-sr="room" data-i="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="dtag">${esc(DOM_NAME[d] || d)}</span><span class="tx"><b>${esc((x && x.name) || this.fname(id))}</b><small>${esc(id)}${this.states()[id] ? '' : ' · no existe'}</small></span>
-          <button data-rdel="${i}" title="Sacar">✕</button></div>`; }).join('') || '<p class="hint">Todavía no tiene equipos.</p>'}
+        ${(R.entities || []).map((x, i) => { const id = eid(x), d = id.split('.')[0]; return `<div class="rme" draggable="true" data-sr="room" data-i="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="dtag">${esc(DOM_NAME[d] || d)}</span><span class="tx" data-rmpick="${i}" style="cursor:pointer"><b>${esc((x && x.name) || this.fname(id))}</b><small>${esc(id)}${this.states()[id] ? '' : ' · no existe'}</small></span>
+          <button data-rmpick="${i}" title="Editar">✎</button><button data-rdel="${i}" title="Sacar">✕</button></div>`; }).join('') || '<p class="hint">Todavía no tiene equipos.</p>'}
         <div class="fld">${this.cbBtn('', 'data-radd="1"').replace('Elegir un equipo…', '+ Agregar un equipo')}</div>
         <h4>Tarjetas del ambiente</h4>
         <p class="hint" style="margin-top:0">Cualquier tarjeta (cámara, escenas, botones, música, texto…), arriba o abajo de sus equipos. Tocala en la pantalla para editarla y arrastrala para ordenarla.</p>
         ${(R.cards || []).map((c) => `<div class="rme"><span class="dtag">${c.zone === 'bottom' ? 'Abajo' : 'Arriba'}</span><span class="tx"><b>${esc(c.title || (window.MaeVista.CATALOG[c.type] || {}).name || c.type)}</b><small>${esc((window.MaeVista.CATALOG[c.type] || {}).name || c.type)}</small></span>
           <button data-rcpick="${esc(c.id)}" title="Editar">✎</button><button data-rcdel="${esc(c.id)}" title="Sacar">✕</button></div>`).join('') || '<p class="hint">Todavía no tiene tarjetas propias.</p>'}
         <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px"><button class="eb sm" data-rcadd="top">+ Tarjeta arriba</button><button class="eb sm" data-rcadd="bottom">+ Tarjeta abajo</button></div>
-        <label class="chk"><input type="checkbox" data-rlocal ${R.local ? 'checked' : ''}> Tarjetas propias de este ambiente sólo en este dashboard (los demás siguen con las de la casa)</label>
         <div style="display:flex;gap:8px;margin-top:12px">${R._orig ? '<button class="eb warn sm" data-rx="del">Borrar este ambiente de la casa</button>' : ''}</div>
         <p class="hint">Los ambientes son de la casa: el cambio se ve en todos los dashboards y en la app al instante.</p>`;
     }
@@ -1671,6 +1707,7 @@
       // las tarjetas van a la casa (todas las pantallas) o, con «versión propia», sólo a este dashboard
       if (!local) { if (hasCards) R.page = page; else delete R.page; } else if (i >= 0 && list[i].page) R.page = list[i].page;
       if (del) { if (i >= 0) list.splice(i, 1); } else if (i >= 0) { list[i] = Object.assign({}, list[i], R); if (!local && !hasCards) delete list[i].page; } else list.push(R);
+      if (!del && i >= 0) { if (!R.open) delete list[i].open; if (!R.cameras_position) delete list[i].cameras_position; } // volvió a lo de siempre
       if (!del && list.filter((x) => x.name.toLowerCase() === R.name.toLowerCase()).length > 1) { this.toast('Ya hay un ambiente con ese nombre'); return; }
       const cfg = Object.assign({}, this.cfg, { rooms: list });
       try {
@@ -1786,7 +1823,19 @@
       const R = this.rdraft, redraw = () => { this.drawProps(); this.syncPreview(); this.bind(); };
       if (R) {
         W.querySelectorAll('#edr [data-rn]').forEach((x) => { x.onchange = () => { R[x.dataset.rn] = x.dataset.rn === 'name' ? (x.value.trim() || R.name) : x.value; this.syncPreview(); }; });
-        W.querySelectorAll('#edr [data-rdel]').forEach((x) => { x.onclick = () => { R.entities.splice(+x.dataset.rdel, 1); redraw(); }; });
+        W.querySelectorAll('#edr [data-rdel]').forEach((x) => { x.onclick = () => { R.entities.splice(+x.dataset.rdel, 1); this.rme = null; redraw(); }; });
+        W.querySelectorAll('#edr [data-rtab]').forEach((x) => { x.onclick = () => { this.rtab = x.dataset.rtab; redraw(); }; });
+        W.querySelectorAll('#edr [data-rmpick]').forEach((x) => { x.onclick = (e) => { e.stopPropagation(); this.rme = +x.dataset.rmpick; redraw(); }; });
+        W.querySelectorAll('#edr [data-rmback]').forEach((x) => { x.onclick = () => { this.rme = null; redraw(); }; });
+        W.querySelectorAll('#edr [data-rmmv]').forEach((x) => { x.onclick = () => { const L = R.entities, i = this.rme, j = i + +x.dataset.rmmv; if (j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; this.rme = j; redraw(); }; });
+        W.querySelectorAll('#edr [data-rmn]').forEach((x) => { x.onchange = () => {
+          const L = R.entities, cur = L[this.rme]; if (cur == null) return;
+          const o = Object.assign({}, typeof cur === 'object' ? cur : { entity: cur }), v = x.value.trim().slice(0, 40);
+          if (v) o.name = v; else delete o.name;
+          L[this.rme] = Object.keys(o).length === 1 ? o.entity : o; redraw();
+        }; });
+        W.querySelectorAll('#edr [data-ropen]').forEach((x) => { x.onclick = () => { if (x.dataset.ropen === 'page') R.open = 'page'; else delete R.open; redraw(); }; });
+        W.querySelectorAll('#edr [data-rcpos]').forEach((x) => { x.onclick = () => { if (x.dataset.rcpos === 'after') delete R.cameras_position; else R.cameras_position = x.dataset.rcpos; redraw(); }; });
         W.querySelectorAll('#edr [data-rmv]').forEach((x) => { x.onclick = () => { const i = +x.dataset.rmv, j = i + +x.dataset.d; if (j < 0 || j >= R.entities.length) return; [R.entities[i], R.entities[j]] = [R.entities[j], R.entities[i]]; redraw(); }; });
         W.querySelectorAll('#edr [data-radd]').forEach((x) => { x.onclick = () => this.openCB(x, ROOM_DOMAINS, (id) => {
           if (!id) return; R.entities = R.entities || [];
@@ -1795,7 +1844,7 @@
         }, false); });
         W.querySelectorAll('#edr [data-rx]').forEach((x) => { x.onclick = () => {
           const k = x.dataset.rx;
-          if (k === 'back') { this.roomEd = null; this.rdraft = null; redraw(); }
+          if (k === 'back') { this.roomEd = null; this.rdraft = null; this.rme = null; redraw(); }
           if (k === 'unpin') { const bb = this.selBlock(), orig = R._orig; this.roomEd = null; this.rdraft = null; this.change(() => { bb.cfg.rooms = (bb.cfg.rooms || []).filter((n) => n !== orig); bb.cfg.auto = false; }); }
           if (k === 'save') this.saveRoom(false);
           if (k === 'del' && confirm(`¿Borrar el ambiente «${R._orig}»? Sus equipos no se borran.`)) this.saveRoom(true);

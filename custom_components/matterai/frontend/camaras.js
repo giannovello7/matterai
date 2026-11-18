@@ -274,15 +274,15 @@
     }
     _bindGestures() {
       const st = this.$('st');
-      let start = null, moved = false, lastTap = 0, pinch = null;
+      let start = null, moved = false, lastTap = 0, pinch = null, noSwipe = false; // noSwipe: el gesto empezó con zoom o fue un pellizco
       const pts = () => [...this._ptr.values()];
       st.addEventListener('pointerdown', (e) => {
         if (e.target.closest && e.target.closest('button')) return;
         if (this._clip) return; // las grabaciones se manejan con sus controles
         this._ptr.set(e.pointerId, this._pt(e));
         try { st.setPointerCapture(e.pointerId); } catch (_) { /* sin captura */ }
-        if (this._ptr.size === 1) { start = this._pt(e); moved = false; }
-        if (this._ptr.size === 2) { const [a, b] = pts(); pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, s: this._z.s }; moved = true; }
+        if (this._ptr.size === 1) { start = this._pt(e); moved = false; noSwipe = this._z.s > 1.01; }
+        if (this._ptr.size === 2) { const [a, b] = pts(); pinch = { d: Math.hypot(a.x - b.x, a.y - b.y) || 1, s: this._z.s }; moved = true; noSwipe = true; }
       });
       st.addEventListener('pointermove', (e) => {
         if (!this._ptr.has(e.pointerId)) return;
@@ -305,7 +305,7 @@
         if (this._ptr.size || !start) return;
         const dx = p.x - start.x, dy = p.y - start.y, s0 = start; start = null;
         if (e.type === 'pointercancel') return;
-        if (this._z.s <= 1.01 && Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy) * 1.4) { this._go(dx < 0 ? 1 : -1); return; } // deslizar: otra cámara
+        if (!noSwipe && this._z.s <= 1.01 && Math.abs(dx) > SWIPE && Math.abs(dx) > Math.abs(dy) * 1.4) { this._go(dx < 0 ? 1 : -1); return; } // deslizar: otra cámara
         if (moved) return;
         const now = Date.now();
         if (now - lastTap < 300) { lastTap = 0; if (this._z.s > 1.01) this._resetZoom(); else this._zoomAt(s0, 2.5); this._ui(true); return; } // doble toque: zoom
