@@ -20,6 +20,11 @@
     const s = document.createElement('script'); s.src = src; s.dataset.maeEd = src.split('?')[0]; s.onload = res; s.onerror = rej; document.head.appendChild(s);
   });
 
+  /* tipo de equipo → [cómo se llama el grupo, la tarjeta que le va] (para «Agregar por equipo») */
+  const ENT_CARD = { light: ['Luces', 'lights'], cover: ['Cortinas y portones', 'covers'], climate: ['Aires', 'climate'], camera: ['Cámaras', 'frigate'], switch: ['Interruptores', 'buttons'],
+    fan: ['Ventiladores', 'buttons'], input_boolean: ['Interruptores de la casa', 'buttons'], media_player: ['Música y TV', 'buttons'], lock: ['Cerraduras', 'lock'], alarm_control_panel: ['Alarma', 'alarm'],
+    sensor: ['Sensores', 'sensor'], binary_sensor: ['Puertas, ventanas y detectores', 'openings'], scene: ['Escenas', 'scenes'], script: ['Scripts', 'scenes'], weather: ['Clima', 'weather'],
+    calendar: ['Calendarios', 'agenda'], valve: ['Válvulas de riego', 'irrigation'] };
   const MAX_CARDS = 60; // tarjetas por diseño: el mismo tope que la casa (views.py MAX_BLOCKS)
   const ACTION_TYPES = [['none', 'Nada'], ['toggle', 'Prender / apagar / abrir'], ['more_info', 'Ver más (ventana del equipo)'], ['room', 'Abrir un ambiente'], ['screen', 'Abrir una pantalla'], ['service', 'Llamar a un servicio']];
   const KPI_KINDS = [['alarm', 'Alarma'], ['lights', 'Luces prendidas'], ['temp', 'Temperatura adentro'], ['acs', 'Aires'], ['curtains', 'Cortinas'], ['power', 'Consumo'], ['people', 'Quién está'], ['entity', 'Un equipo (portón, sensor…)']];
@@ -217,6 +222,18 @@
   textarea.code{width:100%;min-height:340px;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#0f1318;color:#e9ecf2;border:1px solid rgba(160,175,200,.25);border-radius:10px;padding:10px;tab-size:2;resize:vertical}
   .catpaste{display:block;width:100%;text-align:left;margin:0 0 10px;padding:10px 12px;border-radius:12px;border:1px dashed #f2b766;background:rgba(242,183,102,.1);color:#e9ecf2;font:inherit;cursor:pointer}
   .mlist small{color:#8f99ab;font-weight:400}
+  .cattabs{display:flex;gap:6px;margin:12px 16px 0}.cattabs button{flex:1;border:1px solid rgba(160,175,200,.2);background:#1e242e;color:#c4cad6;border-radius:10px;padding:8px 10px;font-weight:600;cursor:pointer;text-align:left}
+  .cattabs button small{display:block;font-weight:400;font-size:11px;color:#8f99ab}.cattabs button.on{border-color:#f2b766;background:rgba(242,183,102,.12);color:#fff}
+  .entl{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;grid-column:1/-1}.enti{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:#1e242e;border:1px solid transparent;cursor:pointer}
+  .enti.on{border-color:#f2b766;background:rgba(242,183,102,.1)}.enti b{display:block;font-size:13px}.enti small{display:block;font-size:11px;color:#8f99ab}.enti input{accent-color:#f2b766}
+  .catf{display:flex;gap:8px;align-items:center;padding:10px 16px;border-top:1px solid rgba(160,175,200,.15);background:#12161c}.catf>span{flex:1;font-size:12.5px;color:#c4cad6}.catf[hidden]{display:none}
+  .catp,.toastE{font:14px/1.4 "Red Hat Display",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;color:#e9ecf2}
+  .catp *{box-sizing:border-box}.catp button{font:inherit;color:inherit}
+  .catp .mbody input,.catp .mbody textarea{margin:0}
+  .mrow{display:flex!important;flex-direction:row!important;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
+  .mlist{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important}.mlist button{padding:10px 12px!important;font-weight:600;line-height:1.25}
+  .mlist .mfull{grid-column:1/-1}.mlist .msep{grid-column:1/-1;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8f99ab;margin:6px 2px 0}
+  @media (max-width:560px){.mlist{grid-template-columns:1fr}}
   .fld input.bad,.fld textarea.bad{border-color:#f08a7c!important;box-shadow:0 0 0 2px rgba(240,138,124,.25)}
   .chips-of{display:flex;gap:3px;margin-top:2px}
   .chips-of.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px;padding:4px}
@@ -341,6 +358,32 @@
       return undefined;
     }
     newId(type) { return `${type}-${window.MaeVista.uid()}`.slice(0, 24); }
+    /** De una lista de equipos, las tarjetas que les van (como «Agregar por entidad» de Home Assistant): las luces juntas,
+     *  las cortinas juntas, cada aire con su termostato, las cámaras en una, los sensores de a uno, interruptores en botones. */
+    cardsFor(ids) {
+      const S = this.states(), out = [], group = {}, CAT = window.MaeVista.CATALOG, K = this.K;
+      const add = (type, cfg, title) => { if ((CAT[type] || { kinds: [] }).kinds.includes(K)) out.push(Object.assign({ type, cfg }, title ? { title } : {})); };
+      ids.filter((id) => S[id]).forEach((id) => {
+        const d = id.split('.')[0], dc = (S[id].attributes || {}).device_class;
+        let k = (ENT_CARD[d] || [])[1]; if (!k) return;
+        if (d === 'cover' && ['garage', 'gate', 'door'].includes(dc)) k = 'buttons';
+        if (d === 'binary_sensor' && !['door', 'window', 'garage_door', 'opening'].includes(dc)) k = 'sensor';
+        if (['climate', 'sensor', 'lock', 'alarm', 'weather', 'energy'].includes(k)) { add(k, { entity: id }, k === 'sensor' || k === 'lock' ? this.fname(id).slice(0, 40) : null); return; }
+        (group[k] = group[k] || []).push(id);
+      });
+      const T = { lights: 'Luces', covers: 'Cortinas', buttons: 'Botones', frigate: 'Cámaras', openings: 'Puertas y ventanas', scenes: 'Escenas', agenda: 'Agenda', irrigation: 'Riego' };
+      Object.keys(group).forEach((k) => add(k, k === 'buttons' ? { items: group[k].map((id) => ({ entity: id })) } : { entities: group[k] }, T[k]));
+      return out;
+    }
+    /** Para que una tarjeta nueva no aparezca vacía: unos equipos de la casa (luces y enchufes primero). */
+    starterItems(n) {
+      const S = this.pickStates(), pre = ['light.', 'switch.', 'fan.', 'cover.', 'lock.'];
+      const ok = (id) => { const a = S[id].attributes || {}; return !a.entity_id && !a.matterai_role && !/grupo|todas|_group/i.test(id + (a.friendly_name || '')); };
+      const out = [];
+      pre.forEach((p) => Object.keys(S).filter((id) => id.startsWith(p) && ok(id)).forEach((id) => { if (out.length < n) out.push({ entity: id }); }));
+      return out;
+    }
+    starterRooms() { const m = this.model(); return m && m.rooms ? m.rooms.slice().sort((a, b) => (b.count || 0) - (a.count || 0)).slice(0, 4).map((r) => r.name) : []; }
     /** La tarjeta copiada (queda guardada en este navegador: se puede pegar en otro dashboard o en el otro equipo). */
     clip() { try { const c = JSON.parse(localStorage.getItem('matterai.editor.clip') || 'null'); return c && c.card && c.card.type ? c : null; } catch (_) { return null; } }
     copyCard(id, cut) {
@@ -381,7 +424,7 @@
       const box = this.modal(`Editar como texto · ${(window.MaeVista.CATALOG[b.type] || {}).name || b.type}`, `<p class="hint" style="margin-top:0">Toda la tarjeta en texto (JSON), como el editor de código de Home Assistant. Sirve para copiar una tarjeta entera o ajustar algo que no está en las pestañas. Si algo está mal escrito, no se cambia nada.</p>
         <textarea class="code" data-code spellcheck="false">${esc(JSON.stringify(show, null, 2))}</textarea>
         <p class="hint" data-cerr style="color:#f08a7c"></p>
-        <div class="fld" style="display:flex;gap:8px;justify-content:flex-end"><button class="eb" data-cx>Cancelar</button><button class="eb pri" data-cok>Aplicar</button></div>`, (e) => {
+        <div class="fld mrow" style="justify-content:flex-end"><button class="eb" data-cx>Cancelar</button><button class="eb pri" data-cok>Aplicar</button></div>`, (e) => {
         if (!e.target.closest('[data-cok]')) return;
         const err = box.querySelector('[data-cerr]'); let o;
         try { o = JSON.parse(box.querySelector('[data-code]').value); } catch (x) { err.textContent = `No es JSON válido: ${x.message}`; return; }
@@ -446,7 +489,8 @@
         return;
       }
       const K = this.K, CAT = window.MaeVista.CATALOG;
-      const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
+      const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: this.starterItems(4) }, rooms: { rooms: this.starterRooms() }, text: { style: 'separator' } }[type] || {};
+      if (type === 'sensor') { const S0 = this.pickStates(), id = Object.keys(S0).find((x) => x.startsWith('sensor.') && ['temperature', 'humidity'].includes((S0[x].attributes || {}).device_class)); if (id) cfg.entity = id; }
       const titled = ['frigate', 'rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text', 'agenda', 'irrigation'];
       // en la sección pedida («+ Agregar tarjeta» de esa sección); si no, en la última
       const S = this.secs(), want = zone && String(zone).startsWith('sec:') ? String(zone).slice(4) : null;
@@ -473,7 +517,8 @@
       const atTxt = atB ? ` · ${at.after ? 'después' : 'antes'} de «${esc(atB.title || (CAT[atB.type] || {}).name || atB.type)}»` : '';
       box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${atTxt ? atTxt : inRoomZ ? ` · ${esc(this.rdraft ? this.rdraft.name : 'ambiente')} (${zone === 'room-bottom' ? 'abajo' : 'arriba'} de los equipos)` : zone && String(zone).startsWith('sec:') ? ` · ${esc(this.secName(String(zone).slice(4)))}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
         ${this.clip() && (CAT[this.clip().card.type] || { kinds: [] }).kinds.includes(K) ? `<button class="catpaste" data-cpaste>📋 Pegar la tarjeta copiada: <b>${esc(this.clip().card.title || (CAT[this.clip().card.type] || {}).name || '')}</b></button>` : ''}
-        <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div></div>`;
+        ${inRoomZ ? '' : '<div class="cattabs"><button class="on" data-ctab="card">Por tarjeta</button><button data-ctab="ent">Por equipo <small>elegís equipos y se arman las tarjetas</small></button></div>'}
+        <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div><div class="catf" hidden></div></div>`;
       this.wrap.appendChild(box);
       this.catBox = box;
       const inp = box.querySelector('input'), g = box.querySelector('.catg');
@@ -489,8 +534,39 @@
           return its.length ? `<h5 class="catgh">${gn}</h5>${its.map(item).join('')}` : '';
         }).join('') || '<p class="hint">No hay tarjetas con ese nombre.</p>';
       };
-      inp.oninput = paint;
-      inp.onkeydown = (e) => { if (e.key === 'Enter') { const f = g.querySelector('[data-ck]'); if (f) f.click(); } };
+      // por equipo: los equipos de la casa (los de la app), agrupados, con casillas; «Agregar» arma las tarjetas
+      let mode = 'card';
+      const picked = new Set(), foot = box.querySelector('.catf');
+      const paintEnt = () => {
+        const q = inp.value.trim().toLowerCase(), S = this.pickStates();
+        const ids = Object.keys(S).filter((id) => ENT_CARD[id.split('.')[0]] && !(S[id].attributes || {}).entity_id).filter((id) => !q || `${id} ${S[id].attributes.friendly_name || ''} ${this.areaOf(id) || ''}`.toLowerCase().includes(q));
+        const by = {}; ids.forEach((id) => { const d = id.split('.')[0]; (by[d] = by[d] || []).push(id); });
+        g.innerHTML = Object.keys(ENT_CARD).filter((d) => by[d]).map((d) => `<h5 class="catgh">${esc(ENT_CARD[d][0])}</h5><div class="entl">${by[d].sort((a, b) => this.fname(a).localeCompare(this.fname(b))).slice(0, 80).map((id) => `<label class="enti ${picked.has(id) ? 'on' : ''}"><input type="checkbox" data-pe="${esc(id)}" ${picked.has(id) ? 'checked' : ''}><span><b>${esc(this.fname(id))}</b><small>${esc([this.areaOf(id), this.stateTxt(id)].filter(Boolean).join(' · '))}</small></span></label>`).join('')}</div>`).join('')
+          || '<p class="hint">No hay equipos con ese nombre.</p>';
+        foot.hidden = false;
+        foot.innerHTML = picked.size ? `<span>${picked.size} equipo${picked.size === 1 ? '' : 's'} elegido${picked.size === 1 ? '' : 's'}: ${esc(this.cardsFor([...picked]).map((x) => (x.title || (CAT[x.type] || {}).name)).join(', '))}</span><button class="eb sm" data-pclr>Limpiar</button><button class="eb pri" data-padd>Agregar ${this.cardsFor([...picked]).length === 1 ? 'la tarjeta' : `${this.cardsFor([...picked]).length} tarjetas`}</button>` : '<span class="hint">Marcá los equipos que querés ver: las luces van juntas en una tarjeta de Luces, las cortinas en una de Cortinas, cada aire en su termostato…</span>';
+      };
+      box.querySelectorAll('[data-ctab]').forEach((x) => { x.onclick = (e) => { e.stopPropagation(); mode = x.dataset.ctab; box.querySelectorAll('[data-ctab]').forEach((y) => y.classList.toggle('on', y === x)); inp.placeholder = mode === 'ent' ? 'Buscar equipo, ambiente…' : 'Buscar tarjeta…'; inp.value = ''; foot.hidden = mode !== 'ent'; if (mode === 'ent') paintEnt(); else paint(); inp.focus(); }; });
+      g.addEventListener('change', (e) => { const c = e.target.closest && e.target.closest('[data-pe]'); if (!c) return; if (c.checked) picked.add(c.dataset.pe); else picked.delete(c.dataset.pe); c.closest('.enti').classList.toggle('on', c.checked); paintEnt(); });
+      foot.onclick = (e) => {
+        e.stopPropagation();
+        if (e.target.closest('[data-pclr]')) { picked.clear(); paintEnt(); return; }
+        if (!e.target.closest('[data-padd]')) return;
+        const list = this.cardsFor([...picked]); if (!list.length || !this.roomFor(list.length)) return;
+        const at0 = this.catAt; this.closeCatalog();
+        const S = this.secs(), want = zone && String(zone).startsWith('sec:') ? String(zone).slice(4) : null;
+        this.change(() => {
+          // al lado de una tarjeta (en su sección), o al final de la sección pedida (o de la última)
+          const B = this.blocks(), t = at0 ? B.findIndex((x) => x.id === at0.target) : -1;
+          const sec = t >= 0 ? this.secOf(B[t]) : want && S.some((x) => x.id === want) ? want : S[S.length - 1].id;
+          let j = t >= 0 ? t + (at0.after ? 1 : 0) : -1;
+          list.forEach((nb) => { nb.id = this.newId(nb.type); nb.sec = sec; if (j >= 0) B.splice(j++, 0, nb); else B.push(nb); });
+          this.sel = null;
+        });
+        this.toast(`Listo: ${list.length} tarjeta${list.length === 1 ? '' : 's'} con los equipos elegidos · Ctrl+Z para deshacer`);
+      };
+      inp.oninput = () => (mode === 'ent' ? paintEnt() : paint());
+      inp.onkeydown = (e) => { if (e.key === 'Enter' && mode === 'card') { const f = g.querySelector('[data-ck]'); if (f) f.click(); } };
       box.onclick = (e) => {
         if (e.target === box || e.target.closest('[data-cx]')) return this.closeCatalog();
         if (e.target.closest('[data-cpaste]')) { const at0 = this.catAt; this.closeCatalog(); this.pasteCard(zone, at0); return undefined; }
@@ -566,8 +642,8 @@
       const n = this.blocks().filter((b) => this.secOf(b) === id).length;
       const box = this.modal('Sección', `<label class="fld"><span>Título (opcional; se ve arriba de sus tarjetas)</span><input data-st value="${esc(sc.title || '')}" maxlength="40" placeholder="Ej: Seguridad"></label>
         ${this.K === 'tablet' ? `<div class="fld"><span>Ancho en la tablet</span><span class="eseg wrap">${[[3, '¼'], [4, '⅓'], [6, '½'], [8, '⅔'], [9, '¾'], [12, 'Completo']].map(([k, l]) => `<button data-sw="${k}" class="${+sc.w === k ? 'on' : ''}">${l}</button>`).join('')}</span></div><p class="hint">También podés arrastrar la manija dorada de la barra de la sección. Las secciones se acomodan una al lado de la otra mientras entren.</p>` : '<p class="hint">En el celular las secciones van una debajo de la otra.</p>'}
-        <div class="fld"><span>Ordenar y copiar</span><span class="eseg wrap"><button data-smv="-1" ${S.indexOf(sc) === 0 ? 'disabled' : ''}>${this.K === 'tablet' ? '← Antes' : '↑ Antes'}</button><button data-smv="1" ${S.indexOf(sc) === S.length - 1 ? 'disabled' : ''}>${this.K === 'tablet' ? 'Después →' : 'Después ↓'}</button><button data-sdup>⧉ Duplicar la sección${n ? ` con sus ${n} tarjeta${n === 1 ? '' : 's'}` : ''}</button></span></div>
-        <div class="fld" style="display:flex;gap:8px;justify-content:space-between"><button class="eb warn" data-sdel ${S.length < 2 ? 'disabled title="Tiene que quedar al menos una sección"' : ''}>Borrar la sección${n ? ` y sus ${n} tarjeta${n === 1 ? '' : 's'}` : ''}</button><button class="eb pri" data-sok>Listo</button></div>`, (e) => {
+        <div class="fld"><span>Ordenar y copiar</span><span class="eseg wrap"><button data-smv="-1" ${S.indexOf(sc) === 0 ? 'disabled' : ''}>${this.K === 'tablet' ? '← Antes' : '↑ Antes'}</button><button data-smv="1" ${S.indexOf(sc) === S.length - 1 ? 'disabled' : ''}>${this.K === 'tablet' ? 'Después →' : 'Después ↓'}</button><button data-sdup>⧉ Duplicar la sección${n ? (n === 1 ? ' con su tarjeta' : ` con sus ${n} tarjetas`) : ''}</button></span></div>
+        <div class="fld mrow"><button class="eb warn" data-sdel ${S.length < 2 ? 'disabled title="Tiene que quedar al menos una sección"' : ''}>Borrar la sección${n ? (n === 1 ? ' y su tarjeta' : ` y sus ${n} tarjetas`) : ''}</button><button class="eb pri" data-sok>Listo</button></div>`, (e) => {
         const t = e.target;
         const sw = t.closest('[data-sw]'); if (sw) { this.closeCatalog(); this.change(() => { sc.w = +sw.dataset.sw; }); return; }
         const mv = t.closest('[data-smv]'); if (mv && !mv.disabled) { this.closeCatalog(); this.change(() => { const i = S.indexOf(sc), j = i + +mv.dataset.smv; if (j < 0 || j >= S.length) return; S.splice(i, 1); S.splice(j, 0, sc); }); return; }
@@ -729,7 +805,7 @@
           <span class="emenu"><button class="eb ico" data-e="more" title="Más opciones" aria-label="Más opciones">⋯</button>${this.moreOpen ? `<span class="emenu-l">
             <button data-e="plan">Plano e imágenes…</button>
             <span class="ml">Simular (no toca la casa)</span>${SIMS.map(([k, l]) => `<button data-sim="${k}">${(this.sim || {})[k] ? '✓ ' : ''}${l}</button>`).join('')}
-            <span class="ml">Este diseño</span><button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
+            <span class="ml">Este diseño</span><button data-e="tpl">Aplicar una plantilla…</button><button data-e="empty">Empezar de cero (vacío)</button><button data-e="pre">Volver al prearmado</button>${hasOther ? `<button data-e="copy">Copiar el diseño ${other === 'tablet' ? 'de la tablet' : 'del celular'}</button>` : ''}
             <button data-e="history">Historial de versiones…</button>${this.trying ? '<button data-e="tryend">■ Terminar la prueba en los equipos</button>' : '<button data-e="try">Probar en los equipos de la casa (15 min, sin guardar)</button>'}
             <button data-e="export">Exportar como plantilla (archivo)</button><button data-e="import">Importar una plantilla…</button>
             </span>` : ''}</span>
@@ -931,12 +1007,16 @@
     cardMenu(id) {
       const b = this.blocks().find((x) => x.id === id); if (!b) return;
       const K = this.K, CAT = window.MaeVista.CATALOG;
-      this.modal(`${(CAT[b.type] || {}).name || b.type}${b.title ? ` · ${b.title}` : ''}`, `<div class="mlist">
-        <button data-cm="edit">✎ Editar</button><button data-cm="above">＋ Agregar una tarjeta arriba</button><button data-cm="below">＋ Agregar una tarjeta abajo</button><button data-cm="dup">⧉ Duplicar</button>
-        <button data-cm="clip">⎘ Copiar <small>(Ctrl+C · se pega en este u otro dashboard)</small></button><button data-cm="cut">✂ Cortar <small>(Ctrl+X)</small></button>${this.clip() ? '<button data-cm="paste">📋 Pegar la copiada abajo <small>(Ctrl+V)</small></button>' : ''}
-        <button data-cm="copy">↗ Mandar una copia a otro dashboard…</button><button data-cm="code">{ } Editar como texto</button>
-        ${this.secs().length > 1 ? this.placeOpts().filter(([k]) => k !== this.placeOf(b)).map(([k, l]) => `<button data-cm="col" data-c="${k}">⇄ Pasar a: ${esc(l)}</button>`).join('') : ''}
-        <button data-cm="del" class="warn">✕ Borrar la tarjeta</button></div>`, (e) => {
+      const nm = (CAT[b.type] || {}).name || b.type;
+      this.modal(`${nm}${b.title && b.title !== nm ? ` · ${b.title}` : ''}`, `<div class="mlist">
+        <button data-cm="edit" class="mfull">✎ Editar</button>
+        <span class="msep">Agregar</span><button data-cm="above">＋ Una tarjeta arriba</button><button data-cm="below">＋ Una tarjeta abajo</button>
+        <span class="msep">Copiar y mover</span><button data-cm="dup">⧉ Duplicar <small>Ctrl+D</small></button><button data-cm="clip">⎘ Copiar <small>Ctrl+C</small></button>
+        <button data-cm="cut">✂ Cortar <small>Ctrl+X</small></button>${this.clip() ? '<button data-cm="paste">📋 Pegar abajo <small>Ctrl+V</small></button>' : '<button data-cm="copy">↗ A otro dashboard…</button>'}
+        ${this.clip() ? '<button data-cm="copy" class="mfull">↗ Mandar una copia a otro dashboard…</button>' : ''}
+        ${this.secs().length > 1 ? this.placeOpts().filter(([k]) => k !== this.placeOf(b)).map(([k, l]) => `<button data-cm="col" data-c="${k}">⇄ A ${esc(l)}</button>`).join('') : ''}
+        <span class="msep">Avanzado</span><button data-cm="code" class="mfull">{ } Editar como texto <small>como el editor de código de Home Assistant</small></button>
+        <button data-cm="del" class="warn mfull">✕ Borrar la tarjeta <small>Supr</small></button></div>`, (e) => {
         const x = e.target.closest('[data-cm]'); if (!x) return;
         this.closeCatalog();
         const k = x.dataset.cm;
@@ -1071,7 +1151,9 @@
     stateTxt(id) {
       const s = this.states()[id]; if (!s) return '';
       const u = s.attributes.unit_of_measurement;
-      return { on: 'prendido', off: 'apagado', open: 'abierto', closed: 'cerrado', locked: 'cerrada', unlocked: 'abierta', unavailable: 'sin conexión', playing: 'sonando', idle: 'en espera' }[s.state] || (u ? `${s.state} ${u}` : s.state.length < 14 ? s.state : '');
+      return { on: 'prendido', off: 'apagado', open: 'abierto', closed: 'cerrado', opening: 'abriendo', closing: 'cerrando', locked: 'cerrada', unlocked: 'abierta', unavailable: 'sin conexión', unknown: 'sin dato', playing: 'sonando', paused: 'en pausa', idle: 'en espera', standby: 'en espera',
+        cool: 'frío', heat: 'calor', heat_cool: 'automático', auto: 'automático', dry: 'seco', fan_only: 'ventilación', home: 'en casa', not_home: 'afuera', disarmed: 'desarmada', armed_away: 'armada (afuera)', armed_home: 'armada (en casa)', armed_night: 'armada (noche)', triggered: 'disparada',
+        sunny: 'despejado', cloudy: 'nublado', partlycloudy: 'algo nublado', rainy: 'lluvia', 'clear-night': 'despejado' }[s.state] || (u ? `${s.state} ${u}` : s.state.length < 14 ? s.state : '');
     }
     /** Buscador de equipos: escribís y filtra por nombre, ambiente, tipo o id; con flechas y Enter. */
     openCB(anchor, domains, onPick, allowNone = true) {
@@ -1868,6 +1950,15 @@
       };
       if (k === 'undo') { if (this.undo.length) { this.redo.push(this.snap()); this.unsnap(this.undo.pop()); fix(); } return; }
       if (k === 'redo') { if (this.redo.length) { this.undo.push(this.snap()); this.unsnap(this.redo.pop()); fix(); } return; }
+      if (k === 'empty') {
+        if (!confirm(`¿Dejar ${this.K === 'tablet' ? 'la tablet' : 'el celular'} vacío para armarlo de cero? (Ctrl+Z lo deshace)`)) { this.draw(); return; }
+        // un título con el nombre del dashboard (así no vuelve el prearmado) y secciones vacías para ir llenando
+        this.change(() => { const L = this.lay(); L.v = 3; delete L.cols; delete L.side;
+          L.secs = this.K === 'tablet' ? [{ id: 's1', title: '', w: 6 }, { id: 's2', title: '', w: 6 }] : [{ id: 's1', title: '', w: 12 }];
+          L.blocks = [{ id: this.newId('text'), type: 'text', sec: 's1', title: (this.v.name || 'Mi casa').slice(0, 40), cfg: { style: 'separator' } }]; this.sel = null; });
+        this.toast('Listo, de cero: tocá «+ Agregar tarjeta» en cada sección (o «+ Tarjeta → Por equipo»)', 5000);
+        return;
+      }
       if (k === 'pre') { if (confirm('¿Reemplazar las tarjetas por el prearmado con los equipos de esta casa?')) this.prearmado(false); else this.draw(); return; }
       if (k === 'reset') { if (!confirm('¿Descartar todos los cambios sin guardar?')) { this.draw(); return; } this.push(); this.v = clone(this.saved); fix(); return; }
       if (k === 'plan') return this.planEditor();

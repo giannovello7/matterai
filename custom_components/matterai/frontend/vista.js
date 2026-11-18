@@ -1970,7 +1970,7 @@
     el.addEventListener('pointerdown', (e) => {
       if (!editing() || e.button > 0 || pinDrag) return;
       const t = e.target;
-      if (t.closest && t.closest('input,select,textarea,.v-ecard,.v-etool,.v-eltool,.v-eadd,.v-eins,[data-eact],[data-radd],[data-rme],.v-pin')) return;
+      if (t.closest && t.closest('input,select,textarea,.v-ecard,.v-etool,.v-eltool,.v-eadd,.v-eins,[data-eact],[data-radd],[data-rme],.v-pin,[data-rsz],[data-hrsz],[data-srsz]')) return;
       let kind0 = null, node = null;
       const it = t.closest && t.closest('[data-el]'), ri = t.closest && t.closest('[data-ri]'), blk = t.closest && t.closest('[data-block]'), dk = t.closest && t.closest('[data-dkk]');
       // Como en Lovelace: agarrando de cualquier parte se mueve la TARJETA. Lo de adentro (un botón, una escena) sólo se
