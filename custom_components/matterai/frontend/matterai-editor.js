@@ -222,6 +222,7 @@
   textarea.code{width:100%;min-height:340px;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#0f1318;color:#e9ecf2;border:1px solid rgba(160,175,200,.25);border-radius:10px;padding:10px;tab-size:2;resize:vertical}
   .catpaste{display:block;width:100%;text-align:left;margin:0 0 10px;padding:10px 12px;border-radius:12px;border:1px dashed #f2b766;background:rgba(242,183,102,.1);color:#e9ecf2;font:inherit;cursor:pointer}
   .mlist small{color:#8f99ab;font-weight:400}
+  .fld input[type=checkbox],.fld input[type=radio]{width:auto;flex:none;accent-color:#f2b766}.fld label.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:#e9ecf2;padding:3px 0;cursor:pointer}
   .cattabs{display:flex;gap:6px;margin:12px 16px 0}.cattabs button{flex:1;border:1px solid rgba(160,175,200,.2);background:#1e242e;color:#c4cad6;border-radius:10px;padding:8px 10px;font-weight:600;cursor:pointer;text-align:left}
   .cattabs button small{display:block;font-weight:400;font-size:11px;color:#8f99ab}.cattabs button.on{border-color:#f2b766;background:rgba(242,183,102,.12);color:#fff}
   .entl{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;grid-column:1/-1}.enti{display:flex;gap:8px;align-items:center;padding:8px 10px;border-radius:10px;background:#1e242e;border:1px solid transparent;cursor:pointer}
@@ -489,7 +490,7 @@
         return;
       }
       const K = this.K, CAT = window.MaeVista.CATALOG;
-      const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: this.starterItems(4) }, rooms: { rooms: this.starterRooms() }, text: { style: 'separator' } }[type] || {};
+      const cfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: this.starterItems(4) }, rooms: { rooms: this.starterRooms() }, text: {} }[type] || {};
       if (type === 'sensor') { const S0 = this.pickStates(), id = Object.keys(S0).find((x) => x.startsWith('sensor.') && ['temperature', 'humidity'].includes((S0[x].attributes || {}).device_class)); if (id) cfg.entity = id; }
       const titled = ['frigate', 'rooms', 'scenes', 'routines', 'buttons', 'camera', 'music', 'lock', 'away', 'covers', 'lights', 'people', 'text', 'agenda', 'irrigation'];
       // en la sección pedida («+ Agregar tarjeta» de esa sección); si no, en la última
@@ -1498,8 +1499,8 @@
       const c = b.cfg;
       return `<label class="fld"><span>Imagen</span><select data-f="cfg.video"><option value="">Video en vivo (visor de Frigate)</option><option value="photo" ${c.video === 'photo' ? 'selected' : ''}>Foto cada 10 s (para internet lento)</option></select></label>
         <p class="hint" style="margin-top:-4px">En el equipo se ve con el visor de Frigate (eventos y grabaciones); acá, en la vista previa, se ve el video en vivo de la cámara.</p>`
-        + this.ent('Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate')
-        + this.multi('Más cámaras (se pasan con «Otra cámara» o deslizando)', 'entities', c.entities, opts(PICK.camera).filter(([e]) => e !== c.entity));
+        + this.ent(b.type === 'frigate' ? 'Primera cámara' : 'Cámara', 'cam', c.entity, PICK.camera, 'cfg.entity') + (b.type === 'frigate' ? '' : this.ent('Botón grande (portón, puerta)', 'gate', c.gate, PICK.gate, 'cfg.gate'))
+        + this.multi(b.type === 'frigate' ? 'Más cámaras (se pasan con las flechas o deslizando; sin ninguna elegida, se ven todas las de la casa)' : 'Más cámaras (se pasan con «Otra cámara» o deslizando)', 'entities', c.entities, opts(PICK.camera).filter(([e]) => e !== c.entity));
     }
     /** Campos de un dato del resumen o de un botón. */
     itemFields(b, i, o) {

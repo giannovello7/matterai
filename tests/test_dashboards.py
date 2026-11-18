@@ -164,7 +164,7 @@ async def test_blocks_and_plan_saved(hass, hass_ws_client) -> None:
     {"plan": {"image": "https://malo.example/x.jpg"}},                                              # imagen de afuera
     {"plan": {"image": "/api/matterai/media/../../secrets.yaml"}},
     {"plan": {"zones": [{"name": "Z", "poly": [[0, 0], [2, 2], [0, 1]]}]}},                         # punto fuera de la imagen
-    {"blocks": [{"id": f"b{i}", "type": "kpis"} for i in range(40)]},                               # demasiadas
+    {"blocks": [{"id": f"b{i}", "type": "kpis"} for i in range(61)]},                               # demasiadas (el tope es 60)
 ])
 async def test_invalid_dashboards_rejected(hass, hass_ws_client, bad) -> None:
     await _setup(hass)
@@ -613,4 +613,18 @@ def test_alto_de_las_tarjetas():
     for bad in (1, 21, "alto"):
         with pytest.raises(vol.Invalid):
             vs.BLOCK({"id": "d", "type": "kpis", "h": bad})
+
+
+def test_hasta_60_tarjetas_por_diseno():
+    import pytest
+    import voluptuous as vol
+    from custom_components.matterai.views import VIEW_SCHEMA
+
+    def view(n):
+        return {"id": "v1", "name": "G", "kind": "tablet", "layouts": {"tablet": {"v": 3, "secs": [{"id": "s1", "w": 12}],
+                "blocks": [{"id": f"t{i}", "type": "text", "sec": "s1", "cfg": {}} for i in range(n)]}}}
+
+    assert len(VIEW_SCHEMA(view(60))["layouts"]["tablet"]["blocks"]) == 60
+    with pytest.raises(vol.Invalid):
+        VIEW_SCHEMA(view(61))
 
