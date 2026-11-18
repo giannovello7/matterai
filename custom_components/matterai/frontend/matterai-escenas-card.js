@@ -1427,7 +1427,7 @@ class MatterAIEscenasCard extends HTMLElement {
   _subscribe() {
     this._err = null;
     this._unsub = this._hass.connection.subscribeMessage((msg) => {
-      this._rules = msg.rules; this._isAdmin = msg.is_admin; this._settings = msg.settings || { hidden: [] }; this._appEnts = msg.app_entities || null;
+      this._rules = msg.rules; this._isAdmin = msg.is_admin; this._settings = msg.settings || { hidden: [] }; this._appEnts = msg.app_entities || null; this._hasApp = msg.has_app !== false;
       try {
         const pid = new URLSearchParams(window.location.search).get('portero');
         if (pid && this._rules.some((r) => r.id === pid) && !window.__maeDoorOpened) {
@@ -1920,7 +1920,7 @@ class MatterAIEscenasCard extends HTMLElement {
         <div class="sec"><div><div class="h">Pestañas que ve el cliente</div><div class="s">Las que apagues no le aparecen (lo que tengan adentro sigue funcionando)</div></div></div>
         <div class="card">${[['scene', 'Escenas'], ['auto', 'Automatizaciones'], ['rem', 'Recordatorios'], ['timer', 'Temporizadores']].map(([k, l]) => row('toff', k, !(o.tabsOff || []).includes(k), l)).join('')}</div>
         <div class="sec"><div><div class="h">Equipos que puede usar</div><div class="s">Al armar escenas y automatizaciones. Lo que ya está creado sigue funcionando.</div></div></div>
-        <div class="seg" style="margin:8px 0 6px">${[['app', 'Los de la app'], ['pick', 'Sólo los que marco'], ['hide', 'Todos menos los que saco']].map(([k, l]) => `<button class="${(o.entsMode || 'hide') === k ? 'on' : ''}" data-a="smode" data-v="${k}">${l}</button>`).join('')}</div>
+        <div class="seg" style="margin:8px 0 6px">${[['app', 'Los de la app'], ['pick', 'Sólo los que marco'], ['hide', 'Todos menos los que saco']].filter(([k]) => k !== 'app' || this._hasApp).map(([k, l]) => `<button class="${(o.entsMode || 'hide') === k ? 'on' : ''}" data-a="smode" data-v="${k}">${l}</button>`).join('')}</div>
         <div class="note" style="margin-top:6px">${o.entsMode === 'app' ? (Array.isArray(this._appEnts) ? `Usa los mismos equipos que elegiste para la app MatterAI (panel MatterAI → Dispositivos): <b>${this._appEnts.length}</b>. Abajo podés sacar alguno más.` : 'Todavía no elegiste los equipos de la app (panel MatterAI → Dispositivos): por ahora se ven todos.') : o.entsMode === 'pick' ? 'Arranca vacío: marcá sólo lo que el cliente va a usar (lo más práctico en casas con muchas entidades). Usá «Todos» en cada ambiente.' : 'Se ven todos los equipos de Home Assistant menos los que desmarques.'}</div>
         <div class="seg" style="margin:10px 0 0">${[['area', 'Por ambiente'], ['dom', 'Por tipo']].map(([k, l]) => `<button class="${(o.sgroup || 'area') === k ? 'on' : ''}" data-a="sgby" data-v="${k}">${l}</button>`).join('')}</div>
         <div class="search" style="margin-top:12px"><input type="text" placeholder="Buscar por nombre, ambiente o tipo…" value="${esc(this._ov.ssearch || '')}" data-a="ssearch"></div>

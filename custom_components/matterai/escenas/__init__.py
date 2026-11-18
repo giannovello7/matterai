@@ -56,6 +56,15 @@ def _app_entities(hass: HomeAssistant) -> list[str] | None:
     return sorted(allowed) if allowed is not None else None
 
 
+def _has_app() -> bool:
+    """¿Es parte de MatterAI (con su página Dispositivos)? En la integración de automatizaciones sola, no."""
+    try:
+        from .. import selection  # noqa: PLC0415, F401
+    except ImportError:
+        return False
+    return True
+
+
 def _manager(hass: HomeAssistant) -> RuleManager:
     manager = hass.data.get(DOMAIN)
     if manager is None:
@@ -224,6 +233,7 @@ def ws_subscribe(hass: HomeAssistant, connection, msg: dict) -> None:
                     "settings": manager.settings,
                     "is_admin": connection.user.is_admin,
                     "app_entities": _app_entities(hass),
+                    "has_app": _has_app(),
                 },
             )
         )
