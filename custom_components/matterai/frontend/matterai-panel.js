@@ -444,7 +444,7 @@
           <div class="box"><div class="bh"><h2>Servicios</h2><button class="lnk" data-go="wd">Mantenimiento</button></div>
             ${svcs.length ? svcs.map((x) => `<div class="kv"><span>${esc(x.name)}</span><b class="${SVC_CLS[x.status] || ''}">${esc(x.status_text)}</b></div>`).join('') : '<p class="mut">Nada para vigilar en esta casa.</p>'}
             ${wd && wd.remote ? `<div class="kv"><span>Acceso remoto</span><b class="${wd.remote.kind === 'ok' ? 'ok' : wd.remote.kind === 'tunnel' ? 'bad' : 'mut'}">${wd.remote.kind === 'ok' ? 'Responde' : wd.remote.kind === 'tunnel' ? 'Túnel caído' : 'Sin internet'}</b></div>` : ''}
-            <div class="kv"><span>Panel central</span><b class="${c.ok ? 'ok' : c.configured ? 'bad' : 'mut'}">${!c.configured ? 'No configurado' : c.ok ? 'Conectado' : c.ok === false ? 'Sin conexión' : 'Esperando…'}</b></div></div>
+            <div class="kv"><span>${c.url ? `<a class="lnk" href="${esc(c.url)}" target="_blank" rel="noopener" title="Abrir el panel central de todas las casas">Panel central ↗</a>` : 'Panel central'}</span><b class="${c.ok ? 'ok' : c.configured ? 'bad' : 'mut'}">${!c.configured ? 'No configurado' : c.ok ? 'Conectado' : c.ok === false ? 'Sin conexión' : 'Esperando…'}</b></div></div>
         </div>`);
     }
 
