@@ -259,7 +259,10 @@
       this.attachShadow({ mode: 'open' });
       let saved = null;
       try { saved = localStorage.getItem(STORE_KEY); } catch (_) { /* sin almacenamiento */ }
-      this._tab = PAGES[saved] ? saved : 'home';
+      // ?tab=… (por ejemplo desde «Visitar» en la página del dispositivo de MatterAI) manda sobre la última pestaña
+      let want = null;
+      try { want = new URLSearchParams(window.location.search).get('tab'); } catch (_) { /* sin dirección */ }
+      this._tab = PAGES[want] ? want : PAGES[saved] ? saved : 'home';
       this._saved = null; this._draft = null; this._pair = null; this._cache = null;
     }
     set hass(h) {

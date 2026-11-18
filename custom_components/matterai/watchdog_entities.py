@@ -21,7 +21,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.dispatcher import async_dispatcher_connect
 from homeassistant.helpers.entity import Entity
 
-from .const import DOMAIN
+from .const import DOMAIN, PANEL_URL_PATH
 from .watchdog import MAINTENANCE_DEFAULT, OK, SIGNAL_WATCHDOG, STATE_TEXT, Watchdog
 
 
@@ -37,7 +37,9 @@ class _Base(Entity):
         self.wd = wd
         self.key = key
         self._attr_device_info = DeviceInfo(identifiers={(DOMAIN, f"{entry.entry_id}_system")}, name="Sistema MatterAI",
-                                            manufacturer="MatterAI", model="Mantenimiento del sistema")
+                                            manufacturer="MatterAI", model="Mantenimiento del sistema",
+                                            # «Visitar» en la página del dispositivo: abre el panel MatterAI en Salud y avisos
+                                            configuration_url=f"homeassistant://{PANEL_URL_PATH}?tab=health")
 
     @property
     def tracked(self):
