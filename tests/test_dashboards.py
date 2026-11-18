@@ -628,3 +628,17 @@ def test_hasta_60_tarjetas_por_diseno():
     with pytest.raises(vol.Invalid):
         VIEW_SCHEMA(view(61))
 
+
+
+def test_plano_de_varios_pisos() -> None:
+    """2.35: el plano de siempre es la planta baja y «floors» trae los demás pisos (cada uno con su render y sus ambientes)."""
+    from custom_components.matterai.view_schema import PLAN  # noqa: PLC0415
+
+    img = "/api/matterai/media/0123456789abcdef.png"
+    zone = {"name": "Dormitorio", "lights": [], "poly": [[0.1, 0.1], [0.5, 0.1], [0.5, 0.5]]}
+    p = PLAN({"name": "PB", "image": img, "zones": [], "floors": [{"name": "PA", "image": img, "zones": [zone]}, {"name": "Terraza", "image": img}]})
+    assert [f["name"] for f in p["floors"]] == ["PA", "Terraza"] and p["floors"][0]["zones"][0]["name"] == "Dormitorio"
+    import pytest  # noqa: PLC0415
+    import voluptuous as vol  # noqa: PLC0415
+    with pytest.raises(vol.Invalid):
+        PLAN({"floors": [{"name": "x"}] * 6})  # hasta 6 pisos en total

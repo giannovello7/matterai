@@ -1287,3 +1287,9 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 /* adentro de un ambiente (que ya es una ventana de vidrio): las tarjetas sin su propio desenfoque. Un vidrio adentro de
    otro deja ver el inicio de atrás nítido en el iPhone y en Safari. */
 .vista.embed :is(.v-b,.v-card,.v-tile,.v-kpi,.v-sq,.v-chip,*){-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+
+/* plano de varios pisos: los botones al costado (PB, PA, Terraza…) */
+.v-floors{position:absolute;right:10px;top:50%;transform:translateY(-50%);display:flex;flex-direction:column;gap:6px;z-index:4}
+.v-floors button{position:relative;min-width:46px;padding:8px 10px;border-radius:12px;border:1px solid var(--line);background:rgba(20,25,32,.78);color:#fff;font:inherit;font-size:13px;font-weight:700;cursor:pointer;-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.v-floors button.on{background:var(--warm,#f2b766);color:#14161b;border-color:transparent}
+.v-floors button i{position:absolute;top:4px;right:4px;width:6px;height:6px;border-radius:50%;background:#ffd36b;box-shadow:0 0 6px #ffd36b}.v-floors button.on i{background:#14161b;box-shadow:none}

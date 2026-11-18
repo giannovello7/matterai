@@ -172,7 +172,18 @@ def _media(v: Any) -> str:
     return v
 
 
+FLOOR = vol.Schema({  # un piso más del plano (2.35): planta alta, terraza…
+    vol.Optional("name"): vol.Any(None, vol.All(str, vol.Length(max=12))),
+    vol.Optional("image"): vol.Any(None, _media),
+    vol.Optional("image_on"): vol.Any(None, _media),
+    vol.Optional("image_day"): vol.Any(None, _media),
+    vol.Optional("aspect"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0.2, max=5))),
+    vol.Optional("zones", default=list): vol.All([ZONE], vol.Length(max=60)),
+}, extra=vol.REMOVE_EXTRA)
+
 PLAN = vol.Schema({
+    vol.Optional("name"): vol.Any(None, vol.All(str, vol.Length(max=12))),  # el botón de este piso (PB) si hay varios
+    vol.Optional("floors"): vol.Any(None, vol.All([FLOOR], vol.Length(max=5))),  # los demás pisos
     vol.Optional("image"): vol.Any(None, _media),     # apagado / de noche
     vol.Optional("image_on"): vol.Any(None, _media),  # con todas las luces prendidas
     vol.Optional("image_day"): vol.Any(None, _media), # de día (opcional)

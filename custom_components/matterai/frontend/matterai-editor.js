@@ -225,6 +225,7 @@
   textarea.code{width:100%;min-height:340px;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#0f1318;color:#e9ecf2;border:1px solid rgba(160,175,200,.25);border-radius:10px;padding:10px;tab-size:2;resize:vertical}
   .catpaste{display:block;width:100%;text-align:left;margin:0 0 10px;padding:10px 12px;border-radius:12px;border:1px dashed #f2b766;background:rgba(242,183,102,.1);color:#e9ecf2;font:inherit;cursor:pointer}
   .mlist small{color:#8f99ab;font-weight:400}
+  .pfl{display:flex;gap:6px;flex-wrap:wrap}
   .tname .who{display:block;font-size:11px;color:#8f99ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}.tname .who.warn{color:#f2b766}
   .fld input[type=checkbox],.fld input[type=radio]{width:auto;flex:none;accent-color:#f2b766}.fld label.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:#e9ecf2;padding:3px 0;cursor:pointer}
   .cattabs{display:flex;gap:6px;margin:12px 16px 0}.cattabs button{flex:1;border:1px solid rgba(160,175,200,.2);background:#1e242e;color:#c4cad6;border-radius:10px;padding:8px 10px;font-weight:600;cursor:pointer;text-align:left}
@@ -340,7 +341,7 @@
       }
       if (mod && k === 's') { e.preventDefault(); if (this.dirty()) this.cmd('save'); return undefined; }
       if (typing) return undefined;
-      const again = () => { if (this.pe) { if (this.zsel != null && !((this.v.plan || {}).zones || [])[this.zsel]) this.zsel = null; this.drawPlan(); } };
+      const again = () => { if (this.pe) { if (this.zsel != null && !(this.fp().zones || [])[this.zsel]) this.zsel = null; this.drawPlan(); } };
       if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); return this.cmd('undo').then(again); }
       if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); return this.cmd('redo').then(again); }
       if (this.pe) return undefined;
@@ -983,7 +984,8 @@
     editCtx() {
       const R = this.rdraft;
       return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
-        onPin: (i, pos) => this.change(() => { const z = ((this.v.plan || {}).zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }), onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' || a === 'menu' ? this.pick(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
+        onPin: (i, pos) => this.change(() => { const z = (this.fp().zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }),
+        floor: this.floor || 0, onFloor: (i) => { this.floor = i; this.pz = null; this.zsel = null; this.drawing = null; this.syncPreview(); if (this.pe) this.drawPlan(); this.drawProps(); this.bind(); }, onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' || a === 'menu' ? this.pick(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone, at) => this.openCatalog(col, zone, at),
         viewH: this.deviceSize()[1], onDragAt: (x, y) => this.dragAt(x, y), onDragEnd: () => this.dragEnd(),
@@ -1662,7 +1664,7 @@
         <p class="hint">Lo que la casa no tiene (cámaras, música, agenda) no aparece aunque esté en la lista. El micrófono queda lindo en el medio.</p>`;
     }
     zoneEditor(i) {
-      const P = this.v.plan || {}, z = (P.zones || [])[i];
+      const P = this.fp(), z = (P.zones || [])[i];
       if (!z) { this.pz = null; return '<p class="hint">Esa zona ya no está.</p>'; }
       const m = this.model(), rooms = m ? m.rooms.map((x) => x.name) : [];
       const lights = Object.keys(this.pickStates()).filter((e) => /^(light|switch)\./.test(e)).sort((a, c) => this.fname(a).localeCompare(this.fname(c), 'es'));
@@ -1763,7 +1765,7 @@
         // si cambió el nombre, las tarjetas y el plano de este dashboard lo siguen
         if (orig && !del && orig !== R.name) {
           Object.values(this.v.layouts || {}).forEach((l) => (l && l.blocks || []).forEach((b) => { if (b.cfg && Array.isArray(b.cfg.rooms)) b.cfg.rooms = b.cfg.rooms.map((n) => (n === orig ? R.name : n)); if (b.cfg && b.cfg.tap && b.cfg.tap.room === orig) b.cfg.tap.room = R.name; (b.cfg && b.cfg.items || []).forEach((it) => { ['tap', 'hold'].forEach((k) => { if (it[k] && it[k].room === orig) it[k].room = R.name; }); }); }));
-          ((this.v.plan || {}).zones || []).forEach((z) => { if (z.room === orig) z.room = R.name; });
+          this.floors().forEach((f) => (f.zones || []).forEach((z) => { if (z.room === orig) z.room = R.name; }));
         }
         if (!del && orig == null && this.newRoomFor) {
           const bb = this.blocks().find((x) => x.id === this.newRoomFor);
@@ -2012,7 +2014,7 @@
       }); });
       W.querySelectorAll('#edr [data-dkadd]').forEach((x) => { x.onchange = () => { if (!x.value) return; this.change(() => { const D = this.dockKeys(); D.push(x.value); this.lay().dock = D; }); }; });
       W.querySelectorAll('#edr [data-dkreset]').forEach((x) => { x.onclick = () => this.change(() => { this.lay().dock = null; }); });
-      const Z = () => ((this.v.plan || {}).zones || [])[this.pz];
+      const Z = () => (this.fp().zones || [])[this.pz];
       W.querySelectorAll('#edr [data-pzf]').forEach((x) => { x.onchange = () => this.change(() => {
         const z = Z(); if (!z) return;
         if (x.dataset.pzf === 'name') z.name = (x.value.trim() || 'Ambiente').slice(0, 40);
@@ -2020,7 +2022,7 @@
       }); });
       W.querySelectorAll('#edr [data-pzl]').forEach((x) => { x.onchange = () => this.change(() => { const z = Z(); if (!z) return; if (x.checked) { if (!z.lights.includes(x.dataset.pzl)) z.lights.push(x.dataset.pzl); } else z.lights = z.lights.filter((y) => y !== x.dataset.pzl); }); });
       W.querySelectorAll('#edr [data-pzpin]').forEach((x) => { x.onclick = () => this.change(() => { const z = Z(); if (z) delete z.pin; }); });
-      W.querySelectorAll('#edr [data-pzdel]').forEach((x) => { x.onclick = () => { if (!confirm('¿Borrar este ambiente del plano? (Se puede deshacer)')) return; this.change(() => { this.v.plan.zones.splice(this.pz, 1); this.pz = null; }); }; });
+      W.querySelectorAll('#edr [data-pzdel]').forEach((x) => { x.onclick = () => { if (!confirm('¿Borrar este ambiente del plano? (Se puede deshacer)')) return; this.change(() => { this.fp().zones.splice(this.pz, 1); this.pz = null; }); }; });
       W.querySelectorAll('#edr [data-elback]').forEach((x) => { x.onclick = () => { this.el = null; this.drawProps(); this.syncPreview(); this.bind(); }; });
       W.querySelectorAll('#edr [data-elact2]').forEach((x) => { x.onclick = (e) => { e.stopPropagation(); this.onElem(this.sel, x.dataset.elact2, +x.dataset.i); }; });
       W.querySelectorAll('#edr [data-elpick]').forEach((x) => { x.onclick = () => {
@@ -2417,10 +2419,11 @@
           return { name: String(z.name || 'Ambiente').slice(0, 40), room: room ? room.name : null, lights,
             poly: z.poly.map((q) => [Math.min(1, Math.max(0, +q[0] || 0)), Math.min(1, Math.max(0, +q[1] || 0))]) };
         });
-        if (this.v.plan.zones && this.v.plan.zones.length && !confirm(`¿Reemplazar los ${this.v.plan.zones.length} ambientes del plano por los ${zones.length} del archivo?`)) return;
+        const FP = this.fp();
+        if (FP.zones && FP.zones.length && !confirm(`¿Reemplazar los ${FP.zones.length} ambientes del plano por los ${zones.length} del archivo?`)) return;
         this.push();
-        this.v.plan.zones = zones;
-        if (d.aspect) this.v.plan.aspect = Math.round(+d.aspect * 1000) / 1000;
+        FP.zones = zones;
+        if (d.aspect) FP.aspect = Math.round(+d.aspect * 1000) / 1000;
         this.zsel = null;
         await this.drawPlan(); this.drawPreview();
         this.toast(`Listo: ${zones.length} ambientes${miss ? `. ${miss} luz${miss > 1 ? 'ces' : ''} no existe${miss > 1 ? 'n' : ''} en la casa: tocá cada ambiente para elegir sus luces` : ''}`);
@@ -2428,6 +2431,15 @@
       inp.click();
     }
     closePlan() { if (this.pe) { this.pe.remove(); this.pe = null; } this.drawing = null; this.draw(); }
+    /** Los pisos del plano: el plano de siempre (planta baja) y los que se sumaron (planta alta, terraza…). */
+    floors() { const P = this.v.plan; return P ? [P, ...(P.floors || [])] : []; }
+    /** El piso que se está editando (el plano de siempre si hay uno solo). */
+    fp() {
+      if (!this.v.plan) this.v.plan = { zones: [] };
+      const F = this.floors(); if (!this.floor || this.floor >= F.length) { this.floor = 0; return this.v.plan; }
+      const f = F[this.floor]; f.zones = f.zones || []; return f;
+    }
+    floorName(i) { const f = this.floors()[i] || {}; return f.name || (i === 0 ? (this.floors().length > 1 ? 'PB' : 'Plano') : `Piso ${i + 1}`); }
     async planEditor() {
       if (this.pe) return;
       if (!this.v.plan) { this.push(); this.v.plan = { zones: [] }; }
@@ -2438,7 +2450,7 @@
       await this.drawPlan();
     }
     async drawPlan() {
-      const P = this.v.plan, m = this.model(), rooms = m ? m.rooms.map((r) => r.name) : [];
+      const P = this.fp(), m = this.model(), rooms = m ? m.rooms.map((r) => r.name) : [];
       const src = await this.signed(P.image);
       const slot = async (k, t) => `<div class="slot">${P[k] ? `<img src="${esc(await this.signed(P[k]))}" alt="">` : '<img alt="">'}<span><b>${t}</b><br><small class="hint">${P[k] ? 'Cargada' : 'Sin imagen'}</small></span>
         <label class="eb sm">Subir<input type="file" accept="image/jpeg,image/png,image/webp" data-up="${k}" hidden></label>${P[k] ? `<button class="eb sm warn" data-rmimg="${k}">✕</button>` : ''}</div>`;
@@ -2452,6 +2464,8 @@
           : 'Tocá un ambiente para editarlo · Ctrl+Z deshace';
       this.pe.innerHTML = `<div class="pe-c">${src ? `<div class="pe-img"><img id="peimg" src="${esc(src)}" alt="" draggable="false"><svg id="pesvg" viewBox="0 0 1000 1000" preserveAspectRatio="none"></svg>${lbls}<span class="pe-tip">${tip}</span></div>` : '<p class="hint">Subí primero la imagen apagada (o de noche) del render.</p>'}</div>
         <div class="pe-r"><div class="row" style="display:flex;gap:8px;align-items:center"><h3 style="margin:0;flex:1">Plano</h3><button class="eb pri" data-pe="done">Listo</button></div>
+          <h4>Pisos</h4><div class="pfl">${this.floors().map((f, i) => `<button class="eb sm ${i === (this.floor || 0) ? 'pri' : ''}" data-pfl="${i}">${esc(this.floorName(i))}${f.image ? '' : ' ·  sin render'}</button>`).join('')}${this.floors().length < 6 ? '<button class="eb sm" data-pfadd>+ Piso</button>' : ''}</div>
+          ${this.floors().length > 1 || this.floor ? `<div class="fld mrow" style="margin-top:8px"><label class="fld" style="flex:1;margin:0"><span>Nombre del botón (corto: PB, PA, 1, Terraza…)</span><input data-pfname value="${esc(this.floorName(this.floor || 0))}" maxlength="12"></label>${this.floor ? '<button class="eb sm warn" data-pfdel title="Borrar este piso">Borrar piso</button>' : ''}</div>` : '<p class="hint" style="margin-top:4px">¿Casa de varios pisos? Con «+ Piso» sumás la planta alta, la terraza…: cada uno con su render y sus ambientes, y en la tarjeta aparecen botones al costado para pasar de uno a otro.</p>'}
           <h4>Imágenes</h4>${await slot('image', 'Apagado / de noche')}${await slot('image_on', 'Con las luces prendidas')}${await slot('image_day', 'De día (opcional)')}
           <p class="hint">Mismo tamaño y encuadre en las tres. JPG, PNG o WebP, hasta 12 MB. Quedan guardadas en la casa, privadas.</p>
           <h4>Ambientes en el plano</h4>
@@ -2467,7 +2481,7 @@
       this.bindPlan();
     }
     bindPlan() {
-      const pe = this.pe, P = this.v.plan;
+      const pe = this.pe, P = this.fp();
       this.chipify(pe);
       const img = pe.querySelector('#peimg'), svg = pe.querySelector('#pesvg');
       const ptsOf = (poly) => poly.map(([x, y]) => `${x * 1000},${y * 1000}`).join(' ');
@@ -2534,6 +2548,19 @@
         const zx = e.target.closest('[data-zx]');
         if (zx) { this.push(); P.zones.splice(+zx.dataset.zx, 1); if (this.zsel != null && this.zsel >= P.zones.length) this.zsel = null; this.drawPlan(); this.drawPreview(); this.toast('Ambiente borrado · Ctrl+Z para deshacer'); return; }
         this.zsel = +x.dataset.zsel; this.drawPlan();
+      }; });
+      const goFloor = (i) => { this.floor = i; this.zsel = null; this.drawing = null; this.pz = null; this.syncPreview(); this.drawPlan(); };
+      pe.querySelectorAll('[data-pfl]').forEach((x) => { x.onclick = () => goFloor(+x.dataset.pfl); });
+      pe.querySelectorAll('[data-pfadd]').forEach((x) => { x.onclick = () => {
+        const n = this.floors().length, NAMES = ['PB', 'PA', 'Terraza', '3', '4', '5'];
+        this.change(() => { const P0 = this.v.plan || (this.v.plan = { zones: [] }); if (!P0.name) P0.name = 'PB'; P0.floors = P0.floors || []; P0.floors.push({ name: NAMES[n] || String(n + 1), zones: [] }); });
+        goFloor(n); this.toast('Piso nuevo: subí su render y dibujá sus ambientes');
+      }; });
+      pe.querySelectorAll('[data-pfname]').forEach((x) => { x.onchange = () => { const v = x.value.trim().slice(0, 12); this.change(() => { const f = this.fp(); if (v) f.name = v; else delete f.name; }); this.drawPlan(); }; });
+      pe.querySelectorAll('[data-pfdel]').forEach((x) => { x.onclick = () => {
+        const i = this.floor || 0; if (!i || !confirm(`¿Borrar el piso «${this.floorName(i)}» con su render y sus ambientes? (Ctrl+Z lo deshace)`)) return;
+        this.change(() => { this.v.plan.floors.splice(i - 1, 1); if (!this.v.plan.floors.length) delete this.v.plan.floors; });
+        goFloor(0);
       }; });
       pe.querySelectorAll('[data-pe]').forEach((x) => { x.onclick = async () => {
         const k = x.dataset.pe;

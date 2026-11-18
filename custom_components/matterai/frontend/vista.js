@@ -1148,8 +1148,18 @@
       void S;
       return h;
     }
+    /** Los pisos del plano: el plano de siempre (planta baja) y los que se sumaron (planta alta, terraza…). */
+    function floorsOf(plan) { return plan ? [plan, ...((plan.floors || []).filter((f) => f && (f.image || editing())))] : []; }
+    function floorName(plan, i) { const f = floorsOf(plan)[i] || {}; return f.name || (i === 0 ? (floorsOf(plan).length > 1 ? 'PB' : 'Plano') : `Piso ${i + 1}`); }
+    /** El piso que se ve: en el editor, el que se está editando; en el equipo, el último que se eligió. */
+    function floorIdx(plan) {
+      const n = floorsOf(plan).length; if (n < 2) return 0;
+      const i = editing() && ctx.edit && ctx.edit.floor != null ? +ctx.edit.floor : X.floor != null ? X.floor : load('matterai.vista.floor', 0);
+      return Math.max(0, Math.min(n - 1, +i || 0));
+    }
+    function curFloor(plan) { return floorsOf(plan)[floorIdx(plan)] || plan; }
     function planHTML(m, zoom, hint = true) {
-      const p = X.layout.plan, sz = ['s', 'm', 'xl'].includes(zoom) ? ` sz-${zoom}` : '';
+      const P0 = X.layout.plan, fl = floorsOf(P0), fi = floorIdx(P0), p = fl[fi] || P0, sz = ['s', 'm', 'xl'].includes(zoom) ? ` sz-${zoom}` : '';
       if (!p || !p.image) return editing() ? '<div class="v-plan empty"><p>Subí el render de la casa en «Plano» para verlo acá.</p></div>' : '';
       const off = img(p.image), on = img(p.image_on || p.image), day = p.image_day ? img(p.image_day) : '';
       const isDay = day && !isNight();
@@ -1165,7 +1175,8 @@
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
         ${zones.map((z, i) => `<polygon class="v-hit${editing() && ctx.edit.pz === i && ctx.edit.selected === X.curB ? ' zsel' : ''}" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
         </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}" data-zpin="1"${z.pin ? ' data-man="1"' : ''}>${pinIcons(z, n, m)}<b>${esc(z.name)}</b></span>`; }).join('')}
-        ${hint ? '<span class="v-ptag">Tocá un ambiente para prender o apagar · tocá su nombre para ver todo</span>' : ''}</div>${elAdd('Dibujar un ambiente en el plano')}`;
+        ${hint ? '<span class="v-ptag">Tocá un ambiente para prender o apagar · tocá su nombre para ver todo</span>' : ''}
+        ${fl.length > 1 ? `<div class="v-floors">${fl.map((f, i) => { const on = (f.zones || []).some((z) => (z.lights || []).some((id) => (st(id) || {}).state === 'on')); return `<button data-floor="${i}" class="${i === fi ? 'on' : ''}" aria-label="${esc(floorName(P0, i))}">${esc(floorName(P0, i))}${on ? '<i></i>' : ''}</button>`; }).join('')}</div>` : ''}</div>${elAdd('Dibujar un ambiente en el plano')}`;
     }
 
     /* ───────── avisos de la casa (campanita) ───────── */
@@ -1580,7 +1591,7 @@
       const cs = dk && typeof getComputedStyle === 'function' ? getComputedStyle(dk) : null;
       const below = cs && cs.position !== 'fixed' && cs.display !== 'none' ? dk.offsetHeight + 16 : kind() === 'tablet' ? 16 : 120;
       e.style.setProperty('--v-full', `${Math.max(320, vh - top - below)}px`);
-      { const p = X.layout && X.layout.plan; e.style.setProperty('--par', String((p && p.aspect) || X.aspect || 0.6)); }
+      { const p = X.layout && X.layout.plan && curFloor(X.layout.plan); e.style.setProperty('--par', String((p && p.aspect) || X.aspect || 0.6)); }
     }
     /** Micrófono a la vista siempre (como en el diseño), salvo que el instalador apague la voz. */
     function voiceOn() { const c = card(); return !!c && typeof c.voice === 'function' && !(c._config && c._config.voice === false); }
@@ -1835,6 +1846,13 @@
     el.addEventListener('pointerdown', onDown);
     ['pointerup', 'pointerleave', 'pointercancel'].forEach((ev) => el.addEventListener(ev, onUp));
     el.addEventListener('contextmenu', (e) => { if (e.target.closest('[data-room],[data-zone],[data-it]')) e.preventDefault(); });
+    el.addEventListener('click', (e) => {
+      const f = e.target && e.target.closest && e.target.closest('[data-floor]'); if (!f) return;
+      e.stopPropagation(); e.preventDefault();
+      const i = +f.dataset.floor;
+      if (editing() && ctx.edit && ctx.edit.onFloor) { ctx.edit.onFloor(i); return; }
+      X.floor = i; save('matterai.vista.floor', i); vib(); render();
+    }, true);
     // brillo de las luces: se manda al soltar el deslizador
     el.addEventListener('pointerdown', (e) => { if (!editing() && e.target.closest && e.target.closest('[data-bri]')) { X.sliding = true; X.slideAt = Date.now(); setTimeout(() => { if (X.sliding && Date.now() - X.slideAt >= 3000) { X.sliding = false; render(); } }, 3100); } }, true);
     el.addEventListener('change', (e) => {
