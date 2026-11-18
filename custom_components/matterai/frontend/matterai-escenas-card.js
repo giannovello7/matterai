@@ -986,6 +986,14 @@ const FLABELS = { person: 'Persona', car: 'Auto', motorcycle: 'Moto', bicycle: '
 const REM_KINDS = ['reminder', 'calalert'];
 const DIAS_L = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
 const isoDay = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+/** Cuándo se ejecutó por última vez: «hoy 19:42», «ayer 07:00», «12/11 23:00». */
+function lastRunText(at) {
+  const d = new Date(at); if (isNaN(d)) return '';
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const day = new Date(d); day.setHours(0, 0, 0, 0);
+  const diff = Math.round((today - day) / 864e5), hhmm = `${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return diff <= 0 ? `hoy ${hhmm}` : diff === 1 ? `ayer ${hhmm}` : `${d.getDate()}/${d.getMonth() + 1} ${hhmm}`;
+}
 function whenText(at) {
   const d = new Date(at); if (isNaN(d)) return '';
   const today = new Date(); today.setHours(0, 0, 0, 0);
@@ -1127,6 +1135,24 @@ function newDraft(kind, extra = {}) {
   }[kind];
   return { ...base, ui: clone(ui), ...extra };
 }
+/** Sugerencias con los equipos de esta casa ya puestos (como Tuya): se abren armadas y sólo falta Guardar.
+ *  ok(eid) = el cliente puede usar ese equipo. */
+function houseSuggestions(h, ok) {
+  const S = h.states, pick = (d, f) => Object.keys(S).filter((e) => dom(e) === d && ok(e) && S[e].state !== 'unavailable' && (!f || f(S[e].attributes || {})));
+  const act = (eid, opId, params) => { const o = opsFor(h, eid).find((x) => x.id === opId); return o ? { type: 'device', entity: eid, op: opId, svc: o.svc, label: o.label, params: params || {} } : null; };
+  const auto = (name, icon, color, trig, actions) => ({ name, icon, color, trig: trig.type, make: () => newDraft('auto', { name, icon, color, ui: { triggers: [trig], conditions: [], cond_mode: 'all', actions: actions.filter(Boolean) } }) });
+  const gate = (a) => ['gate', 'garage'].includes(a.device_class);
+  const locks = pick('lock'), clim = pick('climate'), gates = pick('cover', gate), covers = pick('cover', (a) => !gate(a)), lights = pick('light');
+  const cool = (e) => { const m = (S[e].attributes.hvac_modes || []).filter((x) => x !== 'off'); return m.includes('cool') ? 'cool' : m[0] || 'cool'; };
+  const out = [];
+  if (locks.length && clim.length) out.push(Object.assign(auto('Al llegar, prender el aire', 'mdi:air-conditioner', '#4F8EF7', { type: 'device', entity: locks[0], to: 'unlocked' }, [act(clim[0], 'mode', { hvac_mode: cool(clim[0]) })]), { hint: `Cuando se destraba ${fname(h, locks[0])}, prende ${fname(h, clim[0])}` }));
+  if (lights.length) out.push(Object.assign(auto('Luces al atardecer', 'mdi:weather-sunset', '#F78F4F', { type: 'sun', event: 'sunset', offset: 0, days: [...ALL_DAYS] }, lights.slice(0, 3).map((e) => act(e, 'on'))), { hint: `Prende ${lights.slice(0, 3).map((e) => fname(h, e)).join(', ')} cuando oscurece` }));
+  if (gates.length) out.push(Object.assign(auto('Cerrar el portón a la noche', 'mdi:gate', '#7A8699', { type: 'time', at: '23:00', days: [...ALL_DAYS] }, [act(gates[0], 'close')]), { hint: `A las 23:00, cierra ${fname(h, gates[0])} por si quedó abierto` }));
+  if (clim.length) out.push(Object.assign(auto('Apagar los aires de madrugada', 'mdi:power-sleep', '#5B6CD9', { type: 'time', at: '03:00', days: [...ALL_DAYS] }, clim.slice(0, 4).map((e) => act(e, 'off'))), { hint: 'A las 3:00, apaga los aires que quedaron prendidos' }));
+  if (lights.length) out.push(Object.assign(auto('Apagar las luces a la medianoche', 'mdi:lightbulb-off-outline', '#7A8699', { type: 'time', at: '00:00', days: [...ALL_DAYS] }, lights.slice(0, 4).map((e) => act(e, 'off'))), { hint: 'Por si quedó alguna prendida' }));
+  if (covers.length) out.push(Object.assign(auto('Abrir las cortinas a la mañana', 'mdi:blinds-open', '#F7B84F', { type: 'time', at: '08:00', days: ['mon', 'tue', 'wed', 'thu', 'fri'] }, covers.slice(0, 3).map((e) => act(e, 'open'))), { hint: 'A las 8:00 de lunes a viernes' }));
+  return out;
+}
 const IDEAS = [
   { icon: 'mdi:motion-sensor', color: '#F7B84F', name: 'Luz con movimiento de noche', hint: 'Prende la luz al detectar movimiento y la apaga sola', make: () => newDraft('auto', { icon: 'mdi:motion-sensor', mode: 'restart', ui: { triggers: [{ type: 'device', entity: null, to: 'on', _need: { domains: ['binary_sensor'], dc: ['motion', 'occupancy', 'presence'] } }], conditions: [{ type: 'sun', when: 'night' }], cond_mode: 'all', actions: [{ type: 'device', entity: null, op: 'on', svc: null, label: 'Encender', params: { _off_after: 2 }, _need: { domains: ['light', 'switch'] } }] } }) },
   { icon: 'mdi:home-import-outline', color: '#3DBE8B', name: 'Bienvenida a casa', hint: 'Cuando llega el primero y ya es de noche, prende luces', need: (h) => has(h, 'person'), make: () => newDraft('auto', { icon: 'mdi:home-import-outline', ui: { triggers: [{ type: 'presence', who: 'first' }], conditions: [{ type: 'sun', when: 'night' }], cond_mode: 'all', actions: [{ type: 'device', entity: null, op: 'on', svc: null, label: 'Encender', params: {}, _need: { domains: ['light', 'switch'] } }] } }) },
@@ -1184,6 +1210,10 @@ ha-card{padding:16px;overflow:hidden}
 .sw.on{background:var(--mae-accent)}
 .sw.on::after{left:21px}
 .empty{text-align:center;padding:24px 8px;color:var(--mae-sub)}
+.row .t2.lr{-webkit-line-clamp:1;opacity:.85}
+.sugt{font-size:13px;font-weight:600;color:var(--mae-sub);margin:16px 4px 8px}
+.row.sug{border:1px dashed var(--mae-line);background:transparent}.row.sug .tx{display:flex;flex-direction:column}.sugadd{font-size:13px;font-weight:700;color:var(--mae-accent);white-space:nowrap}
+.sumbox{margin:16px 0 4px;padding:12px 14px;border-radius:var(--mae-r);background:var(--mae-soft);font-size:14px;line-height:1.45}.sumbox .sumh{font-size:11.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--mae-accent);margin-bottom:4px}
 .empty ha-icon{--mdc-icon-size:44px;opacity:.5;margin-bottom:8px}
 .err{padding:14px;border-radius:12px;background:rgba(247,111,111,.12);color:#d64545;font-size:14px}
 .cd{font-variant-numeric:tabular-nums;font-weight:700;color:var(--mae-accent);font-size:15px}
@@ -1469,11 +1499,12 @@ class MatterAIEscenasCard extends HTMLElement {
     if (this._err) return `<div class="err">${esc(this._err)}</div>`;
     if (!this._rules) return '<div class="empty muted">Cargando…</div>';
     const { scenes, autos, smart, timers, rems, cines } = this._counts();
-    const tabs = [['scene', 'Escenas', scenes.length], ['auto', 'Automáticas', autos.length], ['smart', 'Inteligentes', smart.length]];
+    const tabs = [['scene', 'Escenas', scenes.length], ['auto', 'Automatizaciones', autos.length + smart.length]];
     if (this._config.reminders !== false) tabs.push(['rem', '🔔 Recordatorios', rems.filter((r) => r.kind === 'reminder' && (r.pending || r.next_at)).length]);
     if (timers.length) tabs.push(['timer', 'Temporizadores', timers.length]);
     if (!this._adm) { const toff = new Set(this._settings?.tabs_off || []); for (let i = tabs.length - 1; i >= 0; i--) if (toff.has(tabs[i][0]) && tabs.length > 1) tabs.splice(i, 1); }
-    let tab = this._tab || this._config.default_tab || (scenes.length ? 'scene' : smart.length ? 'smart' : 'auto');
+    let tab = this._tab || this._config.default_tab || (scenes.length ? 'scene' : 'auto');
+    if (tab === 'smart') tab = 'auto'; // antes eran dos pestañas
     if (tab === 'timer' && !timers.length) tab = 'scene';
     if (!tabs.some((x) => x[0] === tab)) tab = tabs[0][0];
     const gear = this._isAdmin && !inOverlay && this._config.panel ? '<span class="sp"></span><button class="ib" data-a="settings" title="Equipos visibles"><ha-icon icon="mdi:cog-outline"></ha-icon></button>' : '';
@@ -1494,7 +1525,8 @@ class MatterAIEscenasCard extends HTMLElement {
         </button>`).join('')}</div>`
         : `<div class="empty"><ha-icon icon="mdi:gesture-tap"></ha-icon><div>Todavía no hay escenas.<br>Una escena hace varias cosas con un solo toque.</div></div>`;
     } else if (tab === 'auto' || tab === 'smart') {
-      const list = tab === 'auto' ? autos : smart;
+      const list = [...autos, ...smart];
+      const sug = list.length < 3 ? this._sugHtml(list) : '';
       content = list.length ? `<div class="rows">${list.map((r) => {
         const busy = r.running && r.enabled && ['loop', 'presence', 'irrigation'].includes(r.kind);
         const play = r.kind === 'irrigation'
@@ -1517,14 +1549,13 @@ class MatterAIEscenasCard extends HTMLElement {
           <button class="tx" style="text-align:left" data-a="edit" data-id="${r.id}">
             <div class="t1">${esc(r.name)}${r.locked ? '<span class="badge" style="background:var(--mae-bg);color:var(--mae-sub)" title="La armó tu instalador">🔒</span>' : ''}${this._isAdmin && installerOnly(r) ? '<span class="badge" style="background:var(--mae-bg);color:var(--mae-sub)">instalador</span>' : ''}${busy ? `<span class="badge">${r.kind === 'irrigation' ? 'regando' : 'en curso'}</span>` : ''}${r.kind === 'room' && r.enabled ? `<span class="badge" ${r.occupied ? '' : 'style="background:var(--mae-bg);color:var(--mae-sub)"'}>${r.occupied ? (r.sealed ? 'ocupado 🔒' : 'ocupado') : 'libre'}</span>` : ''}${r.kind === 'watch' && r.enabled && (r.alerting || []).length ? `<span class="badge" style="background:rgba(247,111,111,.15);color:#e04848">⚠ ${r.alerting.length}</span>` : ''}${r.kind === 'away' && r.enabled ? `<span class="badge" ${r.away ? '' : 'style="background:var(--mae-bg);color:var(--mae-sub)"'}>${r.away ? 'ausentes' : 'en casa'}</span>` : ''}${badge2}</div>
             <div class="t2">${esc(ruleSummary(h, r, rules))}</div>
+            ${r.last_run ? `<div class="t2 lr">Última vez: ${esc(lastRunText(r.last_run))}</div>` : ''}
           </button>
           ${play}
           <button class="sw ${r.enabled ? 'on' : ''}" data-a="toggle" data-id="${r.id}" aria-label="Activar"></button>
         </div>`;
-      }).join('')}</div>`
-        : tab === 'auto'
-          ? `<div class="empty"><ha-icon icon="mdi:robot-happy-outline"></ha-icon><div>Todavía no hay automatizaciones propias.<br>Armá la tuya: «si pasa esto, entonces hacé aquello».</div></div>`
-          : `<div class="empty"><ha-icon icon="mdi:lightbulb-auto-outline"></ha-icon><div>Todavía no hay automatizaciones inteligentes.<br>Están listas para usar: luz por presencia, luces de noche, circadiana, riego…</div></div>`;
+      }).join('')}</div>${sug}`
+        : `<div class="empty"><ha-icon icon="mdi:robot-happy-outline"></ha-icon><div>Todavía no hay automatizaciones.<br>Las cosas que la casa hace sola: a una hora, al atardecer, cuando llegás…</div></div>${sug}`;
     } else if (tab === 'rem') {
       content = this._remHtml(rems);
     } else {
@@ -1833,6 +1864,25 @@ class MatterAIEscenasCard extends HTMLElement {
     return true;
   }
   _hiddenSet() { return { has: (e) => !this._entOk(e) }; }
+  /** «Sugerencias para tu casa» debajo de las automatizaciones (cuando hay pocas): con sus equipos ya puestos. */
+  _sugHtml(list) {
+    const h = this._hass, oo = this._optOff(), off = new Set(this._adm ? [] : (this._settings?.client_off || []));
+    if (oo.has('sug') || off.has('auto')) { this._sugs = []; return ''; }
+    const names = new Set((list || []).map((r) => (r.name || '').toLowerCase()));
+    this._sugs = houseSuggestions(h, (e) => this._entOk(e)).filter((x) => !names.has(x.name.toLowerCase()) && !oo.has(`t:${x.trig}`)).slice(0, 3);
+    if (!this._sugs.length) return '';
+    return `<div class="sugt">Sugerencias para tu casa</div><div class="rows">${this._sugs.map((x, i) => `
+      <button class="row sug" data-a="sug" data-v="${i}"><span class="ic" style="background:${x.color}"><ha-icon icon="${x.icon}"></ha-icon></span>
+        <span class="tx"><span class="t1">${esc(x.name)}</span><span class="t2">${esc(x.hint)}</span></span><span class="sugadd">+ Usar</span></button>`).join('')}</div>`;
+  }
+  /** El resumen en una frase, antes de guardar: «Cuando… sólo si… → hace esto». */
+  _sumHtml(d) {
+    if (!['scene', 'auto'].includes(d.kind)) return '';
+    const h = this._hass, u = d.ui || {}, R = this._rules || [];
+    const T = (u.triggers || []).map((t) => describe(h, 'triggers', t, R)), C = (u.conditions || []).map((c) => describe(h, 'conditions', c, R)), A = (u.actions || []).map((a) => describe(h, 'actions', a, R));
+    if (!A.length || (d.kind === 'auto' && !T.length)) return '';
+    return `<div class="sumbox"><div class="sumh">En resumen</div><b>${d.kind === 'scene' ? 'Al tocarla' : `Cuando ${esc(T.join(' o '))}`}</b>${C.length ? `<div>sólo si ${esc(C.join(u.cond_mode === 'any' ? ' o ' : ' y '))}</div>` : ''}${A.map((a) => `<div>→ ${esc(a.replace(/…/g, ''))}</div>`).join('')}</div>`;
+  }
   /** ¿Se muestra como instalador? (un admin puede mirar «como el cliente») */
   get _adm() { return this._isAdmin && !this._asClient; }
   _optOff() { return this._adm ? new Set() : new Set(this._settings?.opt_off || []); }
@@ -1840,7 +1890,7 @@ class MatterAIEscenasCard extends HTMLElement {
   _profile(k) {
     const h = this._hass, allOpts = OPT_LISTS.flatMap(([p, , L]) => L().map((x) => `${p}:${x.id}`));
     if (k === 'todo') return { client_off: [], opt_off: [] };
-    if (k === 'nada') return { client_off: ALL_KIND_IDS.slice(), opt_off: ['ideas', ...allOpts] };
+    if (k === 'nada') return { client_off: ALL_KIND_IDS.slice(), opt_off: ['ideas', 'sug', ...allOpts] };
     if (k === 'basico') {
       const on = new Set(['scene', 'auto', 'timer', 'period', 'night', 'wake', 'away', 'presence', 'reminder']);
       const optOn = new Set(['t:device', 't:time', 't:sun', 't:presence', 'c:time', 'c:sun', 'c:device', 'c:presence', 'c:dates', 'a:device', 'a:area', 'a:scene', 'a:notify', 'a:delay']);
@@ -1864,11 +1914,11 @@ class MatterAIEscenasCard extends HTMLElement {
         <button class="btn" style="margin-top:10px" data-a="asclient"><ha-icon icon="mdi:eye-outline"></ha-icon> Ver cómo lo ve el cliente</button>
         <div class="sec"><div><div class="h">Automatizaciones listas</div><div class="s">Qué tipos de automatización puede crear el cliente</div></div></div>
         ${kinds}
-        <div class="card" style="margin-top:10px">${row('ooff', 'ideas', !oo.has('ideas'), 'Ideas para empezar', 'Las automatizaciones de ejemplo de «Armar la mía»')}</div>
+        <div class="card" style="margin-top:10px">${row('ooff', 'sug', !oo.has('sug'), 'Sugerencias para su casa', 'Debajo de sus automatizaciones: «Al llegar, prender el aire», «Luces al atardecer»… con sus equipos ya puestos')}${row('ooff', 'ideas', !oo.has('ideas'), 'Ideas para empezar', 'Las automatizaciones de ejemplo de «Armar la mía»')}</div>
         <div class="sec"><div><div class="h">Al armar una automatización</div><div class="s">Qué opciones le aparecen en «Si… / Sólo si… / Entonces…»</div></div></div>
         ${opts}
         <div class="sec"><div><div class="h">Pestañas que ve el cliente</div><div class="s">Las que apagues no le aparecen (lo que tengan adentro sigue funcionando)</div></div></div>
-        <div class="card">${[['scene', 'Escenas'], ['auto', 'Automáticas'], ['smart', 'Inteligentes'], ['rem', 'Recordatorios'], ['timer', 'Temporizadores']].map(([k, l]) => row('toff', k, !(o.tabsOff || []).includes(k), l)).join('')}</div>
+        <div class="card">${[['scene', 'Escenas'], ['auto', 'Automatizaciones'], ['rem', 'Recordatorios'], ['timer', 'Temporizadores']].map(([k, l]) => row('toff', k, !(o.tabsOff || []).includes(k), l)).join('')}</div>
         <div class="sec"><div><div class="h">Equipos que puede usar</div><div class="s">Al armar escenas y automatizaciones. Lo que ya está creado sigue funcionando.</div></div></div>
         <div class="seg" style="margin:8px 0 6px">${[['app', 'Los de la app'], ['pick', 'Sólo los que marco'], ['hide', 'Todos menos los que saco']].map(([k, l]) => `<button class="${(o.entsMode || 'hide') === k ? 'on' : ''}" data-a="smode" data-v="${k}">${l}</button>`).join('')}</div>
         <div class="note" style="margin-top:6px">${o.entsMode === 'app' ? (Array.isArray(this._appEnts) ? `Usa los mismos equipos que elegiste para la app MatterAI (panel MatterAI → Dispositivos): <b>${this._appEnts.length}</b>. Abajo podés sacar alguno más.` : 'Todavía no elegiste los equipos de la app (panel MatterAI → Dispositivos): por ahora se ven todos.') : o.entsMode === 'pick' ? 'Arranca vacío: marcá sólo lo que el cliente va a usar (lo más práctico en casas con muchas entidades). Usá «Todos» en cada ambiente.' : 'Se ven todos los equipos de Home Assistant menos los que desmarques.'}</div>
@@ -1978,7 +2028,7 @@ class MatterAIEscenasCard extends HTMLElement {
     if (d.kind === 'scene' || d.kind === 'auto') main = this._editorGeneric(d);
     else main = this[`_editor_${d.kind}`](d);
     const canRun = d.id && ['scene', 'auto', 'irrigation', 'night', 'wake', 'doorbell'].includes(d.kind);
-    const advanced = d.kind === 'auto' ? `
+    const advanced = d.kind === 'auto' && this._adm ? `
       <div class="sec"><div><div class="h">Si se vuelve a activar mientras está en curso</div></div></div>
       <div class="field"><select data-o="d" data-k="mode">
         ${[['restart', 'Empezar de nuevo (ideal para sensores de movimiento)'], ['single', 'Ignorar la nueva activación'], ['queued', 'Hacerla después, en orden'], ['parallel', 'Hacer las dos a la vez']].map(([v, l]) => `<option value="${v}" ${d.mode === v ? 'selected' : ''}>${l}</option>`).join('')}
@@ -1997,6 +2047,7 @@ class MatterAIEscenasCard extends HTMLElement {
       </div>
       <div class="colors">${COLORS.map((c) => `<button class="dot ${d.color === c ? 'on' : ''}" style="background:${c}" data-a="set" data-o="d" data-k="color" data-v="${c}"></button>`).join('')}</div></div>`}
       ${main}
+      ${this._sumHtml(d)}
       ${advanced}
       ${enabledRow}${lockRow}
       ${err ? `<div class="note">⚠ ${esc(err)}</div>` : ''}
@@ -3466,6 +3517,7 @@ class MatterAIEscenasCard extends HTMLElement {
       case 'create': this._nav({ page: 'create' }); return;
       case 'openhome': if (this._rules) this._openOv({ page: 'home' }); return;
       case 'settings': { const s0 = this._settings || {}; this._nav({ page: 'settings', hidden: [...(s0.hidden || [])], clientOff: [...(s0.client_off || [])], optOff: [...(s0.opt_off || [])], tabsOff: [...(s0.tabs_off || [])], entsMode: s0.ents_mode || (Array.isArray(this._appEnts) ? 'app' : 'hide'), shown: [...(s0.shown || [])], sgroup: 'area', sopen: [], ssearch: '' }); return; }
+      case 'sug': { const x = (this._sugs || [])[+ds.v]; if (!x) return; const draft = x.make(); this._nav({ page: 'editor', draft }); return; }
       case 'toff': { o.tabsOff = o.tabsOff || []; const i = o.tabsOff.indexOf(ds.v); if (i >= 0) o.tabsOff.splice(i, 1); else o.tabsOff.push(ds.v); this._renderOv(); return; }
       case 'smode': o.entsMode = ds.v; this._renderOv(); return;
       case 'sgby': o.sgroup = ds.v; o.sopen = []; this._renderOv(); return;
