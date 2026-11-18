@@ -782,6 +782,7 @@
   .camcard.own{position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#0b0e12}.camcard.own>*{position:absolute;inset:0;width:100%;height:100%}
   /* el ambiente como página completa (el instalador lo elige en el editor) */
   .sheet-wrap.rpage .sheet{left:0!important;right:0!important;top:0!important;bottom:0!important;width:auto!important;max-width:none!important;max-height:none!important;border-radius:0!important;border:0!important;box-shadow:none!important;opacity:1!important;transform:translateX(100%)!important;padding:max(14px,max(env(safe-area-inset-top,0px),var(--ios-top,0px))) clamp(16px,4vw,48px) 30px!important}
+  .sheet.rcards>#sheetdyn{position:sticky;top:-10px;z-index:6;margin:-10px -20px 0;padding:10px 20px 2px;background:inherit;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
   .sheet-wrap.rpage.open .sheet{transform:none!important}.sheet-wrap.rpage .grab{display:none!important}
   .sheet-wrap.rpage :is(.rcbox,.camcard.own){max-width:960px}
   .grab{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.18);margin:0 auto 14px}
@@ -2727,6 +2728,7 @@
       const rr = this._m && this._m.byId && this._m.byId[id];
       this._roomCards = false;
       if (rr && typeof this.roomExtra === 'function') { try { this._roomCards = this.roomExtra(rr, this._els.sheet.querySelector('#sheettop'), this._els.sheet.querySelector('#sheetbot')) === true; } catch (_) { this._roomCards = false; } }
+      this._els.sheet.classList.toggle('rcards', this._roomCards); // el título (con la ✕) queda fijo arriba al bajar
       this._renderSheet();
       this._els.sheet.scrollTop = 0;
       this._els.sheetwrap.classList.toggle('rpage', !!(rr && rr.open === 'page'));
