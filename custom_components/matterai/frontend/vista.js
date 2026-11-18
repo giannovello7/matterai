@@ -951,7 +951,7 @@
           }
           return `<div class="v-clock" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || 'sun')}${esc(Math.round(Number(w.attributes.temperature)))}°</button>` : ''}</div>`;
         }
-        case 'plan': return planHTML(m, c.zoom);
+        case 'plan': return planHTML(m, c.zoom, c.hint !== false);
         case 'weather': {
           const w = (c.entity && st(c.entity)) || m.weather;
           if (!w) return editing() ? `${t}<p class="v-empty">La casa no tiene clima: agregá una integración del clima (Met.no).</p>` : '';
@@ -1119,7 +1119,7 @@
       void S;
       return h;
     }
-    function planHTML(m, zoom) {
+    function planHTML(m, zoom, hint = true) {
       const p = X.layout.plan, sz = ['s', 'm', 'xl'].includes(zoom) ? ` sz-${zoom}` : '';
       if (!p || !p.image) return editing() ? '<div class="v-plan empty"><p>Subí el render de la casa en «Plano» para verlo acá.</p></div>' : '';
       const off = img(p.image), on = img(p.image_on || p.image), day = p.image_day ? img(p.image_day) : '';
@@ -1136,7 +1136,7 @@
         ${zones.map((z, i) => { const n = zoneOn(z); return n ? `<image href="${esc(on)}" x="0" y="0" width="1000" height="${(1000 / ar).toFixed(0)}" preserveAspectRatio="none" mask="url(#vz${i})" opacity="0.95"/>` : ''; }).join('')}
         ${zones.map((z, i) => `<polygon class="v-hit${editing() && ctx.edit.pz === i && ctx.edit.selected === X.curB ? ' zsel' : ''}" data-zone="${i}" points="${pts(z.poly.map(([x, y]) => [x, y / ar]))}"/>`).join('')}
         </svg>${zones.map((z, i) => { const [x, y] = cen(z), n = zoneOn(z); return `<span class="v-pin ${n ? 'on' : ''}" style="left:${(x * 100).toFixed(2)}%;top:${(y * 100).toFixed(2)}%" data-zone="${i}" data-zpin="1"${z.pin ? ' data-man="1"' : ''}>${pinIcons(z, n, m)}<b>${esc(z.name)}</b></span>`; }).join('')}
-        ${editing() ? '' : '<span class="v-ptag">Tocá un ambiente para prender o apagar · tocá su nombre para ver todo</span>'}</div>${elAdd('Dibujar un ambiente en el plano')}`;
+        ${hint ? '<span class="v-ptag">Tocá un ambiente para prender o apagar · tocá su nombre para ver todo</span>' : ''}</div>${elAdd('Dibujar un ambiente en el plano')}`;
     }
 
     /* ───────── avisos de la casa (campanita) ───────── */

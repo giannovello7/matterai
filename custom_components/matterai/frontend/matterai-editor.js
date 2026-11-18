@@ -224,6 +224,7 @@
   textarea.code{width:100%;min-height:340px;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#0f1318;color:#e9ecf2;border:1px solid rgba(160,175,200,.25);border-radius:10px;padding:10px;tab-size:2;resize:vertical}
   .catpaste{display:block;width:100%;text-align:left;margin:0 0 10px;padding:10px 12px;border-radius:12px;border:1px dashed #f2b766;background:rgba(242,183,102,.1);color:#e9ecf2;font:inherit;cursor:pointer}
   .mlist small{color:#8f99ab;font-weight:400}
+  .tname .who{display:block;font-size:11px;color:#8f99ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}.tname .who.warn{color:#f2b766}
   .fld input[type=checkbox],.fld input[type=radio]{width:auto;flex:none;accent-color:#f2b766}.fld label.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:#e9ecf2;padding:3px 0;cursor:pointer}
   .cattabs{display:flex;gap:6px;margin:12px 16px 0}.cattabs button{flex:1;border:1px solid rgba(160,175,200,.2);background:#1e242e;color:#c4cad6;border-radius:10px;padding:8px 10px;font-weight:600;cursor:pointer;text-align:left}
   .cattabs button small{display:block;font-weight:400;font-size:11px;color:#8f99ab}.cattabs button.on{border-color:#f2b766;background:rgba(242,183,102,.12);color:#fff}
@@ -284,6 +285,7 @@
       const [lst, cfg] = await Promise.all([this.hass.callWS({ type: 'matterai/views/list' }), this.hass.callWS({ type: 'matterai/config' })]);
       const v = lst.views.find((x) => x.id === this.viewId);
       if (!v) { this.p._toast('Ese dashboard no existe'); return; }
+      this.who = Editor.whoUses(lst, this.viewId);
       this.cfg = cfg.config || {};
       this.v = Editor.v2(Editor.normalize(clone(v)));
       this.K = this.k0 || v.kind || 'phone';
@@ -601,6 +603,15 @@
       this.change(() => { const l = this.lay(), c = window.MaeVista.toSections({ v: 2, blocks: out, side: true, cols: [0, 1, 1] }, this.K); l.blocks = c.blocks; l.secs = c.secs; l.v = 3; this.sel = null; });
       this.toast(`Listo: copiado ${other === 'tablet' ? 'de la tablet' : 'del celular'}`);
     }
+    /** Qué equipos usan este dashboard: los que lo tienen asignado y, si es el general, los que no tienen uno propio. */
+    static whoUses(lst, id) {
+      const P = (lst && lst.people) || [], mine = P.filter((p) => p.view === id), def = lst && lst.default === id;
+      const kind = (p) => (p.kind === 'tablet' ? 'tablet' : p.kind === 'phone' ? 'celular' : '');
+      const names = mine.map((p) => `${p.name}${kind(p) ? ` (${kind(p)})` : ''}`);
+      const free = def ? P.filter((p) => !p.view).map((p) => `${p.name}${kind(p) ? ` (${kind(p)})` : ''}`) : [];
+      const all = [...names, ...free];
+      return { all, none: !all.length && !def, def, other: P.filter((p) => p.view && p.view !== id).map((p) => p.name) };
+    }
     /** El prearmado que se pone solo al abrir no cuenta como cambio sin guardar. */
     baseline() {
       const s = this.saved; if (!s) return;
@@ -799,7 +810,7 @@
       const SIMS = [['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']], simOn = SIMS.filter(([k]) => (this.sim || {})[k]);
       // como Lovelace: a la izquierda volver y el nombre; en el medio qué equipo; a la derecha las acciones y «Listo». El resto, en ⋯
       this.$('#edt').innerHTML = `<button class="eb ico" data-e="close" title="Volver" aria-label="Volver">←</button>
-          <div class="tname"><h2 title="${esc(v.name)}">${esc(v.name)}</h2><span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span></div>
+          <div class="tname"><h2 title="${esc(v.name)}">${esc(v.name)}</h2>${this.who ? `<span class="who ${this.who.none ? 'warn' : ''}" title="${esc(this.who.other.length ? `Con otro dashboard: ${this.who.other.join(', ')}` : '')}">${this.who.none ? '⚠ Ningún equipo usa este dashboard' : this.who.all.length ? `Lo ven: ${esc(this.who.all.slice(0, 3).join(', '))}${this.who.all.length > 3 ? ` y ${this.who.all.length - 3} más` : ''}` : 'Lo ven los equipos sin dashboard propio'}</span>` : ''}<span class="saved ${dirty ? 'dirty' : ''}">${this.saving ? 'Guardando…' : dirty ? (this.dlgOpen() ? 'Editando…' : 'Guardando…') : '✓ Guardado'}</span></div>
           <span class="eseg" title="Un mismo dashboard tiene su diseño para el celular y para la tablet">${[['phone', 'Celular'], ['tablet', 'Tablet']].map(([k, l]) => `<button data-kind="${k}" class="${K === k ? 'on' : ''}">${l}</button>`).join('')}</span>
           ${K === 'tablet' ? `<button class="eb" data-ori="${ori === 'landscape' ? 'portrait' : 'landscape'}" title="Girar la tablet">${ori === 'landscape' ? '▭ Horizontal' : '▯ Vertical'}</button>` : ''}
           ${this.trying ? '<button class="eb pri2" data-e="tryend" title="Los equipos vuelven al diseño guardado">En los equipos · Terminar ✕</button>' : ''}
@@ -1355,6 +1366,7 @@
         case 'lock': h += this.ent('Cerradura', 'lk', c.entity, PICK.lock, 'cfg.entity'); break;
         case 'plan':
           hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
+          if (b.type === 'plan') hs += `<label class="chk"><input type="checkbox" data-fb="cfg.hint" ${c.hint !== false ? 'checked' : ''}> Mostrar el cartel de ayuda («Tocá un ambiente para prender o apagar…»)</label>`;
           h += '<p class="hint">El plano se arma en «Plano e imágenes» (en ⋯, arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
         case 'clock':

@@ -858,7 +858,7 @@
   .actv-wrap.open .actv{transform:none;opacity:1}
   /* iPhone (app web): la barra de arriba (hora, batería) va encima de la página; las ventanas a pantalla completa
      (música, actividad…) arrancan debajo de ella. En Android y en Home Assistant ese margen es 0. */
-  @media (max-width:899px){.actv{border-top:env(safe-area-inset-top,0px) solid #05060d}.sheet{max-height:min(90vh,calc(100vh - env(safe-area-inset-top,0px) - 10px))!important}}
+  @media (max-width:899px){.actv{border-top:env(safe-area-inset-top,0px) solid #05060d}:host([theme]) .actv,:host .actv{border-top-color:#0b0d16!important}:host([theme]) .actv.mus,:host .actv.mus{border-top-color:#070912!important}.actv.mus .mu-main>.mu-head,.actv.mus .mu-main .mu-head:first-child{position:sticky;top:0;z-index:4;margin:0 -16px;padding-left:16px;padding-right:16px;background:var(--mu-bg,#070912)}.sheet{max-height:min(90vh,calc(100vh - env(safe-area-inset-top,0px) - 10px))!important}}
   .sheet-wrap.rpage .sheet{max-height:none!important}
   @media (min-width:900px){.actv{inset:4vh auto 4vh 50%;width:min(860px,94vw);transform:translate(-50%,24px);border-radius:30px;border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 90px rgba(0,0,0,.55)}
     .actv-wrap.open .actv{transform:translate(-50%,0)}}
@@ -3511,7 +3511,7 @@
         // la barra queda fija; sólo cambian los filtros y los resultados (no se pierde lo que escribís)
         if (u.mainKey !== 'search' || !el.querySelector || !el.querySelector('#muq')) {
           u.mainKey = 'search'; delete this._cache.mumain;
-          el.innerHTML = `<div class="mu-head"><h2>Buscar</h2></div><div class="mu-search">${ic('search')}<input id="muq" type="search" placeholder="¿Qué querés escuchar?" value="${esc(u.q)}" autocomplete="off">
+          el.innerHTML = `<div class="mu-head"><h2>Buscar</h2><button class="mt-x" data-action="musclose" aria-label="Cerrar">${ic('x')}</button></div><div class="mu-search">${ic('search')}<input id="muq" type="search" placeholder="¿Qué querés escuchar?" value="${esc(u.q)}" autocomplete="off">
             <button class="mt-x ${u.q ? '' : 'hide'}" data-action="m_clear" aria-label="Borrar">${ic('x')}</button></div><div id="muchips"></div><div id="mures"></div>`;
           this._els.muchips = el.querySelector ? el.querySelector('#muchips') : { innerHTML: '' };
           this._els.mures = el.querySelector ? el.querySelector('#mures') : { innerHTML: '' };
@@ -3587,7 +3587,7 @@
     _hMuLib() {
       const u = this._mus;
       const T = [['playlist', 'Playlists'], ['artist', 'Artistas'], ['album', 'Álbumes'], ['track', 'Canciones'], ['radio', 'Radio']];
-      let h = `<div class="mu-head"><h2>Tu biblioteca</h2><button class="mt-x" data-action="m_page" data-v="search" aria-label="Buscar">${ic('search')}</button></div>
+      let h = `<div class="mu-head"><h2>Tu biblioteca</h2><button class="mt-x" data-action="m_page" data-v="search" aria-label="Buscar">${ic('search')}</button><button class="mt-x" data-action="musclose" aria-label="Cerrar">${ic('x')}</button></div>
         <div class="mchips">${T.map(([k, l]) => `<button class="${u.libTab === k ? 'on' : ''}" data-action="m_libtab" data-v="${k}">${l}</button>`).join('')}</div>`;
       if (!u.entry) return h + '<div class="pempty">Hace falta Music Assistant.</div>';
       const L = u.lib[u.libTab];
