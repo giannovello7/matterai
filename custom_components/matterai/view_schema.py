@@ -150,7 +150,7 @@ ZONE = vol.Schema({
 }, extra=vol.REMOVE_EXTRA)
 
 
-CARD_STYLES = ("list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers", "services", "devices", "tile", "card", "bars")
+CARD_STYLES = ("list", "grid", "big", "compact", "separator", "chips", "tiles", "photo", "covers", "services", "devices", "tile", "card", "bars", "panel")
 
 
 def _card_style(v: Any) -> str | None:

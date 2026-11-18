@@ -373,24 +373,22 @@
       ];
     } else if (k === 'plano') {
       // Plano grande (como el panel de un departamento): el plano ocupa todo el alto de la pantalla y se toca por ambiente;
-      // al lado, dos columnas angostas: la hora con el clima, el resumen, las escenas y el modo ausente; las rutinas, la
-      // cerradura, la cámara y la música. En el celular, el plano arriba y lo demás debajo. Sin la hora arriba (va en su tarjeta).
+      // pegada a él, UNA columna angosta: el nombre con la hora, el clima y tres datos; las escenas; el modo ausente; las
+      // rutinas con su interruptor y la cerradura. Sin la barra de arriba (la campanita va en la tarjeta de la hora).
+      // En el celular, el plano arriba y lo demás debajo.
       const pl = Object.assign({ id: 'plano-plan', type: 'plan', cfg: {} }, plan || {}, { id: 'plano-plan' });
-      const one = (t, sec, extra) => Object.assign({ id: `plano-${t}`.slice(0, 24), type: t, cfg: {} }, extra || {}, T ? { sec } : {});
+      const one = (t, extra) => Object.assign({ id: `plano-${t}`.slice(0, 24), type: t, cfg: {} }, extra || {}, T ? { sec: 'a' } : {});
       B = [
         Object.assign({}, pl, T ? { sec: 'pl', h: 'full' } : {}, { cfg: Object.assign({}, pl.cfg || {}) }),
-        T ? one('clock', 'a') : null,
-        one('kpis', 'a', { cfg: { auto: true, max: T ? 6 : 3 } }),
-        one('scenes', 'a', { title: 'Escenas', cfg: { auto: true } }),
-        one('away', 'a', { title: 'Modo ausente', cfg: { auto: true } }),
-        one('routines', 'b', { title: 'Rutinas', cfg: { auto: true } }),
-        lock ? one('lock', 'b', { title: 'Entrada principal', cfg: { entity: lock } }) : null,
-        cams.length && T ? one('cam', 'b', { type: 'frigate', title: 'Cámaras' }) : null,
-        T ? one('music', 'b', { title: 'Música' }) : null,
+        one('clock', { cfg: { style: 'panel' } }),
+        one('scenes', { title: 'Escenas', cfg: { auto: true } }),
+        one('away', { title: 'Modo ausente', cfg: { auto: true } }),
+        one('routines', { title: 'Rutinas', cfg: { auto: true, style: 'list' } }),
+        lock ? one('lock', { title: 'Entrada principal', cfg: { entity: lock } }) : null,
       ];
-      hdr = T ? { clock: false, weather: false } : null;
+      hdr = { clock: false, weather: false, bell: false, menu: false };
       if (T) {
-        const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: 'matterai', v: 3, secs: [{ id: 'pl', title: '', w: 6 }, { id: 'a', title: '', w: 3 }, { id: 'b', title: '', w: 3 }] });
+        const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: 'matterai', v: 3, secs: [{ id: 'pl', title: '', w: 8 }, { id: 'a', title: '', w: 4 }] });
         delete out.cols; delete out.side;
         out.header = Object.assign({}, base.header || {}, hdr);
         return out;
@@ -492,7 +490,7 @@
         const cfg0 = card() && card()._config;
         const d = template(mine, kind(), m, v, (hass() || {}).states, cfg0 && cfg0.floorplan);
         if (v.plan) d.plan = v.plan;
-        d.header = Object.assign({}, v.header || {}, d.header && d.header.clock === false ? { clock: false, weather: false } : {}); d.dock = v.dock || null; d.theme = v.theme || null; d.style = TPL_STYLE[mine] || mine; d.bg = null;
+        d.header = Object.assign({}, v.header || {}, d.header && d.header.clock === false ? d.header : {}); d.dock = v.dock || null; d.theme = v.theme || null; d.style = TPL_STYLE[mine] || mine; d.bg = null;
         return d;
       }
       if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null, style: v.style || null, bg: v.bg || null, v: v.v, cols: v.cols, side: v.side, secs: v.secs };
@@ -865,6 +863,16 @@
         }
         case 'clock': {
           const d = new Date(), w = m.weather;
+          if (c.style === 'panel') {
+            const cf = card() && card()._config, brand = b.title || (cf && cf.installer) || 'MatterAI', ns = notes(m).length;
+            const items = [{ kind: 'lights' }, { kind: 'acs' }, m.power ? { kind: 'power' } : { kind: 'temp' }];
+            X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items;
+            const A = w ? w.attributes || {} : {};
+            return `<div class="v-card v-pnl"><div class="v-pnlh"><b>${esc(brand)}</b><button class="v-pnlc" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short' }))}</span></button>
+              <button class="v-sq v-pnlb" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button></div>
+              ${w ? `<button class="v-pnlw" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}<b>${esc(Math.round(Number(A.temperature)))}°</b><span>${esc(WX_TXT[w.state] || '')}${A.humidity != null ? `<br>Humedad ${esc(Math.round(Number(A.humidity)))} %` : ''}</span></button>` : ''}
+              <div class="v-kpis n3">${items.map((it, i) => kpi(m, it, i)).join('')}</div></div>`;
+          }
           if (c.style === 'tiles') {
             return `<div class="v-ctiles" data-scr="agenda"><div class="v-ct"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long' }))}</span></div><div class="v-ct"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { month: 'long' }))}</span></div></div>`;
           }
@@ -1282,6 +1290,7 @@
         if (X.sheet) { const sh = X.el.querySelector('#v-sheet'); if (sh && sh.classList) sh.classList.add('show'); }
       }
       set('#v-head', head(m, K === 'phone'));
+      { const H = L.header || {}; if (X.el.classList) X.el.classList.toggle('nohead', ['clock', 'weather', 'bell', 'menu'].every((k) => H[k] === false) && !H.greet); }
       const bl = L.blocks;
       if (secs) {
         const known = new Set(secs.map((x) => x.id));
@@ -1454,8 +1463,9 @@
       const top = (rs.top - re.top) / z + (editing() ? 0 : Math.max(0, re.top + (typeof scrollY === 'number' ? scrollY : 0)) / z);
       const dk = e.querySelector(kind() === 'tablet' ? '#v-dock' : '.v-bottom');
       const cs = dk && typeof getComputedStyle === 'function' ? getComputedStyle(dk) : null;
-      const below = cs && cs.position !== 'fixed' && cs.display !== 'none' ? dk.offsetHeight + 28 : kind() === 'tablet' ? 20 : 120;
+      const below = cs && cs.position !== 'fixed' && cs.display !== 'none' ? dk.offsetHeight + 16 : kind() === 'tablet' ? 16 : 120;
       e.style.setProperty('--v-full', `${Math.max(320, vh - top - below)}px`);
+      { const p = X.layout && X.layout.plan; e.style.setProperty('--par', String((p && p.aspect) || X.aspect || 0.6)); }
     }
     /** Micrófono a la vista siempre (como en el diseño), salvo que el instalador apague la voz. */
     function voiceOn() { const c = card(); return !!c && typeof c.voice === 'function' && !(c._config && c._config.voice === false); }

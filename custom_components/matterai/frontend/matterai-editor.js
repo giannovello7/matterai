@@ -1137,7 +1137,7 @@
           hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           h += '<p class="hint">El plano se arma en «Plano e imágenes» (en ⋯, arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
-        case 'clock': hs += this.styleSeg(c, [['', 'Hora grande'], ['tiles', 'Día y hora en dos cuadros']], ''); break;
+        case 'clock': hs += this.styleSeg(c, [['', 'Hora grande'], ['tiles', 'Día y hora en dos cuadros'], ['panel', 'Panel: nombre, hora, clima y 3 datos']], ''); break;
         case 'music': hs += this.styleSeg(c, [['', 'Barra'], ['card', 'Tarjeta con controles']], ''); break;
         case 'weather': hs += this.styleSeg(c, [['', 'Fila'], ['tile', 'Cuadro']], ''); h += this.ent('Clima (vacío: el de la casa)', 'wx', c.entity, ['weather'], 'cfg.entity') + this.action(c.tap, 'cfg.tap', 'Al tocar (vacío: abre el pronóstico)'); break;
         case 'climate':
@@ -1964,8 +1964,9 @@
           // el encabezado de la plantilla (Vidrio saluda en vez de mostrar la hora; Plano grande la lleva en su tarjeta)
           if (t.theme) L.theme = t.theme; // Vidrio arranca claro (se cambia en «Modo»)
           if (t.header && t.header.greet) L.header = Object.assign({}, L.header || {}, { greet: true }); else if (L.header) delete L.header.greet;
-          if (t.header && t.header.clock === false) L.header = Object.assign({}, L.header || {}, { clock: false, weather: false });
-          else if (L.header) { delete L.header.clock; delete L.header.weather; }
+          if (t.header && t.header.clock === false) L.header = Object.assign({}, L.header || {}, { clock: false, weather: false, bell: t.header.bell, menu: t.header.menu });
+          else if (L.header) { delete L.header.clock; delete L.header.weather; delete L.header.bell; delete L.header.menu; }
+          if (L.header) Object.keys(L.header).forEach((x) => { if (L.header[x] == null) delete L.header[x]; });
           if (kk === 'tablet' && !L.orientation) L.orientation = 'landscape';
         });
         this.sel = null; this.el = null; this.roomEd = null; this.rdraft = null;
