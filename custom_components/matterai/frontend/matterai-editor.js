@@ -20,6 +20,7 @@
     const s = document.createElement('script'); s.src = src; s.dataset.maeEd = src.split('?')[0]; s.onload = res; s.onerror = rej; document.head.appendChild(s);
   });
 
+  const MAX_CARDS = 60; // tarjetas por diseño: el mismo tope que la casa (views.py MAX_BLOCKS)
   const ACTION_TYPES = [['none', 'Nada'], ['toggle', 'Prender / apagar / abrir'], ['more_info', 'Ver más (ventana del equipo)'], ['room', 'Abrir un ambiente'], ['screen', 'Abrir una pantalla'], ['service', 'Llamar a un servicio']];
   const KPI_KINDS = [['alarm', 'Alarma'], ['lights', 'Luces prendidas'], ['temp', 'Temperatura adentro'], ['acs', 'Aires'], ['curtains', 'Cortinas'], ['power', 'Consumo'], ['people', 'Quién está'], ['entity', 'Un equipo (portón, sensor…)']];
   const DOM_NAME = { mae_scene: 'Escena MatterAI', mae_routine: 'Automatización MatterAI', light: 'Luz', switch: 'Interruptor', cover: 'Cortina / portón', lock: 'Cerradura', camera: 'Cámara', climate: 'Aire', fan: 'Ventilador', media_player: 'Parlante / TV',
@@ -207,8 +208,16 @@
   .tsw.tk-vision{background:linear-gradient(160deg,#8d735d,#5a4636)}.tsw.tk-vision i{background:rgba(255,255,255,.3);border-radius:7px}.tsw.tk-vision i:first-child{background:#d4f05a}
   .tsw.tk-control4{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.tsw.tk-control4 i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}
   .tsw.tk-plano{background:#161b21;grid-template-columns:1.3fr 1fr 1fr;grid-template-rows:1fr 1fr}.tsw.tk-plano i{background:#262e3a}.tsw.tk-plano i:first-child{grid-row:span 2;background:linear-gradient(160deg,#3b3020,#f2b766 140%)}
+  .tsw.tk-facil{background:linear-gradient(160deg,#8d735d,#5a4636);grid-template-columns:1fr 1fr}.tsw.tk-facil i{background:rgba(255,255,255,.85);border-radius:8px}
+  .tsw.tk-seguridad{background:#141522;grid-template-columns:2fr 1fr;grid-template-rows:1fr 1fr}.tsw.tk-seguridad i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}.tsw.tk-seguridad i:first-child{grid-row:span 2;background:#0b0e12;border-left:0;box-shadow:inset 0 0 0 1px #4c9bff}
+  .tsw.tk-pared{background:radial-gradient(70% 60% at 20% 20%,#ff9a76,transparent 60%),radial-gradient(70% 60% at 80% 80%,#6f6bff,transparent 60%),#1a1530;grid-template-columns:1fr 1fr 1fr}.tsw.tk-pared i{background:rgba(255,255,255,.28);border-radius:6px}
+  .tsw.tk-confort{background:linear-gradient(#3a3d44,#24262b)}.tsw.tk-confort i{background:linear-gradient(#4a4e57,#30333a);border-radius:5px;box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}.tsw.tk-confort i:first-child{box-shadow:0 0 6px #ffb347;background:#3c3426}
   .tsw.tk-savant{background:#050505}.tsw.tk-savant i{background:#161616;border-radius:2px}.tsw.tk-savant i:first-child{background:#c9a96e}
   .eseg.wrap{flex-wrap:wrap;height:auto}
+  textarea.code{width:100%;min-height:340px;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#0f1318;color:#e9ecf2;border:1px solid rgba(160,175,200,.25);border-radius:10px;padding:10px;tab-size:2;resize:vertical}
+  .catpaste{display:block;width:100%;text-align:left;margin:0 0 10px;padding:10px 12px;border-radius:12px;border:1px dashed #f2b766;background:rgba(242,183,102,.1);color:#e9ecf2;font:inherit;cursor:pointer}
+  .mlist small{color:#8f99ab;font-weight:400}
+  .fld input.bad,.fld textarea.bad{border-color:#f08a7c!important;box-shadow:0 0 0 2px rgba(240,138,124,.25)}
   .chips-of{display:flex;gap:3px;margin-top:2px}
   .chips-of.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px;padding:4px}
   .chips-of.icons button{display:grid;place-items:center;padding:7px 0;min-height:32px}
@@ -307,6 +316,8 @@
       if (mod && k === 'z' && !e.shiftKey) { e.preventDefault(); return this.cmd('undo').then(again); }
       if (mod && (k === 'y' || (k === 'z' && e.shiftKey))) { e.preventDefault(); return this.cmd('redo').then(again); }
       if (this.pe) return undefined;
+      if (mod && k === 'v' && !this.catBox) { e.preventDefault(); const at = this.sel && !this.zone ? { target: this.sel, after: true } : null; return this.pasteCard(this.rscope ? 'room-top' : null, at); }
+      if (mod && (k === 'c' || k === 'x') && this.sel && !this.zone && !this.catBox && !(window.getSelection && String(window.getSelection()))) { e.preventDefault(); return this.copyCard(this.sel, k === 'x'); }
       if (!this.sel || this.dlgOpen()) return undefined;
       if (mod && k === 'd') { e.preventDefault(); return this.blockAct(this.sel, 'dup'); }
       if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); return this.blockAct(this.sel, 'del'); }
@@ -314,21 +325,88 @@
       return undefined;
     }
     /** Lo que se hace con una tarjeta (desde la lista, la barra de la vista previa o el teclado). */
-    blockAct(id, act) {
+    blockAct(id, act, silent) {
       const B = this.blocks(), i = B.findIndex((b) => b.id === id); if (i < 0) return;
       if (act === 'w') return this.change(() => { const n = +B[i].span || 4, nx = n >= 4 ? 1 : n + 1; delete B[i].size; if (nx >= 4) delete B[i].span; else B[i].span = nx; });
       if (act === 'up' || act === 'down') return this.change(() => this.move(id, act === 'up' ? -1 : 1));
       if (act === 'left' || act === 'right') return this.change(() => { const S = this.secs(), k = S.findIndex((x) => x.id === this.secOf(B[i])), nx = S[k + (act === 'left' ? -1 : 1)]; if (nx) B[i].sec = nx.id; });
+      if (act === 'dup' && !this.roomFor(1)) return undefined;
       if (act === 'dup') return this.change(() => { const nb = clone(B[i]); nb.id = this.newId(nb.type); B.splice(i + 1, 0, nb); this.sel = nb.id; });
       if (act === 'del') {
         const name = (window.MaeVista.CATALOG[B[i].type] || {}).name || B[i].type;
         if (this.rscope) { this.change(() => { B.splice(i, 1); }); this.toast(`Tarjeta «${name}» sacada del ambiente · Ctrl+Z para deshacer`); this.backToRoom(); return undefined; }
         this.change(() => { B.splice(i, 1); if (this.sel === id) { this.sel = null; this.el = null; this.roomEd = null; this.rdraft = null; } });
-        this.toast(`Tarjeta «${name}» borrada · Ctrl+Z para deshacer`);
+        if (!silent) this.toast(`Tarjeta «${name}» borrada · Ctrl+Z para deshacer`);
       }
       return undefined;
     }
     newId(type) { return `${type}-${window.MaeVista.uid()}`.slice(0, 24); }
+    /** La tarjeta copiada (queda guardada en este navegador: se puede pegar en otro dashboard o en el otro equipo). */
+    clip() { try { const c = JSON.parse(localStorage.getItem('matterai.editor.clip') || 'null'); return c && c.card && c.card.type ? c : null; } catch (_) { return null; } }
+    copyCard(id, cut) {
+      const b = this.blocks().find((x) => x.id === id); if (!b) return;
+      const c = clone(b); delete c.sec; delete c.col; delete c.zone; delete c.fill;
+      try { localStorage.setItem('matterai.editor.clip', JSON.stringify({ card: c, at: Date.now() })); } catch (_) { this.toast('No se pudo copiar (el navegador no deja guardar)'); return; }
+      const n = b.title || (window.MaeVista.CATALOG[b.type] || {}).name || b.type;
+      if (cut) { this.blockAct(id, 'del', true); this.toast(`Tarjeta «${n}» cortada: pegala con Ctrl+V o desde «+ Tarjeta» (en este u otro dashboard)`); }
+      else this.toast(`Tarjeta «${n}» copiada: pegala con Ctrl+V o desde «+ Tarjeta» (en este u otro dashboard)`);
+    }
+    /** Pega la tarjeta copiada: al lado de la elegida, en la sección pedida o al final. */
+    pasteCard(zone, at) {
+      const c = this.clip(); if (!c) { this.toast('No hay ninguna tarjeta copiada'); return; }
+      const CAT = window.MaeVista.CATALOG, kinds = (CAT[c.card.type] || { kinds: [] }).kinds;
+      const room = zone && String(zone).startsWith('room-') && this.rdraft;
+      if (!kinds.includes(room ? 'phone' : this.K)) { this.toast(`Esa tarjeta no va en ${this.K === 'tablet' ? 'la tablet' : 'el celular'}`); return; }
+      if (room ? (this.rdraft.cards || []).length >= 12 : !this.roomFor(1)) { if (room) this.toast('Llegaste al máximo de 12 tarjetas en un ambiente.'); return; }
+      const nb = clone(c.card); nb.id = this.newId(nb.type);
+      if (room) {
+        nb.zone = zone === 'room-bottom' ? 'bottom' : 'top';
+        this.change(() => { (this.rdraft.cards = this.rdraft.cards || []).push(nb); });
+        this.pick(nb.id); return;
+      }
+      const S = this.secs(), want = zone && String(zone).startsWith('sec:') ? String(zone).slice(4) : null;
+      nb.sec = want && S.some((x) => x.id === want) ? want : S[S.length - 1].id;
+      this.change(() => {
+        const B = this.blocks(), j = at ? B.findIndex((x) => x.id === at.target) : -1;
+        if (j >= 0) { nb.sec = this.secOf(B[j]); B.splice(j + (at.after ? 1 : 0), 0, nb); } else B.push(nb);
+        this.sel = nb.id; this.dlgSnap = null; this.roomEd = null; this.rdraft = null;
+      });
+      this.dlgStart();
+      this.toast('Tarjeta pegada');
+    }
+    /** Editar una tarjeta como texto (como el «editor de código» de Home Assistant): para armar algo a medida. */
+    codeCard(id) {
+      const B = this.blocks(), b = B.find((x) => x.id === id); if (!b) return;
+      const show = clone(b); delete show.id; delete show.sec; delete show.col; delete show.zone; delete show.fill;
+      const box = this.modal(`Editar como texto · ${(window.MaeVista.CATALOG[b.type] || {}).name || b.type}`, `<p class="hint" style="margin-top:0">Toda la tarjeta en texto (JSON), como el editor de código de Home Assistant. Sirve para copiar una tarjeta entera o ajustar algo que no está en las pestañas. Si algo está mal escrito, no se cambia nada.</p>
+        <textarea class="code" data-code spellcheck="false">${esc(JSON.stringify(show, null, 2))}</textarea>
+        <p class="hint" data-cerr style="color:#f08a7c"></p>
+        <div class="fld" style="display:flex;gap:8px;justify-content:flex-end"><button class="eb" data-cx>Cancelar</button><button class="eb pri" data-cok>Aplicar</button></div>`, (e) => {
+        if (!e.target.closest('[data-cok]')) return;
+        const err = box.querySelector('[data-cerr]'); let o;
+        try { o = JSON.parse(box.querySelector('[data-code]').value); } catch (x) { err.textContent = `No es JSON válido: ${x.message}`; return; }
+        const CAT = window.MaeVista.CATALOG;
+        if (!o || typeof o !== 'object' || Array.isArray(o)) { err.textContent = 'Tiene que ser un objeto: { "type": …, "cfg": { … } }'; return; }
+        if (!CAT[o.type]) { err.textContent = `«type» tiene que ser uno de: ${Object.keys(CAT).join(', ')}`; return; }
+        if (!CAT[o.type].kinds.includes(this.rscope ? 'phone' : this.K)) { err.textContent = `Una tarjeta «${CAT[o.type].name}» no va en ${this.K === 'tablet' ? 'la tablet' : 'el celular'}`; return; }
+        if (o.cfg != null && (typeof o.cfg !== 'object' || Array.isArray(o.cfg))) { err.textContent = '«cfg» tiene que ser un objeto { … }'; return; }
+        if (o.title != null && String(o.title).length > 40) { err.textContent = 'El título puede tener hasta 40 letras'; return; }
+        if (o.span != null && !(+o.span >= 1 && +o.span <= 4)) { err.textContent = '«span» (ancho) va de 1 a 4'; return; }
+        if (o.h != null && o.h !== 'full' && !(+o.h >= 2 && +o.h <= 20)) { err.textContent = '«h» (alto) va de 2 a 20, o "full"'; return; }
+        this.closeCatalog();
+        this.change(() => { const i = B.findIndex((x) => x.id === id); if (i < 0) return; const nb = Object.assign({ cfg: {} }, o, { id: b.id }); if (b.sec) nb.sec = b.sec; if (b.zone) nb.zone = b.zone; delete nb.col; B[i] = nb; });
+        this.toast('Tarjeta cambiada · Ctrl+Z para deshacer');
+      });
+      const ta = box.querySelector('[data-code]'); ta.focus();
+      ta.onkeydown = (e) => { if (e.key === 'Tab') { e.preventDefault(); const p = ta.selectionStart; ta.setRangeText('  ', p, ta.selectionEnd, 'end'); } e.stopPropagation(); };
+    }
+    /** ¿Entra una tarjeta más? (la casa guarda hasta MAX_CARDS por diseño y 12 por ambiente) */
+    roomFor(n) {
+      const max = this.rscope || (this.rdraft && this.inRoom(this.sel)) ? 12 : MAX_CARDS, have = this.blocks().length;
+      if (have + (n || 1) <= max) return true;
+      this.toast(`Llegaste al máximo de ${max} tarjetas ${max === 12 ? 'en un ambiente' : 'en este diseño'}. Borrá alguna, o armá otro dashboard o una sección dentro de un ambiente.`, 6000);
+      return false;
+    }
     /** Arrastrar dentro de la vista previa: antes / después de otra tarjeta, o al final de una columna. */
     moveTo(from, where) {
       if (this.inRoom(from)) {
@@ -355,6 +433,7 @@
     }
     /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
     addBlock(type, col, zone, at) {
+      if (zone && String(zone).startsWith('room-') && this.rdraft ? (this.rdraft.cards || []).length >= 12 && (this.toast('Llegaste al máximo de 12 tarjetas en un ambiente.'), true) : !this.roomFor(1)) return;
       if (zone && String(zone).startsWith('room-') && this.rdraft) {
         const CAT0 = window.MaeVista.CATALOG, rcfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
         const nb = { id: this.newId(type), type, zone: zone === 'room-bottom' ? 'bottom' : 'top', cfg: rcfg };
@@ -393,6 +472,7 @@
       const atB = at && !inRoomZ ? this.blocks().find((x) => x.id === at.target) : null;
       const atTxt = atB ? ` · ${at.after ? 'después' : 'antes'} de «${esc(atB.title || (CAT[atB.type] || {}).name || atB.type)}»` : '';
       box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${atTxt ? atTxt : inRoomZ ? ` · ${esc(this.rdraft ? this.rdraft.name : 'ambiente')} (${zone === 'room-bottom' ? 'abajo' : 'arriba'} de los equipos)` : zone && String(zone).startsWith('sec:') ? ` · ${esc(this.secName(String(zone).slice(4)))}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
+        ${this.clip() && (CAT[this.clip().card.type] || { kinds: [] }).kinds.includes(K) ? `<button class="catpaste" data-cpaste>📋 Pegar la tarjeta copiada: <b>${esc(this.clip().card.title || (CAT[this.clip().card.type] || {}).name || '')}</b></button>` : ''}
         <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div></div>`;
       this.wrap.appendChild(box);
       this.catBox = box;
@@ -413,6 +493,7 @@
       inp.onkeydown = (e) => { if (e.key === 'Enter') { const f = g.querySelector('[data-ck]'); if (f) f.click(); } };
       box.onclick = (e) => {
         if (e.target === box || e.target.closest('[data-cx]')) return this.closeCatalog();
+        if (e.target.closest('[data-cpaste]')) { const at0 = this.catAt; this.closeCatalog(); this.pasteCard(zone, at0); return undefined; }
         const ck = e.target.closest('[data-ck]'); if (!ck) return undefined;
         const at0 = this.catAt; this.closeCatalog(); this.addBlock(ck.dataset.ck, col, zone, at0);
         return undefined;
@@ -485,9 +566,18 @@
       const n = this.blocks().filter((b) => this.secOf(b) === id).length;
       const box = this.modal('Sección', `<label class="fld"><span>Título (opcional; se ve arriba de sus tarjetas)</span><input data-st value="${esc(sc.title || '')}" maxlength="40" placeholder="Ej: Seguridad"></label>
         ${this.K === 'tablet' ? `<div class="fld"><span>Ancho en la tablet</span><span class="eseg wrap">${[[3, '¼'], [4, '⅓'], [6, '½'], [8, '⅔'], [9, '¾'], [12, 'Completo']].map(([k, l]) => `<button data-sw="${k}" class="${+sc.w === k ? 'on' : ''}">${l}</button>`).join('')}</span></div><p class="hint">También podés arrastrar la manija dorada de la barra de la sección. Las secciones se acomodan una al lado de la otra mientras entren.</p>` : '<p class="hint">En el celular las secciones van una debajo de la otra.</p>'}
+        <div class="fld"><span>Ordenar y copiar</span><span class="eseg wrap"><button data-smv="-1" ${S.indexOf(sc) === 0 ? 'disabled' : ''}>${this.K === 'tablet' ? '← Antes' : '↑ Antes'}</button><button data-smv="1" ${S.indexOf(sc) === S.length - 1 ? 'disabled' : ''}>${this.K === 'tablet' ? 'Después →' : 'Después ↓'}</button><button data-sdup>⧉ Duplicar la sección${n ? ` con sus ${n} tarjeta${n === 1 ? '' : 's'}` : ''}</button></span></div>
         <div class="fld" style="display:flex;gap:8px;justify-content:space-between"><button class="eb warn" data-sdel ${S.length < 2 ? 'disabled title="Tiene que quedar al menos una sección"' : ''}>Borrar la sección${n ? ` y sus ${n} tarjeta${n === 1 ? '' : 's'}` : ''}</button><button class="eb pri" data-sok>Listo</button></div>`, (e) => {
         const t = e.target;
         const sw = t.closest('[data-sw]'); if (sw) { this.closeCatalog(); this.change(() => { sc.w = +sw.dataset.sw; }); return; }
+        const mv = t.closest('[data-smv]'); if (mv && !mv.disabled) { this.closeCatalog(); this.change(() => { const i = S.indexOf(sc), j = i + +mv.dataset.smv; if (j < 0 || j >= S.length) return; S.splice(i, 1); S.splice(j, 0, sc); }); return; }
+        if (t.closest('[data-sdup]')) {
+          const B = this.blocks(), mine = B.filter((b) => this.secOf(b) === id);
+          if (!this.roomFor(mine.length)) return;
+          this.closeCatalog();
+          this.change(() => { const nid = `s-${window.MaeVista.uid()}`.slice(0, 24); S.splice(S.indexOf(sc) + 1, 0, Object.assign(clone(sc), { id: nid, title: sc.title ? `${sc.title} (copia)`.slice(0, 40) : '' })); mine.forEach((b) => { const nb = clone(b); nb.id = this.newId(nb.type); nb.sec = nid; B.push(nb); }); });
+          this.toast('Sección duplicada'); return;
+        }
         if (t.closest('[data-sdel]') && S.length > 1) { this.closeCatalog(); this.change(() => { const B = this.blocks(); for (let k = B.length - 1; k >= 0; k--) if (this.secOf(B[k]) === id) B.splice(k, 1); S.splice(S.indexOf(sc), 1); this.sel = null; }); this.toast('Sección borrada · Ctrl+Z para deshacer'); return; }
         if (t.closest('[data-sok]')) { const v = (box.querySelector('[data-st]').value || '').trim().slice(0, 40); this.closeCatalog(); if (v !== (sc.title || '')) this.change(() => { sc.title = v; }); }
       });
@@ -550,7 +640,7 @@
       return o;
     }
     fname(id) { const s = this.states()[id]; return (s && s.attributes.friendly_name) || id; }
-    toast(t) { const e = this.$('#toastE'); e.textContent = t; e.style.display = 'block'; clearTimeout(this.tt); this.tt = setTimeout(() => { e.style.display = 'none'; }, 2200); }
+    toast(t, ms) { const e = this.$ && this.$('#toastE'); if (!e) return; e.textContent = t; e.style.display = 'block'; clearTimeout(this.tt); this.tt = setTimeout(() => { e.style.display = 'none'; }, ms || Math.max(2200, Math.min(6000, String(t).length * 45))); }
     dirty() { return JSON.stringify(this.v) !== JSON.stringify(this.saved); }
     snap() { return JSON.stringify({ v: this.v, r: this.rdraft || null }); }
     unsnap(t) {
@@ -802,7 +892,7 @@
         viewH: this.deviceSize()[1], onDragAt: (x, y) => this.dragAt(x, y), onDragEnd: () => this.dragEnd(),
         onCols: null, onSec: (a, id, arg) => this.secAct(a, id, arg),
         onRows: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; if (n) bb.h = n; else delete bb.h; }); },
-        onSpan: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; this.lay().v = 2; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
+        onSpan: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
         onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
         room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null,
         roomPage: R ? Object.assign({ name: R.name }, Editor.roomPageOf(R.cards || [])) : null };
@@ -842,7 +932,9 @@
       const b = this.blocks().find((x) => x.id === id); if (!b) return;
       const K = this.K, CAT = window.MaeVista.CATALOG;
       this.modal(`${(CAT[b.type] || {}).name || b.type}${b.title ? ` · ${b.title}` : ''}`, `<div class="mlist">
-        <button data-cm="edit">✎ Editar</button><button data-cm="above">＋ Agregar una tarjeta arriba</button><button data-cm="below">＋ Agregar una tarjeta abajo</button><button data-cm="dup">⧉ Duplicar</button><button data-cm="copy">↗ Copiar a otro dashboard…</button>
+        <button data-cm="edit">✎ Editar</button><button data-cm="above">＋ Agregar una tarjeta arriba</button><button data-cm="below">＋ Agregar una tarjeta abajo</button><button data-cm="dup">⧉ Duplicar</button>
+        <button data-cm="clip">⎘ Copiar <small>(Ctrl+C · se pega en este u otro dashboard)</small></button><button data-cm="cut">✂ Cortar <small>(Ctrl+X)</small></button>${this.clip() ? '<button data-cm="paste">📋 Pegar la copiada abajo <small>(Ctrl+V)</small></button>' : ''}
+        <button data-cm="copy">↗ Mandar una copia a otro dashboard…</button><button data-cm="code">{ } Editar como texto</button>
         ${this.secs().length > 1 ? this.placeOpts().filter(([k]) => k !== this.placeOf(b)).map(([k, l]) => `<button data-cm="col" data-c="${k}">⇄ Pasar a: ${esc(l)}</button>`).join('') : ''}
         <button data-cm="del" class="warn">✕ Borrar la tarjeta</button></div>`, (e) => {
         const x = e.target.closest('[data-cm]'); if (!x) return;
@@ -851,6 +943,9 @@
         if (k === 'edit') this.pick(id);
         else if (k === 'above' || k === 'below') this.openCatalog(b.col || 0, b.zone || null, { target: id, after: k === 'below' });
         else if (k === 'copy') this.copyTo(b);
+        else if (k === 'clip' || k === 'cut') this.copyCard(id, k === 'cut');
+        else if (k === 'paste') this.pasteCard(null, { target: id, after: true });
+        else if (k === 'code') this.codeCard(id);
         else if (k === 'col') this.change(() => this.setPlace(b, x.dataset.c));
         else this.blockAct(id, k);
       });
@@ -1033,9 +1128,15 @@
         ${a.type === 'room' ? `<label class="fld"><span>Ambiente</span><select data-f="${path}.room">${a.room && !rooms.includes(a.room) ? `<option selected>${esc(a.room)}</option>` : ''}${rooms.map((r) => `<option ${a.room === r ? 'selected' : ''}>${esc(r)}</option>`).join('')}</select></label>` : ''}
         ${a.type === 'screen' ? `<label class="fld"><span>Pantalla</span><select data-f="${path}.screen">${Object.entries(SCR).map(([k, l]) => `<option value="${k}" ${a.screen === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label>` : ''}
         ${a.type === 'more_info' || a.type === 'toggle' ? this.ent('Equipo (vacío: el del botón)', 'ae', a.entity, null, `${path}.entity`) : ''}
-        ${a.type === 'service' ? `<label class="fld"><span>Servicio (dominio.servicio)</span><input data-f="${path}.service" value="${esc(a.service || '')}" placeholder="script.turn_on"></label>
+        ${a.type === 'service' ? `<label class="fld"><span>Servicio (dominio.servicio)</span><input data-f="${path}.service" value="${esc(a.service || '')}" placeholder="script.turn_on" list="mae-svcs" autocomplete="off" spellcheck="false">${this.svcList()}</label>
           <label class="fld"><span>Datos (JSON)</span><textarea data-fj="${path}.data">${esc(a.data ? JSON.stringify(a.data, null, 1) : '')}</textarea></label>` : ''}
         ${a.type !== 'none' ? `<label class="chk"><input type="checkbox" data-fb="${path}.confirm" ${a.confirm ? 'checked' : ''}> Pedir confirmación</label>` : ''}</div>`;
+    }
+    /** Los servicios que tiene la casa, para elegir escribiendo (como el selector de acciones de Home Assistant). */
+    svcList() {
+      const S = (this.hass && this.hass.services) || {}, out = [];
+      Object.keys(S).sort().forEach((d) => Object.keys(S[d] || {}).sort().forEach((x) => { if (out.length < 600) out.push(`${d}.${x}`); }));
+      return `<datalist id="mae-svcs">${out.map((x) => `<option value="${esc(x)}">`).join('')}</datalist>`;
     }
     items(b, opts) {
       const items = (b.cfg.items || []);
@@ -1579,6 +1680,11 @@
           if (path === 'col') val = +val;
           if (/^cfg\.(cols|min|max)$/.test(path)) val = val === '' ? '' : Number(val);
           if (path === 'cfg.image' && val && !/^\/local\/[\w./-]{1,160}$/.test(val)) { this.toast('La imagen tiene que estar en la casa: /local/archivo.png (o subila)'); return; }
+          if (/\.service$/.test(path)) {
+            val = val.trim().toLowerCase().replace(/\s+/g, '');
+            if (val && !/^[a-z_]{2,40}\.[a-z0-9_]{2,60}$/.test(val)) { x.classList.add('bad'); this.toast('El servicio va como dominio.servicio, por ejemplo light.turn_on o script.riego'); return; }
+            x.classList.remove('bad');
+          }
           if (/\.entity$/.test(path) || path === 'cfg.entity' || path === 'cfg.gate') { val = val.trim(); if (val && !this.states()[val]) { this.toast('Ese equipo no existe en la casa'); return; } }
           this.change(() => {
             this.setPath(b, path, val);
@@ -1792,10 +1898,32 @@
           else { this.saved = Editor.normalize(clone(res)); this.autosave(); }
           if (this.trying) await this.endTry();
           if (!quiet) this.toast('Guardado: los equipos con este dashboard lo ven al instante');
-        } catch (e) { this.toast(`No se pudo guardar: ${e.message || e}`); }
+        } catch (e) { this.saveFailed(e, quiet); }
         this.saving = false;
         if (this.$ && this.$('#edt')) this.draw();
       }
+    }
+    /** La casa no aceptó el guardado: se dice qué tarjeta y qué dato (no el mensaje técnico) y se abre esa tarjeta. */
+    saveFailed(e, quiet) {
+      const msg = String((e && e.message) || e || '');
+      const F = { service: 'el servicio', title: 'el título', name: 'el nombre', entity: 'el equipo', entities: 'los equipos', icon: 'el ícono', image: 'la imagen',
+        state: 'el estado', room: 'el ambiente', screen: 'la pantalla', data: 'los datos', color: 'el color', h: 'el alto', span: 'el ancho', w: 'el ancho', text: 'el texto' };
+      const m = msg.match(/\['layouts'\]\['(phone|tablet)'\]\['(blocks|secs)'\]\[(\d+)\](.*)$/);
+      let txt = `No se pudo guardar: ${msg}`, open = null;
+      const big = msg.match(/\['layouts'\]\['(phone|tablet)'\]\['blocks'\]$/);
+      if (big) txt = `No se pudo guardar: el diseño ${big[1] === 'tablet' ? 'de la tablet' : 'del celular'} tiene más de ${MAX_CARDS} tarjetas. Borrá algunas.`;
+      if (/demasiado grande/.test(msg)) txt = 'No se pudo guardar: el dashboard quedó demasiado grande (muchas tarjetas o imágenes). Sacá algunas.';
+      if (m) {
+        const L = ((this.v.layouts || {})[m[1]] || {})[m[2]] || [], x = L[+m[3]], keys = [...m[4].matchAll(/\['?([\w]+)'?\]/g)].map((y) => y[1]).filter((y) => !/^\d+$/.test(y));
+        const what = F[keys[keys.length - 1]] || 'un dato', where = m[1] === 'tablet' ? 'de la tablet' : 'del celular';
+        if (m[2] === 'secs') txt = `No se pudo guardar: la sección «${(x && x.title) || +m[3] + 1}» ${where} tiene ${what} mal cargado.`;
+        else if (x) { const n = (window.MaeVista.CATALOG[x.type] || {}).name || x.type; txt = `No se pudo guardar: la tarjeta «${x.title || n}» ${where} tiene ${what} mal cargado. Te la abro para corregirlo.`; if (m[1] === this.K) open = x.id; }
+      }
+      // guardando solo (cada cambio) no se repite el mismo aviso a cada rato
+      if (quiet && this.lastSaveErr === txt && Date.now() - (this.lastSaveErrAt || 0) < 15000) return;
+      this.lastSaveErr = txt; this.lastSaveErrAt = Date.now();
+      this.toast(txt, 6000);
+      if (open && this.sel !== open && !this.rscope) this.pick(open);
     }
     payloadAsView() { return Object.assign({}, this.payload(), { layouts: this.payload().layouts }); }
     /** Lo que se guarda (o se prueba): los dos diseños, el plano y lo demás del dashboard. */
@@ -1957,7 +2085,7 @@
         kinds.forEach((kk) => {
           const t = V.toSections(V.migrateLayout(V.template(k, kk, m, this.v, this.states(), this.cfg.floorplan), kk), kk);
           const L = (this.v.layouts = this.v.layouts || {})[kk] = this.v.layouts[kk] || {};
-          L.blocks = clone(t.blocks).map((b) => Object.assign(b, { id: this.newId(b.type) }));
+          L.blocks = clone(t.blocks).map((b) => { const nb = Object.assign(b, { id: this.newId(b.type) }); delete nb.col; delete nb.zone; delete nb.fill; return nb; });
           L.v = 3; L.secs = clone(t.secs); delete L.side; delete L.cols;
           const sty = (V.TPL_STYLE || {})[k] || k;
           L.style = sty === 'matterai' ? null : sty;

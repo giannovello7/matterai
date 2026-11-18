@@ -273,9 +273,13 @@
     ['control4', 'Panel', 'Panel táctil oscuro: accesos por tema, música, cámaras y aire'],
     ['savant', 'Elegante', 'Negro y champagne, minimalista: ambientes grandes, escenas, aire y seguridad'],
     ['plano', 'Plano grande', 'El plano de toda la casa a lo alto y al lado la hora, el resumen, escenas, modo ausente, rutinas y la cerradura'],
+    ['facil', 'Fácil', 'Botones grandes y pocos datos, para chicos o personas mayores: luces, escenas, alarma y la cámara'],
+    ['seguridad', 'Seguridad', 'Las cámaras grandes, la alarma, la cerradura, qué quedó abierto, quién está y la actividad'],
+    ['pared', 'Tablet de pared', 'Para la cocina o el living: la hora, el clima, la agenda, la música, escenas y luces'],
+    ['confort', 'Clima y consumo', 'El aire grande, el consumo de la casa, cortinas, luces, riego y las pilas a cambiar'],
   ];
   /* el estilo que usa cada plantilla (si no se dice, el de su mismo nombre) */
-  const TPL_STYLE = { plano: 'matterai' };
+  const TPL_STYLE = { plano: 'matterai', facil: 'apple', seguridad: 'control4', pared: 'liquid', confort: 'relieve' };
   function template(k, kind, m, legacy, S, floorplan) {
     const base = defaults(kind, m, legacy, S, floorplan);
     if (!k || k === 'matterai') return base;
@@ -391,6 +395,70 @@
         const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: 'matterai', v: 3, secs: [{ id: 'pl', title: '', w: 8 }, { id: 'a', title: '', w: 4 }] });
         delete out.cols; delete out.side;
         out.header = Object.assign({}, base.header || {}, hdr);
+        return out;
+      }
+    } else if (['facil', 'seguridad', 'pared', 'confort'].includes(k)) {
+      // plantillas por secciones (como las arma Home Assistant): cada tarjeta dice en qué sección va; en el celular, una
+      // debajo de la otra en el mismo orden. Lo que la casa no tiene (aire, alarma, cámaras, consumo) no se pone.
+      const S0 = (id, w) => ({ id, title: '', w });
+      const c = (t, sec, extra) => Object.assign({ id: `${k}-${t}`.slice(0, 24), type: t, cfg: {} }, extra || {}, T ? { sec } : {});
+      const has = { clim: !!clim, alarm: !!(m && m.alarm), cams: cams.length > 0, lock: !!lock, power: !!(m && m.power), weather: !!(m && m.weather) };
+      let secs;
+      if (k === 'facil') {
+        // pocas cosas y grandes: tres datos, los equipos como mosaicos grandes, escenas, la alarma y una cámara
+        secs = [S0('a', 6), S0('b', 6)];
+        B = [
+          c('kpis', 'a', { cfg: { auto: true, max: 3 } }),
+          c('tiles', 'a', { type: 'buttons', title: 'Equipos', cfg: { style: 'tiles', items: tilesFor(T ? 8 : 6) } }),
+          c('scenes', 'a', { title: 'Escenas', cfg: { auto: true } }),
+          has.alarm ? c('alarm', 'b', { title: 'Alarma' }) : null,
+          has.cams ? c('cam', 'b', { type: 'frigate', title: 'Cámara' }) : null,
+          has.lock ? c('lock', 'b', { title: 'Puerta', cfg: { entity: lock } }) : null,
+        ];
+      } else if (k === 'seguridad') {
+        // las cámaras grandes a la izquierda; al costado lo de la seguridad; abajo la actividad
+        secs = [S0('cam', 8), S0('seg', 4), S0('act', 12)];
+        B = [
+          has.alarm ? c('alarm', T ? 'seg' : 'cam', { title: 'Alarma' }) : null,
+          has.cams ? c('cams', 'cam', Object.assign({ type: 'frigate', title: 'Cámaras' }, T ? { h: 8 } : {})) : null,
+          has.lock ? c('lock', 'seg', { title: 'Entrada', cfg: { entity: lock } }) : null,
+          c('open', 'seg', { type: 'openings', title: 'Puertas y ventanas' }),
+          c('people', 'seg', { title: 'Quién está' }),
+          c('away', 'seg', { title: 'Modo ausente', cfg: { auto: true } }),
+          c('act', 'act', { type: 'activity', title: 'Actividad' }),
+        ];
+        if (!has.cams) secs = [S0('seg', 6), S0('cam', 6), S0('act', 12)];
+      } else if (k === 'pared') {
+        // para la pared: lo del día (hora, clima, agenda), la música y las escenas, y las luces y el aire
+        secs = [S0('dia', 4), S0('mus', 4), S0('casa', 4)];
+        B = [
+          T ? c('clock', 'dia') : null,
+          has.weather ? c('weather', 'dia', { title: 'Clima' }) : null,
+          c('agenda', 'dia', { title: 'Agenda' }),
+          c('music', 'mus', { title: 'Música', cfg: { style: 'card' } }),
+          c('scenes', 'mus', { title: 'Escenas', cfg: { auto: true } }),
+          c('lights', 'casa', { title: 'Luces' }),
+          has.clim ? c('climate', 'casa', { title: 'Aire', cfg: { entity: clim } }) : null,
+        ];
+      } else {
+        // confort: el aire grande, el clima y las cortinas; el consumo, las luces, el riego y las pilas
+        secs = [S0('aire', 6), S0('casa', 6)];
+        B = [
+          has.clim ? c('climate', 'aire', { title: 'Termostato', cfg: { entity: clim, style: 'big' } }) : null,
+          has.weather ? c('weather', 'aire', { title: 'Afuera' }) : null,
+          c('covers', 'aire', { title: 'Cortinas' }),
+          has.power ? c('energy', 'casa', { title: 'Consumo', cfg: { style: 'bars' } }) : null,
+          c('lights', 'casa', { title: 'Luces' }),
+          c('irrigation', 'casa', { title: 'Riego' }),
+          c('batteries', 'casa', { title: 'Pilas' }),
+        ];
+      }
+      B = B.filter(Boolean);
+      if (T) {
+        const used = new Set(B.map((x) => x.sec));
+        const out = Object.assign({}, base, { blocks: B, style: TPL_STYLE[k], v: 3, secs: secs.filter((x) => used.has(x.id)) });
+        delete out.cols; delete out.side;
+        if (k === 'pared') out.header = Object.assign({}, base.header || {}, { clock: false, weather: false }); // la hora va en su tarjeta
         return out;
       }
     } else if (k === 'savant') {

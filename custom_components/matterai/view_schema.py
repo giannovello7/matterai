@@ -54,7 +54,7 @@ SCREENS = ("agenda", "clima", "musica", "actividad", "camaras", "seguridad", "av
 ACTIONS = ("none", "toggle", "more_info", "room", "screen", "service")
 KPI_KINDS = ("alarm", "lights", "temp", "acs", "power", "curtains", "entity", "people")
 MEDIA_RE = re.compile(r"^(/api/matterai/media/[a-f0-9]{16}\.(jpg|png|webp)|/local/[\w./-]{1,160})$")
-MAX_VIEW_BYTES = 200_000
+MAX_VIEW_BYTES = 400_000
 
 _name = vol.All(str, vol.Length(max=60))
 _icon = vol.All(str, vol.Match(r"^[a-z0-9_-]{0,30}$"))
