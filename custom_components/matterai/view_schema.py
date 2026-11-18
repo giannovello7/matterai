@@ -235,7 +235,7 @@ def layout_schema(max_blocks: int) -> vol.Schema:
 
 
 # páginas de ambiente (2.25): tarjetas arriba y abajo de los equipos del ambiente
-MAX_ROOM_BLOCKS = 12
+MAX_ROOM_BLOCKS = 24  # desde la 2.35 los equipos del ambiente también son tarjetas
 
 
 def _unique_ids(page: dict[str, Any]) -> dict[str, Any]:
@@ -246,6 +246,7 @@ def _unique_ids(page: dict[str, Any]) -> dict[str, Any]:
 
 
 ROOM_PAGE = vol.All(vol.Schema({
+    vol.Optional("v"): vol.Any(None, vol.In([2])),  # 2: todo el ambiente son estas tarjetas (sus equipos incluidos)
     vol.Optional("top"): vol.Any(None, vol.All([BLOCK], vol.Length(max=MAX_ROOM_BLOCKS))),
     vol.Optional("bottom"): vol.Any(None, vol.All([BLOCK], vol.Length(max=MAX_ROOM_BLOCKS))),
 }, extra=vol.REMOVE_EXTRA), _unique_ids)

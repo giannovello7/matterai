@@ -75,7 +75,7 @@
   /* pantalla completa (cuando el equipo no la da de verdad, como el iPhone): ocupa todo, y de costado si está parado */
   :host(.fs){position:fixed!important;inset:0!important;z-index:2147483600;width:auto!important;height:auto!important;background:#000}
   :host(.fs) .wrap{position:absolute;inset:0;height:auto}
-  :host(.fs:not(.rot)) .wrap{top:env(safe-area-inset-top,0px);bottom:env(safe-area-inset-bottom,0px)} /* iPhone: debajo de la barra de la hora */
+  :host(.fs:not(.rot)) .wrap{top:max(env(safe-area-inset-top,0px),var(--ios-top,0px));bottom:env(safe-area-inset-bottom,0px)} /* iPhone: debajo de la barra de la hora */
   :host(.fs) .stage,:host(:fullscreen) .stage{aspect-ratio:auto;border-radius:0;flex:1}
   :host(.fs.rot) .wrap{inset:auto;left:50%;top:50%;width:100vh;height:100vw;transform:translate(-50%,-50%) rotate(90deg)}
   :host(.fs) .panel,:host(:fullscreen) .panel{display:none}

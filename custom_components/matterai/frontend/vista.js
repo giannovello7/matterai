@@ -278,6 +278,35 @@
     ['pared', 'Tablet de pared', 'Para la cocina o el living: la hora, el clima, la agenda, la música, escenas y luces'],
     ['confort', 'Clima y consumo', 'El aire grande, el consumo de la casa, cortinas, luces, riego y las pilas a cambiar'],
   ];
+  /** Las tarjetas de los equipos de un ambiente (r = ambiente del modelo de la casa), en el orden del instalador:
+   *  luces juntas, cada aire con su termostato, cortinas y portones, equipos, cerraduras, escenas, sensores y cámaras. */
+  function roomAutoCards(r) {
+    if (!r) return [];
+    const kindOf = {}, put = (k, ids) => (ids || []).forEach((id) => { if (!(id in kindOf)) kindOf[id] = k; });
+    put('light', r.lights); put('clim', r.climates); put('fan', r.fans); put('cover', r.covers); put('media', r.media); put('switch', r.switches);
+    put('lock', r.locks); put('action', r.actions); put('sensor', [...(r.motion || []), ...(r.openings || []), ...(r.sensors || [])]);
+    const DEF = ['light', 'clim', 'fan', 'cover', 'media', 'switch', 'lock', 'action', 'sensor'];
+    let ids = Object.keys(kindOf);
+    if (r.ord) { const at = (id) => (id in r.ord ? r.ord[id] : 1e6); ids = ids.sort((a, b) => at(a) - at(b)); } else ids = ids.sort((a, b) => DEF.indexOf(kindOf[a]) - DEF.indexOf(kindOf[b]));
+    const groups = []; ids.forEach((id) => { const k = kindOf[id], g = groups[groups.length - 1]; if (g && g.k === k) g.ids.push(id); else groups.push({ k, ids: [id] }); });
+    const out = [], n = {}, id = (t) => { n[t] = (n[t] || 0) + 1; return `ra-${t}-${n[t]}`.slice(0, 24); };
+    const items = (L) => L.map((e) => ({ entity: e }));
+    groups.forEach(({ k, ids: L }) => {
+      if (k === 'light') out.push({ id: id('lights'), type: 'lights', title: 'Iluminación', cfg: { entities: L } });
+      else if (k === 'clim') L.forEach((e) => out.push({ id: id('climate'), type: 'climate', cfg: { entity: e } }));
+      else if (k === 'cover') out.push({ id: id('covers'), type: 'covers', title: 'Cortinas y aberturas', cfg: { entities: L } });
+      else if (k === 'lock') L.forEach((e) => out.push({ id: id('lock'), type: 'lock', cfg: { entity: e } }));
+      else if (k === 'action') out.push({ id: id('scenes'), type: 'scenes', title: 'Escenas', cfg: { entities: L } });
+      else out.push({ id: id('buttons'), type: 'buttons', title: { fan: 'Ventiladores', media: 'Música y TV', switch: 'Equipos', sensor: 'Sensores' }[k] || 'Equipos', cfg: { items: items(L) } });
+    });
+    if ((r.cams || []).length) {
+      const cam = { id: id('frigate'), type: 'frigate', title: 'Cámaras', cfg: { entities: r.cams.slice() } };
+      if (r.camPos === 'top') out.unshift(cam);
+      else if (r.camPos === 'end') out.push(cam);
+      else { const j = out.findIndex((b) => b.type === 'scenes'); if (j >= 0) out.splice(j, 0, cam); else out.push(cam); }
+    }
+    return out.slice(0, 24);
+  }
   /* el estilo que usa cada plantilla (si no se dice, el de su mismo nombre) */
   const TPL_STYLE = { plano: 'matterai', facil: 'apple', seguridad: 'control4', pared: 'liquid', confort: 'relieve' };
   function template(k, kind, m, legacy, S, floorplan) {
@@ -1438,26 +1467,33 @@
       if (!lk) return;
       const c = lk.cloneNode(); c.setAttribute('data-mae-vista', '1'); rn.appendChild(c);
     }
+    /** Las tarjetas de un ambiente: las guardadas (v2: todo el ambiente son tarjetas, en el orden que eligió el
+     *  instalador) o, si nunca se editó, las de sus equipos armadas solas, con las viejas de arriba y de abajo. */
+    function roomBlocks(r, p) {
+      if (p && p.v === 2) return p.top || [];
+      return [...((p && p.top) || []), ...roomAutoCards(r), ...((p && p.bottom) || [])];
+    }
     function mountXtra(r, top, bot) {
       closeXtra();
-      if (!top || !bot || ctx.embed) return;
+      if (!top || ctx.embed) return false;
       adoptCss(top);
       const L = X.layout || {};
       const mk = (el0, zone) => { const inst = create(el0, Object.assign({}, ctx, { embed: zone, kind: 'phone' })); return inst; };
-      X.xtra = { r, top: mk(top, 'top'), bot: mk(bot, 'bottom'), theme: L.theme, style: L.style };
+      X.xtra = { r, top: mk(top, 'top'), theme: L.theme, style: L.style };
+      if (bot) bot.innerHTML = '';
       refreshXtra(true);
+      return true; // el motor dibuja todo el ambiente: la tarjeta deja sólo el título
     }
     function refreshXtra(force) {
       const x = X.xtra; if (!x) return;
-      const p = roomPage(x.r.name), L = X.layout || {};
-      const sig = JSON.stringify([p.top || [], p.bottom || [], L.theme, L.style, editing(), editing() && ctx.edit.selected]);
+      const p = roomPage(x.r.name), L = X.layout || {}, blocks = roomBlocks(x.r, p);
+      const sig = JSON.stringify([blocks, L.theme, L.style, editing(), editing() && ctx.edit.selected]);
       if (!force && x.sig === sig) return;
       x.sig = sig;
-      x.top.setCtx({ edit: ctx.edit }); x.bot.setCtx({ edit: ctx.edit });
-      x.top.setView({ blocks: p.top || [], theme: L.theme, style: L.style, plan: L.plan });
-      x.bot.setView({ blocks: p.bottom || [], theme: L.theme, style: L.style, plan: L.plan });
+      x.top.setCtx({ edit: ctx.edit });
+      x.top.setView({ blocks, theme: L.theme, style: L.style, plan: L.plan });
     }
-    function closeXtra() { const x = X.xtra; X.xtra = null; if (x) { try { x.top.destroy(); x.bot.destroy(); } catch (_) { /* ya estaban */ } } }
+    function closeXtra() { const x = X.xtra; X.xtra = null; if (x) { try { x.top.destroy(); } catch (_) { /* ya estaba */ } } }
     if (!ctx.embed) {
       // la pantalla más nueva es la que dibuja (si la app vuelve a crear el inicio, la tarjeta habla con la nueva)
       const hook = () => { const c = card(); if (c && !X.destroyed) { c.roomExtra = (r, top, bot) => mountXtra(r, top, bot); c.roomExtraClose = () => closeXtra(); } };
@@ -2163,5 +2199,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, TPL_STYLE, rowsPx, migrateLayout, toSections, SEC_W, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
+  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, TPL_STYLE, rowsPx, roomAutoCards, migrateLayout, toSections, SEC_W, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
 })(typeof window !== 'undefined' ? window : globalThis);

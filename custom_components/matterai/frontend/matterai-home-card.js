@@ -781,7 +781,7 @@
   .sheet-wrap.open{pointer-events:auto}.sheet-wrap.open .backdrop{opacity:1}.sheet-wrap.open .sheet{transform:none}
   .camcard.own{position:relative;aspect-ratio:16/9;border-radius:18px;overflow:hidden;background:#0b0e12}.camcard.own>*{position:absolute;inset:0;width:100%;height:100%}
   /* el ambiente como página completa (el instalador lo elige en el editor) */
-  .sheet-wrap.rpage .sheet{left:0!important;right:0!important;top:0!important;bottom:0!important;width:auto!important;max-width:none!important;max-height:none!important;border-radius:0!important;border:0!important;box-shadow:none!important;opacity:1!important;transform:translateX(100%)!important;padding:max(14px,env(safe-area-inset-top)) clamp(16px,4vw,48px) 30px!important}
+  .sheet-wrap.rpage .sheet{left:0!important;right:0!important;top:0!important;bottom:0!important;width:auto!important;max-width:none!important;max-height:none!important;border-radius:0!important;border:0!important;box-shadow:none!important;opacity:1!important;transform:translateX(100%)!important;padding:max(14px,max(env(safe-area-inset-top,0px),var(--ios-top,0px))) clamp(16px,4vw,48px) 30px!important}
   .sheet-wrap.rpage.open .sheet{transform:none!important}.sheet-wrap.rpage .grab{display:none!important}
   .sheet-wrap.rpage :is(.rcbox,.camcard.own){max-width:960px}
   .grab{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.18);margin:0 auto 14px}
@@ -858,7 +858,7 @@
   .actv-wrap.open .actv{transform:none;opacity:1}
   /* iPhone (app web): la barra de arriba (hora, batería) va encima de la página; las ventanas a pantalla completa
      (música, actividad…) arrancan debajo de ella. En Android y en Home Assistant ese margen es 0. */
-  @media (max-width:899px){.actv{border-top:env(safe-area-inset-top,0px) solid #05060d}:host([theme]) .actv,:host .actv{border-top-color:#0b0d16!important}:host([theme]) .actv.mus,:host .actv.mus{border-top-color:#070912!important}.actv.mus .mu-main>.mu-head,.actv.mus .mu-main .mu-head:first-child{position:sticky;top:0;z-index:4;margin:0 -16px;padding-left:16px;padding-right:16px;background:var(--mu-bg,#070912)}.sheet{max-height:min(90vh,calc(100vh - env(safe-area-inset-top,0px) - 10px))!important}}
+  @media (max-width:899px){.actv{border-top:max(env(safe-area-inset-top,0px),var(--ios-top,0px)) solid #05060d}:host([theme]) .actv,:host .actv{border-top-color:#0b0d16!important}:host([theme]) .actv.mus,:host .actv.mus{border-top-color:#070912!important}.actv.mus .mu-main>.mu-head,.actv.mus .mu-main .mu-head:first-child{position:sticky;top:0;z-index:4;margin:0 -16px;padding-left:16px;padding-right:16px;background:var(--mu-bg,#070912)}.sheet{max-height:min(90vh,calc(100vh - max(env(safe-area-inset-top,0px),var(--ios-top,0px)) - 10px))!important}}
   .sheet-wrap.rpage .sheet{max-height:none!important}
   @media (min-width:900px){.actv{inset:4vh auto 4vh 50%;width:min(860px,94vw);transform:translate(-50%,24px);border-radius:30px;border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 90px rgba(0,0,0,.55)}
     .actv-wrap.open .actv{transform:translate(-50%,0)}}
@@ -2715,17 +2715,19 @@
     _openRoom(id) {
       this._room = id; this._panel = null;
       // Dos partes: lo que se redibuja con cada cambio (luces, clima…) y las cámaras, que no se tocan para no cortar el video.
-      this._els.sheet.innerHTML = `<div id="sheettop" class="mae-xtra"></div><div id="sheetdyn"></div><div id="sheetcam"></div><div id="sheetdyn2"></div><div id="sheetbot" class="mae-xtra"></div>
+      this._els.sheet.innerHTML = `<div id="sheetdyn"></div><div id="sheettop" class="mae-xtra"></div><div id="sheetcam"></div><div id="sheetdyn2"></div><div id="sheetbot" class="mae-xtra"></div>
         <p class="hint">Tocá para encender · Deslizá para regular · Mantené presionado para más opciones</p>`;
       this._els.sheetdyn = this._els.sheet.querySelector('#sheetdyn');
       this._els.sheetcam = this._els.sheet.querySelector('#sheetcam');
       this._els.sheetdyn2 = this._els.sheet.querySelector('#sheetdyn2');
       this._cache.sheetdyn = null; this._cache.sheetdyn2 = null;
       this._roomCamEl = null; this._roomCamKey = null;
-      this._renderSheet();
-      // tarjetas que el instalador agregó a este ambiente (arriba y abajo de sus equipos): las dibuja el motor de dashboards
+      // el ambiente entero son tarjetas del motor de dashboards (sus equipos y las que agregó el instalador, en su orden);
+      // esta tarjeta deja sólo el título. Sin el motor (tarjeta suelta en Lovelace), el ambiente de siempre.
       const rr = this._m && this._m.byId && this._m.byId[id];
-      if (rr && typeof this.roomExtra === 'function') { try { this.roomExtra(rr, this._els.sheet.querySelector('#sheettop'), this._els.sheet.querySelector('#sheetbot')); } catch (_) { /* sin tarjetas extra */ } }
+      this._roomCards = false;
+      if (rr && typeof this.roomExtra === 'function') { try { this._roomCards = this.roomExtra(rr, this._els.sheet.querySelector('#sheettop'), this._els.sheet.querySelector('#sheetbot')) === true; } catch (_) { this._roomCards = false; } }
+      this._renderSheet();
       this._els.sheet.scrollTop = 0;
       this._els.sheetwrap.classList.toggle('rpage', !!(rr && rr.open === 'page'));
       this._els.sheetwrap.classList.add('open');
@@ -2749,6 +2751,13 @@
       }
       const r = this._m && this._m.byId[this._room];
       if (!r) return this._closeRoom();
+      if (this._roomCards) { // sólo el título: lo demás son las tarjetas del ambiente
+        this._set('sheetdyn', this._hSheet(r, true)[0]);
+        if (this._els.sheetdyn2) this._set('sheetdyn2', '');
+        if (this._els.sheetcam && this._els.sheetcam.firstChild) this._els.sheetcam.innerHTML = '';
+        this._roomCamEl = null; this._roomCamKey = null;
+        return;
+      }
       const [a, b] = this._hSheet(r); // las cámaras quedan entre las dos partes
       this._set('sheetdyn', a);
       if (this._els.sheetdyn2) this._set('sheetdyn2', b);
@@ -2860,7 +2869,7 @@
         <div class="bt">${off ? b('turn_on', 'power') : `${b('volume_down', 'minus')}${b('media_play_pause', st.state === 'playing' ? 'pause' : 'play', 'pp')}${b('volume_up', 'plus')}${b('turn_off', 'power')}`}</div></div>`;
     }
 
-    _hSheet(r) {
+    _hSheet(r, headOnly) {
       const S = this._hass.states, sub = [];
       if (r.temp != null) sub.push(`<span class="mt">${ic('thermo')}${fmt(r.temp)}°</span>`);
       if (r.hum != null) sub.push(`<span class="mh">${ic('drop')}${fmt(r.hum, 0)}%</span>`);
@@ -2873,7 +2882,7 @@
       let h = `<div class="grab"></div><div class="sh-head" style="--lc:${r.rgb}"><div class="ri big ${on ? 'on' : ''}">${ic(r.icon)}</div>
         <div class="sh-t"><h2>${esc(r.name)}</h2><div class="sh-sub">${sub.join('')}</div></div>
         <button class="ib" data-action="close" aria-label="Cerrar">${ic('x')}</button></div>`;
-      const head = h; if (pos === 'top') h = '';
+      const head = h; if (headOnly) return [head, '']; if (pos === 'top') h = '';
       const blk = (icon, title, body, extra = '') => `<div class="blk"><div class="blk-h"><h4>${ic(icon)}${title}</h4>${extra}</div>${body}</div>`;
       // En el orden exacto de la lista del instalador: las entidades seguidas del mismo tipo forman un bloque
       // (si el toldo está al final de la lista, va al final aunque el portón también sea una abertura).

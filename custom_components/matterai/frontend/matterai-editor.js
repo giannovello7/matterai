@@ -25,7 +25,8 @@
     fan: ['Ventiladores', 'buttons'], input_boolean: ['Interruptores de la casa', 'buttons'], media_player: ['Música y TV', 'buttons'], lock: ['Cerraduras', 'lock'], alarm_control_panel: ['Alarma', 'alarm'],
     sensor: ['Sensores', 'sensor'], binary_sensor: ['Puertas, ventanas y detectores', 'openings'], scene: ['Escenas', 'scenes'], script: ['Scripts', 'scenes'], weather: ['Clima', 'weather'],
     calendar: ['Calendarios', 'agenda'], valve: ['Válvulas de riego', 'irrigation'] };
-  const MAX_CARDS = 60; // tarjetas por diseño: el mismo tope que la casa (views.py MAX_BLOCKS)
+  const MAX_CARDS = 60;
+  const ROOM_MAX = 24; // tarjetas por ambiente (sus equipos son tarjetas desde la 2.35) // tarjetas por diseño: el mismo tope que la casa (views.py MAX_BLOCKS)
   const ACTION_TYPES = [['none', 'Nada'], ['toggle', 'Prender / apagar / abrir'], ['more_info', 'Ver más (ventana del equipo)'], ['room', 'Abrir un ambiente'], ['screen', 'Abrir una pantalla'], ['service', 'Llamar a un servicio']];
   const KPI_KINDS = [['alarm', 'Alarma'], ['lights', 'Luces prendidas'], ['temp', 'Temperatura adentro'], ['acs', 'Aires'], ['curtains', 'Cortinas'], ['power', 'Consumo'], ['people', 'Quién está'], ['entity', 'Un equipo (portón, sensor…)']];
   const DOM_NAME = { mae_scene: 'Escena MatterAI', mae_routine: 'Automatización MatterAI', light: 'Luz', switch: 'Interruptor', cover: 'Cortina / portón', lock: 'Cerradura', camera: 'Cámara', climate: 'Aire', fan: 'Ventilador', media_player: 'Parlante / TV',
@@ -410,7 +411,7 @@
       const CAT = window.MaeVista.CATALOG, kinds = (CAT[c.card.type] || { kinds: [] }).kinds;
       const room = zone && String(zone).startsWith('room-') && this.rdraft;
       if (!kinds.includes(room ? 'phone' : this.K)) { this.toast(`Esa tarjeta no va en ${this.K === 'tablet' ? 'la tablet' : 'el celular'}`); return; }
-      if (room ? (this.rdraft.cards || []).length >= 12 : !this.roomFor(1)) { if (room) this.toast('Llegaste al máximo de 12 tarjetas en un ambiente.'); return; }
+      if (room ? (this.rdraft.cards || []).length >= ROOM_MAX : !this.roomFor(1)) { if (room) this.toast(`Llegaste al máximo de ${ROOM_MAX} tarjetas en un ambiente.`); return; }
       const nb = clone(c.card); nb.id = this.newId(nb.type);
       if (room) {
         nb.zone = zone === 'room-bottom' ? 'bottom' : 'top';
@@ -455,9 +456,9 @@
     }
     /** ¿Entra una tarjeta más? (la casa guarda hasta MAX_CARDS por diseño y 12 por ambiente) */
     roomFor(n) {
-      const max = this.rscope || (this.rdraft && this.inRoom(this.sel)) ? 12 : MAX_CARDS, have = this.blocks().length;
+      const max = this.rscope || (this.rdraft && this.inRoom(this.sel)) ? ROOM_MAX : MAX_CARDS, have = this.blocks().length;
       if (have + (n || 1) <= max) return true;
-      this.toast(`Llegaste al máximo de ${max} tarjetas ${max === 12 ? 'en un ambiente' : 'en este diseño'}. Borrá alguna, o armá otro dashboard o una sección dentro de un ambiente.`, 6000);
+      this.toast(`Llegaste al máximo de ${max} tarjetas ${max === ROOM_MAX ? 'en un ambiente' : 'en este diseño'}. Borrá alguna, o armá otro dashboard o una sección dentro de un ambiente.`, 6000);
       return false;
     }
     /** Arrastrar dentro de la vista previa: antes / después de otra tarjeta, o al final de una columna. */
@@ -486,7 +487,7 @@
     }
     /** Tarjetas nuevas: con valores que ya muestran algo (no una tarjeta vacía). */
     addBlock(type, col, zone, at) {
-      if (zone && String(zone).startsWith('room-') && this.rdraft ? (this.rdraft.cards || []).length >= 12 && (this.toast('Llegaste al máximo de 12 tarjetas en un ambiente.'), true) : !this.roomFor(1)) return;
+      if (zone && String(zone).startsWith('room-') && this.rdraft ? (this.rdraft.cards || []).length >= ROOM_MAX && (this.toast(`Llegaste al máximo de ${ROOM_MAX} tarjetas en un ambiente.`), true) : !this.roomFor(1)) return;
       if (zone && String(zone).startsWith('room-') && this.rdraft) {
         const CAT0 = window.MaeVista.CATALOG, rcfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
         const nb = { id: this.newId(type), type, zone: zone === 'room-bottom' ? 'bottom' : 'top', cfg: rcfg };
@@ -682,7 +683,7 @@
     }
     /** Lugares de la tablet: cada columna y las bandas de arriba y de abajo. */
     placeOpts() {
-      if (this.rscope) return [['top', 'Arriba de los equipos'], ['bottom', 'Abajo de los equipos']];
+      if (this.rscope) return []; // en un ambiente no hay «arriba / abajo de los equipos»: sus equipos también son tarjetas
       return this.secs().map((x) => [x.id, this.secName(x.id)]); }
     placeOf(b) { if (this.rscope) return b.zone === 'bottom' ? 'bottom' : 'top'; return this.secOf(b); }
     setPlace(b, k) {
@@ -853,7 +854,8 @@
     /** {top, bottom} de las tarjetas de un ambiente (sin el lado, que es del editor). */
     static roomPageOf(cards) {
       const strip = (c) => { const b = clone(c); delete b.zone; delete b.col; return b; };
-      return { top: (cards || []).filter((c) => c.zone !== 'bottom').map(strip), bottom: (cards || []).filter((c) => c.zone === 'bottom').map(strip) };
+      // v2: el ambiente entero son estas tarjetas, en este orden (sus equipos incluidos)
+      return { v: 2, top: (cards || []).map(strip), bottom: [] };
     }
     drawList() {
       if (!this.$('#edl')) return; // ya no hay lista a la izquierda: se edita en la pantalla (como Lovelace)
@@ -1049,7 +1051,7 @@
         <span class="msep">Copiar y mover</span><button data-cm="dup">⧉ Duplicar <small>Ctrl+D</small></button><button data-cm="clip">⎘ Copiar <small>Ctrl+C</small></button>
         <button data-cm="cut">✂ Cortar <small>Ctrl+X</small></button>${this.clip() ? '<button data-cm="paste">📋 Pegar abajo <small>Ctrl+V</small></button>' : '<button data-cm="copy">↗ A otro dashboard…</button>'}
         ${this.clip() ? '<button data-cm="copy" class="mfull">↗ Mandar una copia a otro dashboard…</button>' : ''}
-        ${this.secs().length > 1 ? this.placeOpts().filter(([k]) => k !== this.placeOf(b)).map(([k, l]) => `<button data-cm="col" data-c="${k}">⇄ A ${esc(l)}</button>`).join('') : ''}
+        ${this.placeOpts().length > 1 ? this.placeOpts().filter(([k]) => k !== this.placeOf(b)).map(([k, l]) => `<button data-cm="col" data-c="${k}">⇄ A ${esc(l)}</button>`).join('') : ''}
         <span class="msep">Avanzado</span><button data-cm="code" class="mfull">{ } Editar como texto <small>como el editor de código de Home Assistant</small></button>
         <button data-cm="del" class="warn mfull">✕ Borrar la tarjeta <small>Supr</small></button></div>`, (e) => {
         const x = e.target.closest('[data-cm]'); if (!x) return;
@@ -1143,10 +1145,42 @@
       this.rdraft = i >= 0 ? clone(list[i]) : { name: this.roomEd || 'Ambiente nuevo', entities: [] };
       this.rdraft._orig = i >= 0 ? list[i].name : null;
       const own = (this.v.room_pages || {})[this.rdraft.name], page = own || this.rdraft.page || {};
-      this.rdraft.cards = [...(page.top || []).map((b) => Object.assign(clone(b), { zone: 'top' })), ...(page.bottom || []).map((b) => Object.assign(clone(b), { zone: 'bottom' }))];
+      if (page.v === 2) this.rdraft.cards = (page.top || []).map((b) => Object.assign(clone(b), { zone: 'top' }));
+      else {
+        // como lo dibuja la app: sus tarjetas de arriba, las de sus equipos y las de abajo, todas en una sola lista
+        const mr = ((this.model() || { rooms: [] }).rooms || []).find((x) => x.name === this.rdraft.name);
+        const auto = window.MaeVista.roomAutoCards ? window.MaeVista.roomAutoCards(mr) : [];
+        this.rdraft.cards = [...(page.top || []), ...auto, ...(page.bottom || [])].map((b) => Object.assign(clone(b), { zone: 'top' }));
+      }
       this.rdraft.local = !!own; this.rdraft._origLocal = !!own; this.rdraft._origCards = JSON.stringify(this.rdraft.cards);
       delete this.rdraft.page;
       return this.rdraft;
+    }
+    /** Cuántos equipos muestra una tarjeta (para la lista del ambiente). */
+    cardEnts(c) { const f = (c && c.cfg) || {}; return (f.entities || []).length + (f.items || []).filter((x) => x && x.entity).length + (f.entity ? 1 : 0); }
+    /** Un equipo nuevo en el ambiente: va a la tarjeta que le corresponde (las luces con las luces…) o a una nueva. */
+    roomCardAdd(id) {
+      const R = this.rdraft; if (!R) return;
+      R.cards = R.cards || [];
+      const nb = this.cardsFor([id])[0]; if (!nb) return;
+      const same = R.cards.find((c) => c.type === nb.type && ((nb.cfg.entities && Array.isArray((c.cfg || {}).entities)) || (nb.cfg.items && Array.isArray((c.cfg || {}).items))));
+      if (same && nb.cfg.entities) { if (!same.cfg.entities.includes(id)) same.cfg.entities.push(id); return; }
+      if (same && nb.cfg.items) { if (!same.cfg.items.some((x) => x && x.entity === id)) same.cfg.items.push({ entity: id }); return; }
+      if (R.cards.length >= ROOM_MAX) return;
+      nb.id = this.newId(nb.type); nb.zone = 'top'; R.cards.push(nb);
+    }
+    /** Un equipo que sale del ambiente: sale de sus tarjetas (las de un solo equipo se van). */
+    roomCardDel(id) {
+      const R = this.rdraft; if (!R || !id) return;
+      R.cards = (R.cards || []).filter((c) => {
+        const f = c.cfg || {};
+        if (Array.isArray(f.entities)) f.entities = f.entities.filter((e) => e !== id);
+        if (Array.isArray(f.items)) f.items = f.items.filter((x) => !x || x.entity !== id);
+        if (f.entity === id && !(f.entities && f.entities.length) && !(f.items && f.items.length)) return false;
+        if (['lights', 'covers', 'scenes', 'frigate'].includes(c.type) && Array.isArray(f.entities) && !f.entities.length) return false;
+        if (c.type === 'buttons' && Array.isArray(f.items) && !f.items.length) return false;
+        return true;
+      });
     }
     /** Lo que se hace desde el ambiente abierto en la pantalla del medio. */
     roomAct(a, i) {
@@ -1157,13 +1191,13 @@
       if (a === 'pick') { this.rme = i; this.rtab = 'cfg'; return redraw(); }
       if (a === 'move' && i && typeof i === 'object') { this.reorder('room', i.from, i.to); return undefined; }
       if (a === 'save') return this.saveRoom(false);
-      if (a === 'del') { L.splice(i, 1); this.rme = null; return redraw(); }
+      if (a === 'del') { const gone = L[i]; L.splice(i, 1); this.roomCardDel(typeof gone === 'object' ? gone && gone.entity : gone); this.rme = null; return redraw(); }
       if (a === 'up' || a === 'down') { const j = i + (a === 'up' ? -1 : 1); if (j < 0 || j >= L.length) return undefined; [L[i], L[j]] = [L[j], L[i]]; return redraw(); }
       if (a === 'add') {
         return this.openCB(null, ROOM_DOMAINS, (id) => {
           if (!id) return;
           if (L.some((y) => (y && y.entity) === id || y === id)) { this.toast('Ya está en este ambiente'); return; }
-          L.push(id); redraw();
+          L.push(id); this.roomCardAdd(id); redraw();
         }, false);
       }
       return undefined;
@@ -1438,7 +1472,8 @@
         if (hv && hv !== 'full') lay += `<div class="fld"><span class="eseg"><button data-bhd="-1" aria-label="Más bajo">− más bajo</button><button data-bhd="1" aria-label="Más alto">+ más alto</button></span></div>`;
         lay += '<p class="hint">También se cambia arrastrando el borde de abajo de la tarjeta (dos toques en ese borde la vuelven a automático). Con un alto fijo, si el contenido no entra se desliza adentro de la tarjeta.</p>';
       }
-      if (this.rscope || this.secs().length > 1) {
+      if (this.rscope) lay += '<p class="hint">Para cambiarla de lugar adentro del ambiente, arrastrala en la pantalla o usá ↑ ↓ en la lista del ambiente.</p>';
+      else if (this.secs().length > 1) {
         lay += `<div class="fld"><span>${this.rscope ? 'Dónde va' : 'Sección'}</span><span class="eseg wrap">${this.placeOpts().map(([k, l]) => `<button data-place="${k}" class="${this.placeOf(b) === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</span></div>`;
       }
       lay += '<p class="hint">Para moverla, también podés arrastrarla en la pantalla. Con ⋮ (en la tarjeta) se duplica, se copia a otro dashboard o se borra.</p>';
@@ -1701,17 +1736,17 @@
         ${(R.entities || []).map((x, i) => { const id = eid(x), d = id.split('.')[0]; return `<div class="rme" draggable="true" data-sr="room" data-i="${i}"><span class="hd" title="Arrastrar para ordenar">⋮⋮</span><span class="dtag">${esc(DOM_NAME[d] || d)}</span><span class="tx" data-rmpick="${i}" style="cursor:pointer"><b>${esc((x && x.name) || this.fname(id))}</b><small>${esc(id)}${this.states()[id] ? '' : ' · no existe'}</small></span>
           <button data-rmpick="${i}" title="Editar">✎</button><button data-rdel="${i}" title="Sacar">✕</button></div>`; }).join('') || '<p class="hint">Todavía no tiene equipos.</p>'}
         <div class="fld">${this.cbBtn('', 'data-radd="1"').replace('Elegir un equipo…', '+ Agregar un equipo')}</div>
-        <h4>Tarjetas del ambiente</h4>
-        <p class="hint" style="margin-top:0">Cualquier tarjeta (cámara, escenas, botones, música, texto…), arriba o abajo de sus equipos. Tocala en la pantalla para editarla y arrastrala para ordenarla.</p>
-        ${(R.cards || []).map((c) => `<div class="rme"><span class="dtag">${c.zone === 'bottom' ? 'Abajo' : 'Arriba'}</span><span class="tx"><b>${esc(c.title || (window.MaeVista.CATALOG[c.type] || {}).name || c.type)}</b><small>${esc((window.MaeVista.CATALOG[c.type] || {}).name || c.type)}</small></span>
-          <button data-rcpick="${esc(c.id)}" title="Editar">✎</button><button data-rcdel="${esc(c.id)}" title="Sacar">✕</button></div>`).join('') || '<p class="hint">Todavía no tiene tarjetas propias.</p>'}
-        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px"><button class="eb sm" data-rcadd="top">+ Tarjeta arriba</button><button class="eb sm" data-rcadd="bottom">+ Tarjeta abajo</button></div>
+        <h4>Lo que se ve en el ambiente (en este orden)</h4>
+        <p class="hint" style="margin-top:0">Todo son tarjetas, como en un dashboard: las de sus equipos y las que agregues (cámaras, escenas, música, texto…). Tocalas en la pantalla para editarlas, arrastralas para ordenarlas, o usá ↑ ↓ ✎ ✕ acá.</p>
+        ${(R.cards || []).map((c, i, A) => `<div class="rme"><span class="dtag">${i + 1}</span><span class="tx" data-rcpick="${esc(c.id)}" style="cursor:pointer"><b>${esc(c.title || (window.MaeVista.CATALOG[c.type] || {}).name || c.type)}</b><small>${esc((window.MaeVista.CATALOG[c.type] || {}).name || c.type)}${this.cardEnts(c) ? ` · ${this.cardEnts(c)} equipo${this.cardEnts(c) === 1 ? '' : 's'}` : ''}</small></span>
+          <button data-rcmv="${esc(c.id)}" data-d="-1" title="Más arriba" ${i ? '' : 'disabled'}>↑</button><button data-rcmv="${esc(c.id)}" data-d="1" title="Más abajo" ${i < A.length - 1 ? '' : 'disabled'}>↓</button><button data-rcpick="${esc(c.id)}" title="Editar">✎</button><button data-rcdel="${esc(c.id)}" title="Sacar del ambiente">✕</button></div>`).join('') || '<p class="hint">El ambiente está vacío: agregá una tarjeta o un equipo.</p>'}
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin:6px 0 10px"><button class="eb sm pri" data-rcadd="top">+ Agregar tarjeta</button>${(R.cards || []).length ? '' : '<button class="eb sm" data-rcauto>Volver a armarlo con sus equipos</button>'}</div>
         <div style="display:flex;gap:8px;margin-top:12px">${R._orig ? '<button class="eb warn sm" data-rx="del">Borrar este ambiente de la casa</button>' : ''}</div>
         <p class="hint">Los ambientes son de la casa: el cambio se ve en todos los dashboards y en la app al instante.</p>`;
     }
     async saveRoom(del, keep) {
       const R = clone(this.rdraft), orig = R._orig; delete R._orig;
-      const cards = R.cards || [], local = !!R.local, page = Editor.roomPageOf(cards), hasCards = page.top.length + page.bottom.length > 0;
+      const cards = R.cards || [], local = !!R.local, page = Editor.roomPageOf(cards), hasCards = true; // v2: se guarda siempre (aunque quede vacío)
       delete R.cards; delete R.local; delete R._origLocal; delete R._origCards;
       R.name = String(R.name || '').trim() || 'Ambiente';
       if (!R.icon) delete R.icon;
@@ -1835,7 +1870,7 @@
       const R = this.rdraft, redraw = () => { this.drawProps(); this.syncPreview(); this.bind(); };
       if (R) {
         W.querySelectorAll('#edr [data-rn]').forEach((x) => { x.onchange = () => { R[x.dataset.rn] = x.dataset.rn === 'name' ? (x.value.trim() || R.name) : x.value; this.syncPreview(); }; });
-        W.querySelectorAll('#edr [data-rdel]').forEach((x) => { x.onclick = () => { R.entities.splice(+x.dataset.rdel, 1); this.rme = null; redraw(); }; });
+        W.querySelectorAll('#edr [data-rdel]').forEach((x) => { x.onclick = () => { const gone = R.entities[+x.dataset.rdel]; R.entities.splice(+x.dataset.rdel, 1); this.roomCardDel(typeof gone === 'object' ? gone && gone.entity : gone); this.rme = null; redraw(); }; });
         W.querySelectorAll('#edr [data-rtab]').forEach((x) => { x.onclick = () => { this.rtab = x.dataset.rtab; redraw(); }; });
         W.querySelectorAll('#edr [data-rmpick]').forEach((x) => { x.onclick = (e) => { e.stopPropagation(); this.rme = +x.dataset.rmpick; redraw(); }; });
         W.querySelectorAll('#edr [data-rmback]').forEach((x) => { x.onclick = () => { this.rme = null; redraw(); }; });
@@ -1852,7 +1887,7 @@
         W.querySelectorAll('#edr [data-radd]').forEach((x) => { x.onclick = () => this.openCB(x, ROOM_DOMAINS, (id) => {
           if (!id) return; R.entities = R.entities || [];
           if (R.entities.some((y) => (y && y.entity) === id || y === id)) { this.toast('Ya está en este ambiente'); return; }
-          R.entities.push(id); redraw();
+          R.entities.push(id); this.roomCardAdd(id); redraw();
         }, false); });
         W.querySelectorAll('#edr [data-rx]').forEach((x) => { x.onclick = () => {
           const k = x.dataset.rx;
@@ -1921,6 +1956,8 @@
       const selB = () => this.blocks().find((y) => y.id === this.sel);
       W.querySelectorAll('#edr [data-rcpick]').forEach((x) => { x.onclick = () => this.pick(x.dataset.rcpick); });
       W.querySelectorAll('#edr [data-rcdel]').forEach((x) => { x.onclick = () => this.change(() => { const R = this.rdraft; if (R) R.cards = (R.cards || []).filter((c) => c.id !== x.dataset.rcdel); }); });
+      W.querySelectorAll('#edr [data-rcmv]').forEach((x) => { x.onclick = () => this.change(() => { const R = this.rdraft; if (!R) return; const L = R.cards || [], i = L.findIndex((c) => c.id === x.dataset.rcmv), j = i + +x.dataset.d; if (i < 0 || j < 0 || j >= L.length) return; [L[i], L[j]] = [L[j], L[i]]; }); });
+      W.querySelectorAll('#edr [data-rcauto]').forEach((x) => { x.onclick = () => this.change(() => { const R = this.rdraft; if (!R) return; const mr = ((this.model() || { rooms: [] }).rooms || []).find((y) => y.name === (R._orig || R.name)); R.cards = (window.MaeVista.roomAutoCards(mr) || []).map((b) => Object.assign(b, { id: this.newId(b.type), zone: 'top' })); }); });
       W.querySelectorAll('#edr [data-rcadd]').forEach((x) => { x.onclick = () => this.openCatalog(null, `room-${x.dataset.rcadd}`); });
       W.querySelectorAll('#edr [data-rlocal]').forEach((x) => { x.onchange = () => { if (this.rdraft) { this.rdraft.local = x.checked; this.drawProps(); this.bind(); } }; });
       W.querySelectorAll('#edr [data-span]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; const n = +x.dataset.span; if (n >= 4) { delete bb.span; delete bb.size; } else { bb.span = n; if (n === 2) bb.size = 'half'; else delete bb.size; } }); });
