@@ -117,6 +117,17 @@ def installer_only(rule: dict[str, Any]) -> bool:
     return rule.get("kind") in INSTALLER_KINDS or (rule.get("kind") == KIND_ROOM and bool((rule.get("ui") or {}).get("only_sensor")))
 
 
+def _rule_opts(rule: dict[str, Any] | None) -> set[str]:
+    """Las opciones que usa una regla armada a mano: «t:time», «c:sun», «a:notify»…"""
+    ui = (rule or {}).get("ui") or {}
+    out: set[str] = set()
+    for key, pre in (("triggers", "t"), ("conditions", "c"), ("actions", "a")):
+        for item in ui.get(key) or []:
+            if isinstance(item, dict) and item.get("type"):
+                out.add(f"{pre}:{item['type']}")
+    return out
+
+
 def _is_admin(user) -> bool:
     return user is None or bool(getattr(user, "is_admin", False))
 
@@ -538,6 +549,10 @@ class RuleManager:
         if isinstance(off, list):
             # tipos que este cliente no puede crear (los decide el instalador)
             self.settings["client_off"] = sorted({str(k) for k in off if k in KINDS})
+        opt = settings.get("opt_off")
+        if isinstance(opt, list):
+            # opciones de «Si… / Sólo si… / Entonces…» y las ideas de ejemplo que el cliente no ve (2.34)
+            self.settings["opt_off"] = sorted({str(k)[:40] for k in opt if isinstance(k, str)})[:80]
         self._save()
         self._changed()
 
@@ -572,7 +587,7 @@ class RuleManager:
         await self.async_stop_all()
         self.rules = {r["id"]: r for r in clean}
         if isinstance(settings, dict):
-            self.settings.update({k: v for k, v in settings.items() if k in ("hidden", "client_off")})
+            self.settings.update({k: v for k, v in settings.items() if k in ("hidden", "client_off", "opt_off")})
         self._save()
         await self.async_start_all()
         return len(clean)
@@ -835,6 +850,12 @@ class RuleManager:
                 raise InvalidRule("Esto lo configura tu instalador")
             if not prev and raw.get("kind") in self.settings.get("client_off", []):
                 raise InvalidRule("Tu instalador no habilitó este tipo de automatización")
+            # las opciones que el instalador apagó: no se pueden sumar (lo que ya tenía la regla sigue)
+            off = set(self.settings.get("opt_off", []))
+            if off:
+                new = _rule_opts(raw) - (_rule_opts(prev) if prev else set())
+                if new & off:
+                    raise InvalidRule("Tu instalador no habilitó esa opción para las automatizaciones")
         rule = await self.async_validate(raw, is_admin)
         old = self.rules.get(rule["id"])
         rule["locked"] = bool(raw.get("locked")) if is_admin else False

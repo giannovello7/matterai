@@ -951,6 +951,36 @@ const CLIENT_KINDS = [['scene', 'Escenas'], ['auto', 'Automáticas («Si… ento
   ['period', 'Encender en un horario'], ['loop', 'Ciclos'], ['presence', 'Simular presencia'], ['wake', 'Despertador con luz'], ['night', 'Buenas noches'], ['away', 'Me voy / Llego'],
   ['room', 'Luz por presencia'], ['circadian', 'Luz circadiana y brillo'], ['clima', 'Clima inteligente'], ['tv', 'Tele inteligente'], ['watch', 'Avisar si algo quedó abierto'],
   ['guest', 'Invitados'], ['doorbell', 'Portero'], ['fdetect', 'Detección con cámaras'], ['fface', 'Caras y patentes'], ['irrigation', 'Riego']];
+/* Pantalla del instalador «Qué puede usar el cliente»: cada automatización lista, agrupada, con qué necesita la casa. */
+const has2 = (h, d, f) => Object.keys(h.states).some((e) => dom(e) === d && (!f || f(h.states[e].attributes || {})));
+const SENSORS = (h) => has2(h, 'binary_sensor', (a) => ['motion', 'occupancy', 'presence', 'door', 'window', 'opening', 'garage_door'].includes(a.device_class));
+const KIND_GROUPS = [
+  ['Básicas', [['scene', 'Escenas: varias cosas con un toque'], ['auto', 'Automáticas «Si… entonces…» (las arma el cliente)'], ['timer', 'Temporizadores («apagá en 30 min»)'], ['period', 'Encender y apagar en un horario']]],
+  ['Rutinas de la casa', [['night', 'Buenas noches'], ['wake', 'Despertador con luz'], ['away', 'Me voy / Llego'], ['presence', 'Simular presencia (de viaje)'], ['guest', 'Invitados (link para abrir)'], ['reminder', 'Recordatorios'], ['calalert', 'Avisos del calendario']]],
+  ['Necesitan sensores', [['room', 'Luz por presencia'], ['watch', 'Avisar si algo quedó abierto o prendido'], ['loop', 'Ciclos (repetir algo)']]],
+  ['Luces y clima inteligentes', [['circadian', 'Luz circadiana y brillo según la hora'], ['clima', 'Clima inteligente (aires)']]],
+  ['Multimedia', [['tv', 'Tele inteligente (modo cine)']]],
+  ['Cámaras y portero', [['doorbell', 'Portero'], ['fdetect', 'Detección con cámaras'], ['fface', 'Caras y patentes conocidas']]],
+  ['Jardín', [['irrigation', 'Riego por zonas']]],
+];
+/* qué tiene que tener la casa para que cada una sirva (si no lo tiene, se sugiere apagarla) */
+const KIND_NEED = {
+  room: [SENSORS, 'sensores de movimiento o puertas'], watch: [(h) => SENSORS(h) || has(h, 'cover') || has(h, 'climate') || has(h, 'lock'), 'puertas, portones, aires o cerraduras'],
+  circadian: [(h) => has2(h, 'light', (a) => (a.supported_color_modes || []).some((m) => m !== 'onoff')), 'luces que regulan'], clima: [(h) => has(h, 'climate'), 'aires acondicionados'],
+  tv: [(h) => has(h, 'media_player'), 'una tele conectada'], doorbell: [(h) => has(h, 'camera'), 'un portero con cámara'], fdetect: [(h) => has(h, 'camera'), 'cámaras con Frigate'],
+  fface: [(h) => has(h, 'camera'), 'cámaras con Frigate'], irrigation: [(h) => has(h, 'valve') || has(h, 'switch'), 'válvulas de riego'], away: [(h) => has(h, 'person'), 'personas con la app'],
+  calalert: [(h) => has(h, 'calendar'), 'un calendario'], guest: [(h) => has(h, 'cover') || has(h, 'lock'), 'un portón o una cerradura'], presence: [(h) => has(h, 'light'), 'luces'],
+};
+const kindOk = (h, k) => !KIND_NEED[k] || KIND_NEED[k][0](h);
+const ALL_KIND_IDS = KIND_GROUPS.flatMap(([, L]) => L.map(([k]) => k));
+const OPT_LISTS = [['t', 'Si… (qué la dispara)', () => TRIGGER_TYPES], ['c', 'Sólo si… (condiciones)', () => COND_TYPES], ['a', 'Entonces… (qué hace)', () => ACTION_TYPES]];
+/* perfiles de un toque */
+const PROFILES = {
+  casa: { name: 'Según esta casa', hint: 'Apaga lo que la casa no puede usar (sin sensores: nada de luz por presencia…)' },
+  basico: { name: 'Básico: escenas y horarios', hint: 'Escenas, horarios, temporizadores y rutinas; sin las inteligentes ni las ideas armadas' },
+  todo: { name: 'Todo', hint: 'El cliente puede crear de todo' },
+  nada: { name: 'Sólo usar lo armado', hint: 'No crea nada: usa, activa y pausa lo que armaste vos' },
+};
 const TV_APPS = ['Netflix', 'Prime Video', 'Disney+', 'Max', 'YouTube', 'Paramount+', 'Apple TV', 'Plex', 'Kodi', 'Flow', 'Star+', 'Crunchyroll'];
 const FLABELS = { person: 'Persona', car: 'Auto', motorcycle: 'Moto', bicycle: 'Bicicleta', truck: 'Camión', dog: 'Perro', cat: 'Gato', bird: 'Pájaro', package: 'Paquete' };
 const REM_KINDS = ['reminder', 'calalert'];
@@ -1780,11 +1810,40 @@ class MatterAIEscenasCard extends HTMLElement {
         }).join('')}</div>`;
     }).join('')}</div>`;
   }
+  /** ¿Se muestra como instalador? (un admin puede mirar «como el cliente») */
+  get _adm() { return this._isAdmin && !this._asClient; }
+  _optOff() { return this._adm ? new Set() : new Set(this._settings?.opt_off || []); }
+  /** Un perfil de un toque → qué tipos y qué opciones quedan apagados. */
+  _profile(k) {
+    const h = this._hass, allOpts = OPT_LISTS.flatMap(([p, , L]) => L().map((x) => `${p}:${x.id}`));
+    if (k === 'todo') return { client_off: [], opt_off: [] };
+    if (k === 'nada') return { client_off: ALL_KIND_IDS.slice(), opt_off: ['ideas', ...allOpts] };
+    if (k === 'basico') {
+      const on = new Set(['scene', 'auto', 'timer', 'period', 'night', 'wake', 'away', 'presence', 'reminder']);
+      const optOn = new Set(['t:device', 't:time', 't:sun', 't:presence', 'c:time', 'c:sun', 'c:device', 'c:presence', 'c:dates', 'a:device', 'a:area', 'a:scene', 'a:notify', 'a:delay']);
+      return { client_off: ALL_KIND_IDS.filter((x) => !on.has(x) || !kindOk(h, x)), opt_off: ['ideas', ...allOpts.filter((x) => !optOn.has(x))] };
+    }
+    // según esta casa: apaga lo que sus equipos no pueden usar (sin sensores, sin cámaras…)
+    const sens = SENSORS(h);
+    return { client_off: ALL_KIND_IDS.filter((x) => !kindOk(h, x) || ['fdetect', 'fface', 'doorbell'].includes(x) && !has(h, 'camera')), opt_off: sens ? [] : ['ideas'] };
+  }
   _pageSettings() {
+    const h = this._hass, o = this._ov, off = new Set(o.clientOff || []), oo = new Set(o.optOff || []);
+    const row = (a, v, on, t1, t2, warn) => `<button class="item" data-a="${a}" data-v="${esc(v)}"><div class="tx"><div class="t1">${esc(t1)}</div>${t2 ? `<div class="t2">${esc(t2)}</div>` : ''}${warn ? `<div class="t2" style="color:#F7B84F">⚠ ${esc(warn)}</div>` : ''}</div><span class="sw ${on ? 'on' : ''}"></span></button>`;
+    const kinds = KIND_GROUPS.map(([g, L]) => `<div class="grp">${esc(g)}</div><div class="card">${L.map(([k, l]) => row('coff', k, !off.has(k), l, '', kindOk(h, k) ? '' : `Esta casa no tiene ${KIND_NEED[k][1]}`)).join('')}</div>`).join('');
+    const opts = OPT_LISTS.map(([p, t, L]) => `<div class="grp">${esc(t)}</div><div class="card">${L().map((x) => row('ooff', `${p}:${x.id}`, !oo.has(`${p}:${x.id}`), x.label, x.hint ? `Ej: ${x.hint}` : '', x.need && !x.need(h) ? 'Esta casa no lo tiene (no le aparece igual)' : '')).join('')}</div>`).join('');
     return `<div class="ov"><div class="bar"><button class="ib" data-a="back"><ha-icon icon="mdi:arrow-left"></ha-icon></button><h1>Ajustes del instalador</h1><button class="save" data-a="ssave">Guardar</button></div>
       <div class="body"><div class="wrap">
-        <div class="sec" style="margin-top:0"><div><div class="h">Qué puede crear el cliente</div><div class="s">Lo que ya está armado sigue funcionando y el cliente lo puede activar o pausar</div></div></div>
-        <div class="chips">${CLIENT_KINDS.map(([k, l]) => { const on = !(this._ov.clientOff || []).includes(k); return `<button class="chip ${on ? 'on' : ''}" data-a="coff" data-v="${k}">${on ? '✓ ' : ''}${esc(l)}</button>`; }).join('')}</div>
+        <div class="sec" style="margin-top:0"><div><div class="h">Qué puede usar el cliente</div><div class="s">Vos, como administrador, ves todo siempre. Lo que ya armaste sigue funcionando y el cliente lo puede activar o pausar.</div></div></div>
+        <div class="grp">Perfil rápido</div>
+        <div class="chips">${Object.entries(PROFILES).map(([k, p]) => `<button class="chip" data-a="sprof" data-v="${k}" title="${esc(p.hint)}">${esc(p.name)}</button>`).join('')}</div>
+        <div class="note" style="margin-top:6px">Un perfil marca todo de una vez; después ajustás lo que quieras abajo. «Según esta casa» mira sus equipos: sin sensores apaga la luz por presencia, sin cámaras el portero…</div>
+        <button class="btn" style="margin-top:10px" data-a="asclient"><ha-icon icon="mdi:eye-outline"></ha-icon> Ver cómo lo ve el cliente</button>
+        <div class="sec"><div><div class="h">Automatizaciones listas</div><div class="s">Qué tipos de automatización puede crear el cliente</div></div></div>
+        ${kinds}
+        <div class="card" style="margin-top:10px">${row('ooff', 'ideas', !oo.has('ideas'), 'Ideas para empezar', 'Las automatizaciones de ejemplo de «Armar la mía»')}</div>
+        <div class="sec"><div><div class="h">Al armar una automatización</div><div class="s">Qué opciones le aparecen en «Si… / Sólo si… / Entonces…»</div></div></div>
+        ${opts}
         <div class="sec"><div><div class="h">Equipos visibles</div></div></div>
         <div class="note" style="margin-top:6px">Elegí qué equipos puede usar el cliente al armar escenas y automatizaciones. Los desmarcados no aparecen en las listas (lo que ya está creado sigue funcionando). Sólo vos, como administrador, ves esta pantalla.</div>
         <div class="search" style="margin-top:12px"><input type="text" placeholder="Buscar por nombre, ambiente o tipo…" value="${esc(this._ov.ssearch || '')}" data-a="ssearch"></div>
@@ -1796,8 +1855,9 @@ class MatterAIEscenasCard extends HTMLElement {
   _pageCreate() {
     const h = this._hass;
     let it = (a, attrs, icon, color, t1, t2) => `<button class="item" data-a="${a}" ${attrs}><div class="ic" style="background:${color}"><ha-icon icon="${icon}"></ha-icon></div><div class="tx"><div class="t1">${esc(t1)}</div>${t2 ? `<div class="t2">${esc(t2)}</div>` : ''}</div><ha-icon class="chev" icon="mdi:chevron-right"></ha-icon></button>`;
-    const trig = TRIGGER_TYPES.filter((t) => !t.need || t.need(h));
-    const ideas = IDEAS.filter((i) => !i.need || i.need(h));
+    const oo = this._optOff();
+    const trig = TRIGGER_TYPES.filter((t) => (!t.need || t.need(h)) && !oo.has(`t:${t.id}`));
+    const ideas = oo.has('ideas') ? [] : IDEAS.filter((i) => !i.need || i.need(h));
     const tab = this._ctab || 'smart';
     const riego = IDEAS.findIndex((i) => i.make && i.name.startsWith('Riego'));
     // qué tipos puede crear este usuario (el instalador los elige por casa)
@@ -1811,13 +1871,13 @@ class MatterAIEscenasCard extends HTMLElement {
     const itAll = it;
     const itOk = (a, attrs, ...rest) => {
       const k = kindOf(a, attrs);
-      if (k === 'occ' || k === 'gate') return this._isAdmin ? itAll(a, attrs, ...rest) : '';
-      return this._isAdmin || !off.has(k) ? itAll(a, attrs, ...rest) : '';
+      if (k === 'occ' || k === 'gate') return this._adm ? itAll(a, attrs, ...rest) : '';
+      return this._adm || !off.has(k) ? itAll(a, attrs, ...rest) : '';
     };
     it = itOk;
     let body = tab === 'smart' ? `
       <div class="hint" style="margin:2px 4px 0">Automatizaciones completas, listas para usar: elegís tus equipos y ajustás lo que quieras.</div>
-      ${this._isAdmin ? `<div class="sec"><div><div class="h">🛠 Equipos del instalador</div><div class="s">Se configuran una vez al instalar. El cliente no los ve: usa lo que crean (el portón, el sensor)</div></div></div>
+      ${this._adm ? `<div class="sec"><div><div class="h">🛠 Equipos del instalador</div><div class="s">Se configuran una vez al instalar. El cliente no los ve: usa lo que crean (el portón, el sensor)</div></div></div>
       <div class="card">
         ${it('newkind', 'data-v="gate"', 'mdi:gate', '#4F8EF7', 'Portón inteligente', 'Abriendo / Cerrando con un solo sensor, aprende cuánto tarda, seguros del pulso y avisos')}
         ${it('newocc', '', 'mdi:account-check-outline', '#7A8699', 'Sensor de ocupación de un ambiente', 'Movimiento + puerta (+ mmWave): sabe si hay alguien aunque no se mueva. Para usar en otras automatizaciones')}
@@ -1872,9 +1932,10 @@ class MatterAIEscenasCard extends HTMLElement {
       <div class="card">${ideas.map((i) => it('idea', `data-v="${IDEAS.indexOf(i)}"`, i.icon, i.color, i.name, i.hint)).join('')}</div>`;
     // secciones que quedaron vacías (tipos que el instalador no habilitó)
     body = body.replace(/<div class="sec"[^>]*><div><div class="h">[^<]*<\/div>(?:<div class="s">[^<]*<\/div>)?<\/div><\/div>\s*<div class="card"[^>]*>\s*<\/div>/g, '');
-    if (!/class="item"/.test(body)) body = '<div class="empty"><ha-icon icon="mdi:lock-outline"></ha-icon><div>Tu instalador todavía no habilitó automatizaciones para crear.</div></div>';
+    if (!/class="item"/.test(body)) body = `<div class="empty"><ha-icon icon="mdi:lock-outline"></ha-icon><div>${tab === 'smart' ? 'Tu instalador no habilitó automatizaciones listas. Probá «🛠 Armar la mía».' : 'Tu instalador todavía no habilitó automatizaciones para crear.'}</div></div>`;
     return `<div class="ov"><div class="bar"><button class="ib" data-a="close"><ha-icon icon="mdi:close"></ha-icon></button><h1>Crear</h1><span style="width:40px"></span></div>
     <div class="body"><div class="wrap">
+      ${this._isAdmin && this._asClient ? '<div class="note" style="margin:0 0 10px;display:flex;align-items:center;gap:10px"><span style="flex:1">👁 Estás viendo lo que ve el cliente</span><button class="chip on" data-a="asadmin">Ver como instalador</button></div>' : ''}
       <div class="seg" style="margin-bottom:6px"><button class="${tab === 'smart' ? 'on' : ''}" data-a="ctab" data-v="smart">✨ Inteligentes</button><button class="${tab === 'mine' ? 'on' : ''}" data-a="ctab" data-v="mine">🛠 Armar la mía</button></div>
       ${body}
       <div class="brandrow" style="margin-top:14px">${BRAND}</div>
@@ -3081,7 +3142,8 @@ class MatterAIEscenasCard extends HTMLElement {
       title = s.title; body = `<div class="note" style="margin-top:0">${esc(s.text)}</div>`;
       foot = `<button class="btn danger" style="margin-top:0" data-a="confirmok">${esc(s.ok)}</button>`;
     } else if (s.step === 'type') {
-      const types = { triggers: TRIGGER_TYPES, conditions: COND_TYPES, actions: ACTION_TYPES }[s.list].filter((t) => !t.need || t.need(h));
+      const oo = this._optOff(), pre = { triggers: 't', conditions: 'c', actions: 'a' }[s.list];
+      const types = { triggers: TRIGGER_TYPES, conditions: COND_TYPES, actions: ACTION_TYPES }[s.list].filter((t) => (!t.need || t.need(h)) && !oo.has(`${pre}:${t.id}`));
       title = { triggers: 'Si…', conditions: 'Sólo si…', actions: 'Entonces…' }[s.list];
       body = `<div class="card">${types.map((t) => `<button class="item" data-a="picktype" data-v="${t.id}"><div class="ic" style="background:${t.color}"><ha-icon icon="${t.icon}"></ha-icon></div><div class="tx"><div class="t1">${esc(t.label)}</div>${t.hint ? `<div class="t2">Ej: ${esc(t.hint)}</div>` : ''}</div><ha-icon class="chev" icon="mdi:chevron-right"></ha-icon></button>`).join('')}</div>`;
     } else {
@@ -3376,7 +3438,11 @@ class MatterAIEscenasCard extends HTMLElement {
       case 'tab': this._tab = ds.v; this._render(); return;
       case 'create': this._nav({ page: 'create' }); return;
       case 'openhome': if (this._rules) this._openOv({ page: 'home' }); return;
-      case 'settings': this._nav({ page: 'settings', hidden: [...(this._settings?.hidden || [])], clientOff: [...(this._settings?.client_off || [])], ssearch: '' }); return;
+      case 'settings': this._nav({ page: 'settings', hidden: [...(this._settings?.hidden || [])], clientOff: [...(this._settings?.client_off || [])], optOff: [...(this._settings?.opt_off || [])], ssearch: '' }); return;
+      case 'ooff': { o.optOff = o.optOff || []; const i = o.optOff.indexOf(ds.v); if (i >= 0) o.optOff.splice(i, 1); else o.optOff.push(ds.v); this._renderOv(); return; }
+      case 'sprof': { const P = this._profile(ds.v); o.clientOff = P.client_off; o.optOff = P.opt_off; this._renderOv(); this._toast(`Perfil «${PROFILES[ds.v].name}»: revisá y tocá Guardar`); return; }
+      case 'asclient': this._asClient = true; this._nav({ page: 'create' }); this._toast('Así lo ve el cliente. Volvé con «Ver como instalador»'); return;
+      case 'asadmin': this._asClient = false; this._renderOv(); return;
       case 'coff': { const i = o.clientOff.indexOf(ds.v); if (i >= 0) o.clientOff.splice(i, 1); else o.clientOff.push(ds.v); this._renderOv(); return; }
       case 'stoggle': { const i = o.hidden.indexOf(ds.v); if (i >= 0) o.hidden.splice(i, 1); else o.hidden.push(ds.v); this._renderOv(); return; }
       case 'sgrp': {
@@ -3386,7 +3452,7 @@ class MatterAIEscenasCard extends HTMLElement {
         o.hidden = [...set]; this._renderOv(); return;
       }
       case 'ssave':
-        try { await this._ws('set_settings', { settings: { hidden: o.hidden, client_off: o.clientOff || [] } }); this._toast('Guardado ✓'); this._back(); } catch (err) { this._toast(err.message, true); }
+        try { await this._ws('set_settings', { settings: { hidden: o.hidden, client_off: o.clientOff || [], opt_off: o.optOff || [] } }); this._settings = Object.assign({}, this._settings, { hidden: o.hidden, client_off: o.clientOff || [], opt_off: o.optOff || [] }); this._toast('Guardado ✓'); this._back(); } catch (err) { this._toast(err.message, true); }
         return;
       case 'edit': {
         const r = (this._rules || []).find((x) => x.id === ds.id); if (!r) return;
