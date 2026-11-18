@@ -234,7 +234,12 @@
   .mrow{display:flex!important;flex-direction:row!important;gap:8px;justify-content:space-between;align-items:center;flex-wrap:wrap}
   .mlist{display:grid!important;grid-template-columns:1fr 1fr;gap:6px!important}.mlist button{padding:10px 12px!important;font-weight:600;line-height:1.25}
   .mlist .mfull{grid-column:1/-1}.mlist .msep{grid-column:1/-1;font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:#8f99ab;margin:6px 2px 0}
+  .ugrp{display:inline-flex;gap:6px;flex:none}
   @media (max-width:560px){.mlist{grid-template-columns:1fr}}
+  /* celular: la ventana de la tarjeta es una hoja que sube desde abajo, a todo el ancho (como Home Assistant en el celular);
+     arriba queda a la vista la pantalla con la tarjeta elegida */
+  @media (max-width:700px){.ed.dlgon .ed-c{padding-right:0;padding-bottom:62vh}.dlg{top:auto;left:0;right:0;bottom:0;width:auto;height:60vh;border-radius:18px 18px 0 0;border-bottom:0}
+    .dlg-h{padding:10px 12px 0}.dlg-h .tabs button{padding:8px 10px}.dlg-f{padding:10px 12px calc(10px + env(safe-area-inset-bottom,0px))}}
   .fld input.bad,.fld textarea.bad{border-color:#f08a7c!important;box-shadow:0 0 0 2px rgba(240,138,124,.25)}
   .chips-of{display:flex;gap:3px;margin-top:2px}
   .chips-of.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(34px,1fr));gap:4px;padding:4px}
@@ -798,7 +803,7 @@
           ${this.trying ? '<button class="eb pri2" data-e="tryend" title="Los equipos vuelven al diseño guardado">En los equipos · Terminar ✕</button>' : ''}
           ${simOn.length ? `<button class="eb pri2" data-e="simoff" title="Dejar de simular">Simulando: ${esc(simOn.map((x) => x[1].toLowerCase()).join(', '))} ✕</button>` : ''}
           <span class="sp"></span>
-          <button class="eb ico" data-e="undo" ${this.undo.length ? '' : 'disabled'} title="Deshacer (Ctrl+Z)">↶</button><button class="eb ico" data-e="redo" ${this.redo.length ? '' : 'disabled'} title="Rehacer (Ctrl+Y)">↷</button>
+          <span class="ugrp"><button class="eb ico" data-e="undo" ${this.undo.length ? '' : 'disabled'} title="Deshacer (Ctrl+Z)">↶</button><button class="eb ico" data-e="redo" ${this.redo.length ? '' : 'disabled'} title="Rehacer (Ctrl+Y)">↷</button></span>
           <button class="eb" data-e="rooms" title="Los ambientes de la casa: nombre, ícono, equipos y las tarjetas de adentro" ${this.playing ? 'disabled' : ''}>🏠 Ambientes</button>
           <button class="eb" data-e="dash" title="Plantilla, estilo, fondo, modo de día o de noche y nombre" ${this.playing ? 'disabled' : ''}>🎨 Diseño</button>
           <button class="eb pri2" data-e="add" title="Agregar una tarjeta" ${this.playing ? 'disabled' : ''}>+ Tarjeta</button>
@@ -1003,6 +1008,21 @@
       this.drawList(); this.drawProps(); this.drawDlg(); this.syncPreview(); this.bind();
       if (this.$ && this.$('#ed')) this.draw();
       if (this.autosaveAfter) { this.autosaveAfter = false; if (this.dirty()) this.cmd('save', true); }
+      if (id && !this.rscope) this.revealSel(id);
+    }
+    /** La tarjeta elegida queda a la vista (si quedó abajo, o tapada por la ventana en el celular). */
+    revealSel(id) {
+      setTimeout(() => {
+        try {
+          const ifr = this.ifr, edc = this.$ && this.$('#edc'); if (!ifr || !edc || !ifr.contentDocument) return;
+          const el = ifr.contentDocument.querySelector(`[data-block="${(window.CSS && CSS.escape) ? CSS.escape(id) : id}"]`); if (!el) return;
+          const fr = ifr.getBoundingClientRect(), sc = fr.width / (ifr.offsetWidth || 1), r = el.getBoundingClientRect(), box = edc.getBoundingClientRect();
+          const dlg = this.$('#dlg'), dr = dlg && this.$('#ed').classList.contains('dlgon') ? dlg.getBoundingClientRect() : null;
+          const bottom = dr && dr.top > box.top + 80 && dr.left < box.left + 40 ? dr.top : box.bottom; // en el celular la ventana tapa la parte de abajo
+          const top = fr.top + r.top * sc, h = Math.min(r.height * sc, (bottom - box.top) * 0.7);
+          if (top < box.top + 8 || top + h > bottom - 8) edc.scrollBy({ top: top - box.top - Math.max(12, (bottom - box.top - h) / 3), behavior: 'smooth' });
+        } catch (_) { /* si no se puede medir, queda como está */ }
+      }, 60);
     }
     /** ⋮ de una tarjeta: editar, duplicar, copiar a otro dashboard, columna y borrar. */
     cardMenu(id) {
