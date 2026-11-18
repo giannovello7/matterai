@@ -1219,3 +1219,28 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 /* en claro, los valores de arriba (Alarma, Portón, Luces) en negro: el amarillo y el verde no se leen sobre blanco */
 .vista.st-brutal.light .v-kpi .v{color:#111!important}
 .vista.st-clay.light{--green:#1f9d6a;--cool:#2f7fc0;--red:#e0485c}
+
+/* ═════════════════ ALTO DE LAS TARJETAS (2026-11-18) ═════════════════ */
+/* alto fijo (filas de 56 px como Home Assistant) o «toda la pantalla»: el contenido principal toma lo que queda y, si no
+   entra, se desliza adentro de la tarjeta */
+.vista .v-b.hset{height:var(--bh);display:flex;flex-direction:column;min-height:0;box-sizing:border-box}
+.vista .v-b.hfull{height:var(--v-full,calc(var(--vh,800px) - 200px))}
+.vista .v-b.hset>*{flex:none}
+.vista .v-b.hset>:not(h3,.v-btag,.v-ecard,.v-eins,.v-rsz,.v-hrsz,.v-cbar,.v-eladd,.v-camnav,.v-rsztip){flex:1 1 auto;min-height:0;overflow:auto;scrollbar-width:thin}
+.vista .v-b.hset>.v-eladd{order:9}
+/* la cámara llena el alto (sin estirar la imagen: se recorta como en Home Assistant) */
+.vista .v-b.hset .v-cam{flex:1 1 0!important;aspect-ratio:auto!important;height:auto!important;min-height:0!important}
+.vista .v-b.hset .v-cbar,.vista .v-b.hset .v-camnav{flex:none}
+/* el plano entra entero en el alto elegido, centrado (no se deforma) */
+.vista .v-b.hset.t-plan{container-type:size;align-items:center;justify-content:center}
+.vista .v-b.hset.t-plan>.v-plan{flex:none!important;overflow:hidden!important;width:min(100cqw,calc(100cqh * var(--ar,.6)));height:auto;max-width:none;margin:0 auto}
+.vista .v-b.hset.t-image :is(img,.v-imgc){height:100%;object-fit:cover}
+/* tarjetas al lado del plano: no se estiran hasta su alto (la cámara quedaba larga y finita) */
+.vista .v-row4:has(>.t-plan){align-items:start!important}
+.vista .v-row4:has(>.t-plan)>.v-b:not(.hset) .v-cam{aspect-ratio:16/9!important;height:auto!important;min-height:0!important}
+/* editor: manija en el borde de abajo para cambiar el alto arrastrando */
+.v-hrsz{position:absolute;z-index:6;left:0;right:0;bottom:-13px;height:26px;cursor:ns-resize;touch-action:none;display:none;align-items:center;justify-content:center;pointer-events:auto!important}
+.v-hrsz>i{height:8px;width:56px;max-width:60%;border-radius:6px;background:var(--warm);box-shadow:0 0 0 2px rgba(0,0,0,.35);pointer-events:none}
+.vista.editing .v-b:hover>.v-hrsz,.vista.editing .v-b.sel>.v-hrsz,.vista.editing .v-b.rsz>.v-hrsz{display:flex}
+.v-rsztip.v-hrsztip{top:auto;bottom:18px;right:50%;transform:translateX(50%)}
+.vista:is(.st-vision,.st-control4) .v-hrsz>i{background:#f2b766}

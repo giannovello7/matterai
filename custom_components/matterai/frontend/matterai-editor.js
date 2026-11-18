@@ -206,6 +206,7 @@
   .tsw.tk-matterai{background:#161b21}.tsw.tk-matterai i{background:#262e3a}.tsw.tk-matterai i:first-child{background:#f2b766}
   .tsw.tk-vision{background:linear-gradient(160deg,#8d735d,#5a4636)}.tsw.tk-vision i{background:rgba(255,255,255,.3);border-radius:7px}.tsw.tk-vision i:first-child{background:#d4f05a}
   .tsw.tk-control4{background:radial-gradient(90% 70% at 85% 10%,#6b2c4f,transparent 60%),#141522}.tsw.tk-control4 i{background:rgba(48,51,66,.95);border-left:2px solid #4c9bff}
+  .tsw.tk-plano{background:#161b21;grid-template-columns:1.3fr 1fr 1fr;grid-template-rows:1fr 1fr}.tsw.tk-plano i{background:#262e3a}.tsw.tk-plano i:first-child{grid-row:span 2;background:linear-gradient(160deg,#3b3020,#f2b766 140%)}
   .tsw.tk-savant{background:#050505}.tsw.tk-savant i{background:#161616;border-radius:2px}.tsw.tk-savant i:first-child{background:#c9a96e}
   .eseg.wrap{flex-wrap:wrap;height:auto}
   .chips-of{display:flex;gap:3px;margin-top:2px}
@@ -800,6 +801,7 @@
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone, at) => this.openCatalog(col, zone, at),
         viewH: this.deviceSize()[1], onDragAt: (x, y) => this.dragAt(x, y), onDragEnd: () => this.dragEnd(),
         onCols: null, onSec: (a, id, arg) => this.secAct(a, id, arg),
+        onRows: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; if (n) bb.h = n; else delete bb.h; }); },
         onSpan: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; this.lay().v = 2; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
         onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
         room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], dirty: this.roomDirty() } : null,
@@ -1189,6 +1191,15 @@
       const span = +b.span || (b.size === 'half' ? 2 : 4);
       let lay = hs ? `<h4>Cómo se ve</h4>${hs}` : '';
       lay += `<h4>Tamaño y lugar</h4><div class="fld"><span>Ancho</span><span class="eseg">${[[1, '¼'], [2, '½'], [3, '¾'], [4, 'Completo']].map(([k, l]) => `<button data-span="${k}" class="${span === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
+      {
+        // alto: como las filas de Home Assistant (56 px + 8 de separación); «Pantalla» = lo que queda de alto
+        const hv = b.h === 'full' ? 'full' : +b.h || 0, px = window.MaeVista.rowsPx || ((n) => n * 64 - 8);
+        const H = [[0, 'Automático'], [3, 'Chico'], [5, 'Mediano'], [8, 'Grande'], ['full', 'Pantalla']];
+        const other = hv && hv !== 'full' && !H.some(([k]) => k === hv);
+        lay += `<div class="fld"><span>Alto${hv && hv !== 'full' ? ` · ${px(hv)} px` : ''}</span><span class="eseg wrap">${H.map(([k, l]) => `<button data-bh="${k}" class="${hv === k || (k === 0 && !hv) ? 'on' : ''}">${l}</button>`).join('')}${other ? `<button class="on" data-bh="${hv}">${px(hv)} px</button>` : ''}</span></div>`;
+        if (hv && hv !== 'full') lay += `<div class="fld"><span class="eseg"><button data-bhd="-1" aria-label="Más bajo">− más bajo</button><button data-bhd="1" aria-label="Más alto">+ más alto</button></span></div>`;
+        lay += '<p class="hint">También se cambia arrastrando el borde de abajo de la tarjeta (dos toques en ese borde la vuelven a automático). Con un alto fijo, si el contenido no entra se desliza adentro de la tarjeta.</p>';
+      }
       if (this.rscope || this.secs().length > 1) {
         lay += `<div class="fld"><span>${this.rscope ? 'Dónde va' : 'Sección'}</span><span class="eseg wrap">${this.placeOpts().map(([k, l]) => `<button data-place="${k}" class="${this.placeOf(b) === k ? 'on' : ''}">${esc(l)}</button>`).join('')}</span></div>`;
       }
@@ -1617,6 +1628,8 @@
       W.querySelectorAll('#edr [data-rcadd]').forEach((x) => { x.onclick = () => this.openCatalog(null, `room-${x.dataset.rcadd}`); });
       W.querySelectorAll('#edr [data-rlocal]').forEach((x) => { x.onchange = () => { if (this.rdraft) { this.rdraft.local = x.checked; this.drawProps(); this.bind(); } }; });
       W.querySelectorAll('#edr [data-span]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; const n = +x.dataset.span; if (n >= 4) { delete bb.span; delete bb.size; } else { bb.span = n; if (n === 2) bb.size = 'half'; else delete bb.size; } }); });
+      W.querySelectorAll('#edr [data-bh]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; const v = x.dataset.bh; if (v === 'full') bb.h = 'full'; else if (+v) bb.h = +v; else delete bb.h; }); });
+      W.querySelectorAll('#edr [data-bhd]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb || !+bb.h) return; bb.h = Math.max(2, Math.min(20, +bb.h + +x.dataset.bhd)); }); });
       W.querySelectorAll('#edr [data-place]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (bb) this.setPlace(bb, x.dataset.place); }); });
       W.querySelectorAll('#edr [data-fill]').forEach((x) => { x.onchange = () => this.change(() => { const bb = selB(); if (bb) { if (x.checked) bb.fill = true; else delete bb.fill; } }); });
       W.querySelectorAll('#edr [data-ccols]').forEach((x) => { x.onclick = () => this.change(() => { const bb = selB(); if (!bb) return; bb.cfg = bb.cfg || {}; if (x.dataset.ccols) bb.cfg.cols = +x.dataset.ccols; else delete bb.cfg.cols; }); });
@@ -1946,10 +1959,13 @@
           const L = (this.v.layouts = this.v.layouts || {})[kk] = this.v.layouts[kk] || {};
           L.blocks = clone(t.blocks).map((b) => Object.assign(b, { id: this.newId(b.type) }));
           L.v = 3; L.secs = clone(t.secs); delete L.side; delete L.cols;
-          L.style = k === 'matterai' ? null : k;
-          // el encabezado de la plantilla (Vidrio saluda en vez de mostrar la hora)
+          const sty = (V.TPL_STYLE || {})[k] || k;
+          L.style = sty === 'matterai' ? null : sty;
+          // el encabezado de la plantilla (Vidrio saluda en vez de mostrar la hora; Plano grande la lleva en su tarjeta)
           if (t.theme) L.theme = t.theme; // Vidrio arranca claro (se cambia en «Modo»)
           if (t.header && t.header.greet) L.header = Object.assign({}, L.header || {}, { greet: true }); else if (L.header) delete L.header.greet;
+          if (t.header && t.header.clock === false) L.header = Object.assign({}, L.header || {}, { clock: false, weather: false });
+          else if (L.header) { delete L.header.clock; delete L.header.weather; }
           if (kk === 'tablet' && !L.orientation) L.orientation = 'landscape';
         });
         this.sel = null; this.el = null; this.roomEd = null; this.rdraft = null;

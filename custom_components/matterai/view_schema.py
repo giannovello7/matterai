@@ -123,6 +123,8 @@ BLOCK = vol.Schema({
     vol.Optional("zone"): vol.Any(None, vol.In(["top", "bottom"])),
     vol.Optional("span"): vol.Any(None, vol.All(vol.Coerce(int), vol.Range(min=1, max=4))),
     vol.Optional("fill"): vol.Any(None, bool),
+    # 2.32: alto fijo en filas (56 px + 8) o «full» = toda la pantalla
+    vol.Optional("h"): vol.Any(None, "full", vol.All(vol.Coerce(int), vol.Range(min=2, max=20))),
     # diseño v3 (2.29): a qué sección pertenece la tarjeta
     vol.Optional("sec"): vol.Any(None, vol.All(str, vol.Match(r"^[\w-]{1,24}$"))),
     vol.Optional("show"): vol.Any(None, vol.All([COND], vol.Length(max=6))),  # se ve sólo si se cumple todo

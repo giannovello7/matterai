@@ -142,7 +142,8 @@
      layout.cols = [ancho, …]   ancho relativo de cada columna de la tablet (0 = el ancho justo del contenido)
      layout.side = true         la columna 0 va al costado, de arriba a abajo (al lado de la hora), como el plano de siempre
      tarjeta.col = 0…3          su columna (tablet)          tarjeta.zone = 'top' | 'bottom'   banda de lado a lado (tablet)
-     tarjeta.span = 1…4         ancho en cuartos (4 = completa, 2 = media)   tarjeta.fill = true   llena el alto que sobra */
+     tarjeta.span = 1…4         ancho en cuartos (4 = completa, 2 = media)   tarjeta.fill = true   llena el alto que sobra
+     tarjeta.h = 2…20 | 'full'  alto fijo en filas (56 px + 8 de separación, como Home Assistant) o toda la pantalla */
   const TABLET_PRESETS = [
     ['side2', 'Plano al costado + 2 columnas', { side: true, cols: [0, 1, 1] }],
     ['side1', 'Plano al costado + 1 columna', { side: true, cols: [0, 1] }],
@@ -160,6 +161,8 @@
      bandas que administrar: es el modelo de «secciones» de Home Assistant.
      Datos: el diseño lleva secs: [{ id, title, w }] y cada tarjeta dice a qué sección pertenece (sec). */
   const SEC_W = [3, 4, 6, 8, 9, 12];
+  /** Alto en píxeles de N filas (como las secciones de Home Assistant: filas de 56 px con 8 de separación). */
+  const rowsPx = (n) => n * 56 + (n - 1) * 8;
   const snapW = (w) => SEC_W.reduce((a, x) => (Math.abs(x - w) < Math.abs(a - w) ? x : a), 12);
   /** Pasa un diseño de columnas y bandas (v2) a secciones (v3). Lo que ya es v3 queda igual. */
   function toSections(L0, kind) {
@@ -269,7 +272,10 @@
     ['vision', 'Vidrio', 'Ventanas de vidrio: termostato grande, clima, luces y ambientes'],
     ['control4', 'Panel', 'Panel táctil oscuro: accesos por tema, música, cámaras y aire'],
     ['savant', 'Elegante', 'Negro y champagne, minimalista: ambientes grandes, escenas, aire y seguridad'],
+    ['plano', 'Plano grande', 'El plano de toda la casa a lo alto y al lado la hora, el resumen, escenas, modo ausente, rutinas y la cerradura'],
   ];
+  /* el estilo que usa cada plantilla (si no se dice, el de su mismo nombre) */
+  const TPL_STYLE = { plano: 'matterai' };
   function template(k, kind, m, legacy, S, floorplan) {
     const base = defaults(kind, m, legacy, S, floorplan);
     if (!k || k === 'matterai') return base;
@@ -365,6 +371,30 @@
         tiles(0),
         cam(0),
       ];
+    } else if (k === 'plano') {
+      // Plano grande (como el panel de un departamento): el plano ocupa todo el alto de la pantalla y se toca por ambiente;
+      // al lado, dos columnas angostas: la hora con el clima, el resumen, las escenas y el modo ausente; las rutinas, la
+      // cerradura, la cámara y la música. En el celular, el plano arriba y lo demás debajo. Sin la hora arriba (va en su tarjeta).
+      const pl = Object.assign({ id: 'plano-plan', type: 'plan', cfg: {} }, plan || {}, { id: 'plano-plan' });
+      const one = (t, sec, extra) => Object.assign({ id: `plano-${t}`.slice(0, 24), type: t, cfg: {} }, extra || {}, T ? { sec } : {});
+      B = [
+        Object.assign({}, pl, T ? { sec: 'pl', h: 'full' } : {}, { cfg: Object.assign({}, pl.cfg || {}) }),
+        T ? one('clock', 'a') : null,
+        one('kpis', 'a', { cfg: { auto: true, max: T ? 6 : 3 } }),
+        one('scenes', 'a', { title: 'Escenas', cfg: { auto: true } }),
+        one('away', 'a', { title: 'Modo ausente', cfg: { auto: true } }),
+        one('routines', 'b', { title: 'Rutinas', cfg: { auto: true } }),
+        lock ? one('lock', 'b', { title: 'Entrada principal', cfg: { entity: lock } }) : null,
+        cams.length && T ? one('cam', 'b', { type: 'frigate', title: 'Cámaras' }) : null,
+        T ? one('music', 'b', { title: 'Música' }) : null,
+      ];
+      hdr = T ? { clock: false, weather: false } : null;
+      if (T) {
+        const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: 'matterai', v: 3, secs: [{ id: 'pl', title: '', w: 6 }, { id: 'a', title: '', w: 3 }, { id: 'b', title: '', w: 3 }] });
+        delete out.cols; delete out.side;
+        out.header = Object.assign({}, base.header || {}, hdr);
+        return out;
+      }
     } else if (k === 'savant') {
       // Savant / Lutron: los ambientes son la pantalla (tarjetas grandes), negro y dorado, todo minimalista;
       // a la derecha la hora, las escenas, el clima y la seguridad
@@ -385,7 +415,7 @@
         n('alarm', 0, { title: 'Seguridad' }),
       ];
     } else return base;
-    const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: k });
+    const out = Object.assign({}, base, { blocks: B.filter(Boolean), style: TPL_STYLE[k] || k });
     if (hdr) out.header = Object.assign({}, base.header || {}, hdr);
     if (thm) out.theme = thm;
     if (T && G) { out.v = 2; out.side = G.side; out.cols = G.cols; out.blocks.forEach((b) => { if (b.size === 'half' && !b.span) { b.span = 2; delete b.size; } }); }
@@ -462,7 +492,7 @@
         const cfg0 = card() && card()._config;
         const d = template(mine, kind(), m, v, (hass() || {}).states, cfg0 && cfg0.floorplan);
         if (v.plan) d.plan = v.plan;
-        d.header = v.header || null; d.dock = v.dock || null; d.theme = v.theme || null; d.style = mine; d.bg = null;
+        d.header = Object.assign({}, v.header || {}, d.header && d.header.clock === false ? { clock: false, weather: false } : {}); d.dock = v.dock || null; d.theme = v.theme || null; d.style = TPL_STYLE[mine] || mine; d.bg = null;
         return d;
       }
       if (Array.isArray(v.blocks) && v.blocks.length) return { blocks: v.blocks, plan: v.plan || null, orientation: v.orientation || 'landscape', header: v.header || null, dock: v.dock || null, theme: v.theme || null, style: v.style || null, bg: v.bg || null, v: v.v, cols: v.cols, side: v.side, secs: v.secs };
@@ -1085,13 +1115,17 @@
       const inner = block(b, m);
       if (!inner && !editing()) return '';
       const sel = editing() && ctx.edit.selected === b.id;
-      const sp = spanOf(b), cls = ` sp-${sp}${b.fill ? ' fill' : ''}${!shown ? ' hid' : ''}${(b.show || []).length ? ' cond' : ''}`;
+      const sp = spanOf(b), hh = hOf(b), cls = ` sp-${sp}${b.fill ? ' fill' : ''}${hh ? ` hset${hh === 'full' ? ' hfull' : ''}` : ''}${!shown ? ' hid' : ''}${(b.show || []).length ? ' cond' : ''}`;
+      const hsty = hh && hh !== 'full' ? ` style="--bh:${rowsPx(hh)}px"` : '';
       // en el editor, como Lovelace: la tarjeta entera se arrastra; ✎ la edita (o tocarla) y ⋮ tiene duplicar, copiar y borrar
       const ins = ctx.edit && ctx.edit.onAdd && !ctx.embed ? '<button class="v-eins" data-eins title="Agregar una tarjeta acá" aria-label="Agregar una tarjeta acá">+</button>' : '';
       const tool = `${ins}<span class="v-ecard">${editing() && ctx.edit.onSpan && !ctx.embed ? `<button data-eact="w" class="v-ewbtn" title="Ancho: tocá para cambiarlo (¼, ½, ¾, completo)" aria-label="Cambiar el ancho">${{ 1: '¼', 2: '½', 3: '¾', 4: '↔' }[spanOf(b)]}</button>` : ''}<button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
       const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
-      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}">${editing() ? `<span class="v-btag">${tag}</span>${tool}${ctx.edit.onSpan && !ctx.embed && !b.fill ? '<span class="v-rsz" data-rsz title="Arrastrá para cambiar el ancho"><i></i></span>' : ''}` : ''}${inner}</section>`;
+      const hgrip = editing() && ctx.edit.onRows && !ctx.embed && !b.fill ? '<span class="v-hrsz" data-hrsz title="Arrastrá para cambiar el alto (tocá dos veces: automático)"><i></i></span>' : '';
+      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${hsty}>${editing() ? `<span class="v-btag">${tag}${hh ? ` · alto ${hh === 'full' ? 'pantalla' : rowsPx(hh)}` : ''}</span>${tool}${ctx.edit.onSpan && !ctx.embed && !b.fill ? '<span class="v-rsz" data-rsz title="Arrastrá para cambiar el ancho"><i></i></span>' : ''}${hgrip}` : ''}${inner}</section>`;
     }
+    /** Alto fijo de una tarjeta: filas (2…20) o 'full' (lo que queda de pantalla); 0 = el de su contenido. */
+    function hOf(b) { if (b.h === 'full') return 'full'; const n = Math.round(+b.h || 0); return n >= 2 ? Math.min(20, n) : 0; }
     /** Ancho de una tarjeta en cuartos de su columna (4 = completa). */
     function spanOf(b) { const n = +b.span || (b.size === 'half' ? 2 : 4); return Math.max(1, Math.min(4, n)); }
     /** Una columna en partes: cada tarjeta completa es una parte; las más angostas se juntan en filas de hasta 4 cuartos. */
@@ -1260,7 +1294,7 @@
           setCol(`#v-s${i}`, list, m, addSlot(0, `sec:${x.id}`), head);
           const ce = X.el.querySelector(`#v-s${i}`); if (ce && ce.classList) ce.classList.toggle('v-empty', !list.length && !editing());
         });
-        if (K === 'tablet') { fit(vertical); const p = drawPlayer(); set('#v-dock', dockHTML(m, p)); } else {
+        if (K === 'tablet') { fit(vertical); const p = drawPlayer(); set('#v-dock', dockHTML(m, p)); fullH(X.vhNow); } else {
           if (X.el.style && X.el.style.setProperty) { if (editing() && ctx.edit.viewH) X.el.style.setProperty('--vh', `${ctx.edit.viewH}px`); else X.el.style.removeProperty('--vh'); }
           set('#v-allb', `${ic('grid')}Toda la casa`);
           { const ab = X.el.querySelector('#v-allb'); if (ab && ab.classList) ab.classList.toggle('off', ((L.header || {}).casa) === false); }
@@ -1402,11 +1436,26 @@
       if (typeof innerWidth === 'undefined') return;
       const setVh = (h) => { if (e.style.setProperty) e.style.setProperty('--vh', `${h}px`); };
       e.style.height = '';
-      if (editing()) { e.style.width = e.style.zoom = ''; setVh(ctx.edit.viewH || innerHeight); return; }
+      if (editing()) { e.style.width = e.style.zoom = ''; setVh(ctx.edit.viewH || innerHeight); fullH(ctx.edit.viewH || innerHeight); return; }
       const iw = innerWidth, ih = innerHeight, W = Math.max(iw, vertical ? 800 : 1180), s = iw / W;
       // zoom (y no transform) para que el scroll vertical y las ventanas fijas sigan andando bien
       e.style.zoom = s < 1 ? String(s) : ''; e.style.width = s < 1 ? W + 'px' : '';
       setVh(Math.round(ih / s));
+      fullH(Math.round(ih / s));
+    }
+    /** Las tarjetas con alto «toda la pantalla»: lo que queda debajo del encabezado y arriba de la barra de abajo. */
+    function fullH(vh) {
+      X.vhNow = vh;
+      const e = X.el; if (!e || !e.querySelector || !e.style.setProperty) return;
+      const s = e.querySelector('.v-b.hfull'); if (!s) return; // (se mide desde la primera: su alto no cambia dónde empieza)
+      // en píxeles del diseño: lo que se ve dividido el zoom de la tablet (fuera del editor cuenta también lo que haya arriba del
+      // dashboard en la página, como la barra de Home Assistant)
+      const re = e.getBoundingClientRect(), rs = s.getBoundingClientRect(), z = (e.offsetWidth && re.width / e.offsetWidth) || 1;
+      const top = (rs.top - re.top) / z + (editing() ? 0 : Math.max(0, re.top + (typeof scrollY === 'number' ? scrollY : 0)) / z);
+      const dk = e.querySelector(kind() === 'tablet' ? '#v-dock' : '.v-bottom');
+      const cs = dk && typeof getComputedStyle === 'function' ? getComputedStyle(dk) : null;
+      const below = cs && cs.position !== 'fixed' && cs.display !== 'none' ? dk.offsetHeight + 28 : kind() === 'tablet' ? 20 : 120;
+      e.style.setProperty('--v-full', `${Math.max(320, vh - top - below)}px`);
     }
     /** Micrófono a la vista siempre (como en el diseño), salvo que el instalador apague la voz. */
     function voiceOn() { const c = card(); return !!c && typeof c.voice === 'function' && !(c._config && c._config.voice === false); }
@@ -1693,6 +1742,35 @@
       if (d.span) ctx.edit.onSpan(d.id, d.span);
     };
     ['pointerup', 'pointercancel'].forEach((ev) => el.addEventListener(ev, rszEnd));
+    // editor: el alto de una tarjeta se cambia arrastrando su borde de abajo (filas de 64 px); dos toques = automático
+    let hDrag = null;
+    el.addEventListener('pointerdown', (e) => {
+      const h = editing() && ctx.edit.onRows && e.target.closest && e.target.closest('[data-hrsz]'); if (!h) return;
+      const sec = h.closest('[data-block]'); if (!sec) return;
+      e.preventDefault(); e.stopPropagation();
+      const rs = sec.getBoundingClientRect(), z = rs.height && sec.offsetHeight ? rs.height / sec.offsetHeight : 1;
+      const tip = document.createElement('span'); tip.className = 'v-rsztip v-hrsztip'; sec.appendChild(tip);
+      hDrag = { sec, tip, id: sec.dataset.block, top: rs.top, z, rows: 0, moved: false };
+      sec.classList.add('rsz');
+      try { h.setPointerCapture(e.pointerId); } catch (_) { /* navegador viejo */ }
+    }, true);
+    el.addEventListener('pointermove', (e) => {
+      const d = hDrag; if (!d) return;
+      const n = Math.max(2, Math.min(20, Math.round(((e.clientY - d.top) / d.z + 8) / 64)));
+      if (n === d.rows) return;
+      d.rows = n; d.moved = true; d.tip.textContent = `Alto ${rowsPx(n)} px`;
+      d.sec.style.height = `${rowsPx(n)}px`; d.sec.classList.add('hset');
+    });
+    const hEnd = () => {
+      const d = hDrag; if (!d) return;
+      hDrag = null; X.gutAt = Date.now();
+      d.sec.classList.remove('rsz');
+      if (d.tip.parentNode) d.tip.parentNode.removeChild(d.tip);
+      if (d.moved && d.rows) ctx.edit.onRows(d.id, d.rows);
+    };
+    ['pointerup', 'pointercancel'].forEach((ev) => el.addEventListener(ev, hEnd));
+    el.addEventListener('dblclick', (e) => { const h = editing() && ctx.edit.onRows && e.target.closest && e.target.closest('[data-hrsz]'); if (!h) return; const sec = h.closest('[data-block]'); if (sec) { e.stopPropagation(); ctx.edit.onRows(sec.dataset.block, null); } }, true);
+    el.addEventListener('click', (e) => { if (X.gutAt && Date.now() - X.gutAt < 400 && e.target.closest && e.target.closest('[data-hrsz]')) e.stopPropagation(); }, true);
     el.addEventListener('click', (e) => { if (X.gutAt && Date.now() - X.gutAt < 400 && e.target.closest && e.target.closest('[data-rsz]')) e.stopPropagation(); }, true);
     let gutDrag = null;
     el.addEventListener('pointerdown', (e) => {
@@ -1988,5 +2066,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, migrateLayout, toSections, SEC_W, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
+  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, TPL_STYLE, rowsPx, migrateLayout, toSections, SEC_W, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
 })(typeof window !== 'undefined' ? window : globalThis);

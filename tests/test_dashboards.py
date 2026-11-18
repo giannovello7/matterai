@@ -599,3 +599,18 @@ def test_estilos_nuevos_se_aceptan():
     for st in ("liquid", "relieve", "suizo", "clay", "brutal"):
         assert st in vs.STYLES
 
+
+def test_alto_de_las_tarjetas():
+    from custom_components.matterai import view_schema as vs
+
+    ok = vs.BLOCK({"id": "a", "type": "frigate", "h": 5})
+    assert ok["h"] == 5
+    assert vs.BLOCK({"id": "b", "type": "plan", "h": "full"})["h"] == "full"
+    assert vs.BLOCK({"id": "c", "type": "kpis"}).get("h") is None
+    import pytest
+    import voluptuous as vol
+
+    for bad in (1, 21, "alto"):
+        with pytest.raises(vol.Invalid):
+            vs.BLOCK({"id": "d", "type": "kpis", "h": bad})
+
