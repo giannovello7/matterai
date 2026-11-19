@@ -111,6 +111,15 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **Tocá cualquier cosa** en la pantalla del medio (una tarjeta, un ambiente, un dato del resumen, la parte de arriba o la barra de abajo) y se abre su ventana con 3 pestañas: **Contenido** (qué muestra), **Aspecto** (cómo se ve, su ancho y dónde va) y **Cuándo se ve** (mostrarla sólo si…).
 - **Ancho de cada tarjeta**: ¼, ½, ¾ o completo; las angostas se acomodan una al lado de la otra.
 - **Quién lo ve** (2.34.2): arriba, debajo del nombre del dashboard, dice qué equipos lo usan («Lo ven: Tablet living (tablet)…») o «⚠ Ningún equipo usa este dashboard». Si un equipo muestra otra cosa que el editor, casi siempre es porque tiene asignado otro dashboard: se cambia en la página Dashboards.
+- **2.35.4**:
+  - Con un ambiente abierto, «+ Tarjeta» (arriba) agrega a ese ambiente.
+  - Una tarjeta nueva adentro de un ambiente arranca con los equipos de ese ambiente (las cortinas del Garage, no las de toda la casa).
+  - Las tarjetas de adentro de un ambiente también se agrandan arrastrando, de ancho y de alto.
+  - La tarjeta «Reloj y clima → Saludo completo» suma la hora, el clima y, si se quiere, los datos de la casa.
+  - La parte de arriba con saludo muestra la hora y el clima si se marcan.
+  - El cartel de ayuda del plano viene apagado.
+  - En estilo claro, los carteles del plano se leen.
+  - Si Home Assistant no guarda los pisos del plano, el editor avisa que falta reiniciarlo.
 - **Plano de varios pisos** (2.35): en «Plano e imágenes» (⋯), «+ Piso» suma la planta alta, la terraza… (hasta 6). Cada piso tiene su render (apagado, prendido y de día), sus ambientes dibujados y sus luces, y un nombre corto para su botón (PB, PA, 1, Terraza). En la tarjeta del plano aparecen los botones al costado: el cliente toca uno y cambia de piso (el equipo recuerda el último; un puntito avisa si en ese piso hay luces prendidas). En el editor, tocar un piso en la vista previa cambia el piso que se edita. En Aspecto de la tarjeta del plano, «Botones de los pisos» elige dónde van: afuera abajo (lo normal, no tapan el plano), afuera arriba, en una esquina o al costado.
 - **Plano**: en Aspecto, «Mostrar el cartel de ayuda» («Tocá un ambiente para prender o apagar…») se puede desmarcar (2.34.2). El editor ahora muestra el cartel igual que el equipo.
 - **La parte de arriba** (saludo u hora, clima, campanita, menú): tocándola elegís qué muestra. Ocupa siempre todo el ancho; desde la 2.34, con **«Pasarla a una tarjeta»** queda como una tarjeta (Reloj y clima, aspecto «Saludo» u «Hora grande») arriba de la primera sección, que se mueve y se le cambia el ancho como a cualquiera, y con **«Sacar la parte de arriba»** desaparece. En el editor queda una barrita «Parte de arriba oculta»: tocándola se vuelve a mostrar.

@@ -783,6 +783,8 @@
   /* el ambiente como página completa (el instalador lo elige en el editor) */
   .sheet-wrap.rpage .sheet{left:0!important;right:0!important;top:0!important;bottom:0!important;width:auto!important;max-width:none!important;max-height:none!important;border-radius:0!important;border:0!important;box-shadow:none!important;opacity:1!important;transform:translateX(100%)!important;padding:max(14px,var(--ios-top,0px)) clamp(16px,4vw,48px) 30px!important}
   .sheet.rcards>#sheetdyn{position:sticky;top:-10px;z-index:6;margin:-10px -20px 0;padding:10px 20px 2px;background:inherit;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
+  /* el título del ambiente sin el recuadro oscuro (no gustaba): queda sobre el fondo de la ventana */
+  .sheet.rcards .sh-head,:host([look]) .sheet.rcards .sh-head,:host([look][theme]) .app .sheet.rcards .sh-head{position:static!important;background:none!important;box-shadow:none!important;border:0!important}
   .sheet-wrap.rpage.open .sheet{transform:none!important}.sheet-wrap.rpage .grab{display:none!important}
   .sheet-wrap.rpage :is(.rcbox,.camcard.own){max-width:960px}
   .grab{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.18);margin:0 auto 14px}

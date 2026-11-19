@@ -1299,3 +1299,9 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-floors.f-below,.v-floors.f-above{position:static;transform:none;flex-direction:row;justify-content:center;flex-wrap:wrap;margin:8px 0}
 .v-floors.f-below button:not(.on),.v-floors.f-above button:not(.on){background:var(--card,rgba(20,25,32,.78));color:var(--txt,#fff)}
 .v-b.hfull.t-plan:has(.v-floors.f-below,.v-floors.f-above) .v-plan{max-height:calc(100% - 52px)}
+/* los carteles del plano tienen fondo oscuro: su letra siempre clara (en el estilo claro no se leían) */
+.vista .v-plan .v-pin,.vista .v-plan .v-pin b,.vista .v-plan .v-ptag{color:#fff!important}
+/* la tarjeta de saludo completa */
+.v-grc{flex-direction:column;align-items:stretch}.v-grr{display:flex;align-items:center;gap:10px;min-width:0}.v-grc .v-when{margin-right:2px}.v-grc.wk .v-kpis{margin-top:12px}
+/* en modo claro el número de la campanita no se leía (quedaba un punto negro) */
+.vista.light .v-badge{background:#e5484d!important;color:#fff!important;border-color:transparent!important}

@@ -492,6 +492,15 @@
       if (zone && String(zone).startsWith('room-') && this.rdraft) {
         const CAT0 = window.MaeVista.CATALOG, rcfg = { kpis: { auto: true }, scenes: { auto: true }, routines: { auto: true }, buttons: { items: [] }, rooms: { rooms: [] }, text: { style: 'separator' } }[type] || {};
         const nb = { id: this.newId(type), type, zone: zone === 'room-bottom' ? 'bottom' : 'top', cfg: rcfg };
+        // adentro de un ambiente arranca con los equipos de ESE ambiente (no con los de toda la casa)
+        const mr = ((this.model() || { rooms: [] }).rooms || []).find((x) => x.name === (this.rdraft._orig || this.rdraft.name));
+        if (mr) {
+          const ents = { lights: mr.lights, covers: mr.covers, scenes: mr.actions, frigate: mr.cams }[type];
+          if (ents && ents.length) nb.cfg = { entities: ents.slice(0, 24) };
+          else if (type === 'buttons' && [...(mr.switches || []), ...(mr.fans || [])].length) nb.cfg = { items: [...mr.switches, ...mr.fans].slice(0, 12).map((e) => ({ entity: e })) };
+          else if (type === 'climate' && (mr.climates || []).length) nb.cfg = { entity: mr.climates[0] };
+          else if (type === 'lock' && (mr.locks || []).length) nb.cfg = { entity: mr.locks[0] };
+        }
         if (!['kpis', 'plan', 'clock'].includes(type)) nb.title = type === 'frigate' ? 'Cámaras' : CAT0[type].name;
         this.change(() => {
           const L = (this.rdraft.cards = this.rdraft.cards || []), j = at ? L.findIndex((x) => x.id === at.target) : -1;
@@ -527,7 +536,7 @@
       box.className = 'catp';
       const atB = at && !inRoomZ ? this.blocks().find((x) => x.id === at.target) : null;
       const atTxt = atB ? ` · ${at.after ? 'después' : 'antes'} de «${esc(atB.title || (CAT[atB.type] || {}).name || atB.type)}»` : '';
-      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${atTxt ? atTxt : inRoomZ ? ` · ${esc(this.rdraft ? this.rdraft.name : 'ambiente')} (${zone === 'room-bottom' ? 'abajo' : 'arriba'} de los equipos)` : zone && String(zone).startsWith('sec:') ? ` · ${esc(this.secName(String(zone).slice(4)))}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
+      box.innerHTML = `<div class="catin"><div class="cath"><b>Agregar tarjeta${atTxt ? atTxt : inRoomZ ? ` · adentro de ${esc(this.rdraft ? this.rdraft.name : 'el ambiente')}` : zone && String(zone).startsWith('sec:') ? ` · ${esc(this.secName(String(zone).slice(4)))}` : ''}</b><button class="eb sm" data-cx>✕</button></div>
         ${this.clip() && (CAT[this.clip().card.type] || { kinds: [] }).kinds.includes(K) ? `<button class="catpaste" data-cpaste>📋 Pegar la tarjeta copiada: <b>${esc(this.clip().card.title || (CAT[this.clip().card.type] || {}).name || '')}</b></button>` : ''}
         ${inRoomZ ? '' : '<div class="cattabs"><button class="on" data-ctab="card">Por tarjeta</button><button data-ctab="ent">Por equipo <small>elegís equipos y se arman las tarjetas</small></button></div>'}
         <input placeholder="Buscar tarjeta…" autocomplete="off"><div class="catg"></div><div class="catf" hidden></div></div>`;
@@ -990,8 +999,8 @@
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone, at) => this.openCatalog(col, zone, at),
         viewH: this.deviceSize()[1], onDragAt: (x, y) => this.dragAt(x, y), onDragEnd: () => this.dragEnd(),
         onCols: null, onSec: (a, id, arg) => this.secAct(a, id, arg),
-        onRows: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; if (n) bb.h = n; else delete bb.h; }); },
-        onSpan: (id, n) => { if (this.inRoom(id)) return; this.change(() => { const bb = (this.lay().blocks || []).find((x) => x.id === id); if (!bb) return; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
+        onRows: (id, n) => { this.change(() => { const bb = (this.inRoom(id) ? this.rdraft.cards : (this.lay().blocks || [])).find((x) => x.id === id); if (!bb) return; if (n) bb.h = n; else delete bb.h; }); },
+        onSpan: (id, n) => { this.change(() => { const bb = (this.inRoom(id) ? this.rdraft.cards : (this.lay().blocks || [])).find((x) => x.id === id); if (!bb) return; delete bb.size; if (n >= 4) delete bb.span; else bb.span = n; }); },
         onDock: (from, to, after) => this.change(() => { const D = this.dockKeys(), i = D.indexOf(from); if (i < 0) return; D.splice(i, 1); let j = D.indexOf(to); if (j < 0) j = D.length; else if (after) j += 1; D.splice(j, 0, from); this.lay().dock = D; }), onRoom: (a, i) => this.roomAct(a, i),
         roomEl: R && this.rme != null ? this.rme : null,
         room: R && !this.pcard ? { name: R.name, icon: R.icon, entities: R.entities || [], open: R.open, cameras_position: R.cameras_position, dirty: this.roomDirty() } : null,
@@ -1403,14 +1412,15 @@
         case 'plan':
           hs += `<div class="fld"><span>Tamaño</span><span class="eseg">${[['s', 'Chico'], ['m', 'Mediano'], ['', 'Normal'], ['xl', 'Grande']].map(([k, l]) => `<button data-plz="${k}" class="${(c.zoom || '') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
           if (b.type === 'plan' && (((this.v.plan || {}).floors) || []).length) hs += `<div class="fld"><span>Botones de los pisos</span><span class="eseg wrap">${[['below', 'Afuera, abajo'], ['above', 'Afuera, arriba'], ['bl', 'Esquina ↙'], ['br', 'Esquina ↘'], ['tl', 'Esquina ↖'], ['tr', 'Esquina ↗'], ['side', 'Al costado']].map(([k, l]) => `<button data-fpos="${k}" class="${(c.floors_pos || 'below') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>`;
-          if (b.type === 'plan') hs += `<label class="chk"><input type="checkbox" data-fb="cfg.hint" ${c.hint !== false ? 'checked' : ''}> Mostrar el cartel de ayuda («Tocá un ambiente para prender o apagar…»)</label>`;
+          if (b.type === 'plan') hs += `<label class="chk"><input type="checkbox" data-fb="cfg.hint" ${c.hint === true ? 'checked' : ''}> Mostrar el cartel de ayuda («Tocá un ambiente para prender o apagar…»)</label>`;
           h += '<p class="hint">El plano se arma en «Plano e imágenes» (en ⋯, arriba): subís el render y dibujás los ambientes.</p><button class="eb" data-e="plan">Editar el plano</button>';
           break;
         case 'clock':
-          hs += this.styleSeg(c, [['', 'Hora grande'], ['tiles', 'Día y hora en dos cuadros'], ['panel', 'Panel: nombre, hora, clima y datos'], ['greet', 'Saludo («Buenas tardes»)']], '');
+          hs += this.styleSeg(c, [['', 'Hora grande'], ['tiles', 'Día y hora en dos cuadros'], ['panel', 'Panel: nombre, hora, clima y datos'], ['greet', 'Saludo completo (saludo, hora, clima, avisos)']], '');
           if (c.style === 'panel') h += '<p class="hint">El nombre de arriba es el título de la tarjeta (vacío: el del instalador). Tocar la hora abre la agenda; el clima, el pronóstico.</p>' + this.elemSection(b) + '<p class="hint">Hasta 6 datos. Cada uno puede ser un resumen (luces, aires, consumo…) o un equipo cualquiera (un portón, un sensor).</p>';
-          else if (c.style === 'greet') h += `<p class="hint">El saludo cambia solo (Buen día, Buenas tardes, Buenas noches) y dice cómo está la casa. El nombre del saludo se pone en la parte de arriba.</p>
-            <label class="chk"><input type="checkbox" data-gopt="bell" ${c.bell === false ? '' : 'checked'}> Campanita de avisos</label><label class="chk"><input type="checkbox" data-gopt="menu" ${c.menu === false ? '' : 'checked'}> Botón de menú</label>`;
+          else if (c.style === 'greet') h += `<p class="hint">La tarjeta de arriba completa: el saludo (cambia solo y dice cómo está la casa), la hora, el clima, la campanita y el menú. Se le cambia el ancho y el alto como a cualquiera. El nombre del saludo se pone en la parte de arriba.</p>
+            ${[['clock', 'Hora y fecha'], ['weather', 'Clima'], ['bell', 'Campanita de avisos'], ['menu', 'Botón de menú']].map(([k, l]) => `<label class="chk"><input type="checkbox" data-gopt="${k}" ${c[k] === false ? '' : 'checked'}> ${l}</label>`).join('')}
+            <label class="chk"><input type="checkbox" data-fb="cfg.kpis" ${c.kpis ? 'checked' : ''}> Datos de la casa abajo (luces, aires, temperatura o consumo)</label>`;
           else h += '<p class="hint">Tocar la hora abre la agenda; tocar el clima, el pronóstico. En Aspecto: también como panel con datos o como saludo.</p>';
           break;
         case 'music': hs += this.styleSeg(c, [['', 'Barra'], ['card', 'Tarjeta con controles']], ''); break;
@@ -1629,7 +1639,7 @@
       const H = this.lay().header || {};
       return `<h4>Qué se ve arriba</h4>
         ${[['clock', 'Hora y fecha (al tocarla abre la agenda)'], ['weather', 'Clima (al tocarlo abre el pronóstico)'], ['bell', 'Campanita de avisos'], ['menu', 'Menú (opciones y soporte)']]
-          .map(([k, l]) => `<label class="chk"><input type="checkbox" data-hd="${k}" ${H[k] !== false ? 'checked' : ''}> ${l}</label>`).join('')}
+          .map(([k, l]) => `<label class="chk"><input type="checkbox" data-hd="${k}" ${(H.greet && (k === 'clock' || k === 'weather') ? H[k] === true : H[k] !== false) ? 'checked' : ''}> ${l}</label>`).join('')}
         <h4>Saludo</h4>
         <label class="chk"><input type="checkbox" data-hgreet ${H.greet ? 'checked' : ''}> Saludo en vez de la hora («Buenas tardes» y cómo está la casa)</label>
         ${H.greet ? `<label class="fld"><span>Nombre para el saludo (opcional)</span><input data-hname value="${esc(H.name || '')}" maxlength="30" placeholder="Ej: Ana"></label>` : ''}
@@ -2007,7 +2017,12 @@
       W.querySelectorAll('#edr [data-gopt]').forEach((x) => { x.onchange = () => { const b0 = this.selBlock(); if (b0) this.change(() => { b0.cfg = b0.cfg || {}; if (x.checked) delete b0.cfg[x.dataset.gopt]; else b0.cfg[x.dataset.gopt] = false; }); }; });
       W.querySelectorAll('#edr [data-hgreet]').forEach((x) => { x.onchange = () => hset((H) => { if (x.checked) H.greet = true; else { delete H.greet; delete H.name; } }); });
       W.querySelectorAll('#edr [data-hname]').forEach((x) => { x.onchange = () => hset((H) => { const v = x.value.trim().slice(0, 30); if (v) H.name = v; else delete H.name; }); });
-      W.querySelectorAll('#edr [data-hd]').forEach((x) => { x.onchange = () => this.change(() => { const l = this.lay(), H = Object.assign({}, l.header || {}); if (x.checked) delete H[x.dataset.hd]; else H[x.dataset.hd] = false; l.header = Object.keys(H).length ? H : null; }); });
+      W.querySelectorAll('#edr [data-hd]').forEach((x) => { x.onchange = () => this.change(() => {
+        const l = this.lay(), H = Object.assign({}, l.header || {}), k = x.dataset.hd;
+        if (H.greet && (k === 'clock' || k === 'weather')) { if (x.checked) H[k] = true; else delete H[k]; } // con saludo: se suman a pedido
+        else if (x.checked) delete H[k]; else H[k] = false;
+        l.header = Object.keys(H).length ? H : null;
+      }); });
       W.querySelectorAll('#edr [data-dk]').forEach((x) => { x.onclick = () => this.change(() => {
         const D = this.dockKeys(), i = +x.dataset.i, a = x.dataset.dk;
         if (a === 'del') D.splice(i, 1);
@@ -2092,7 +2107,8 @@
       if (k === 'simm') { this.simOpen = !this.simOpen; this.draw(); return; }
       if (k === 'simoff') { this.sim = {}; if (this.vista) this.vista.setCtx({ sim: this.sim }); this.draw(); return; }
       if (k === 'list') { this.showList = !this.showList; try { localStorage.setItem('matterai.editor.list', this.showList ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } this.draw(); this.sizeFrame(); return; }
-      if (k === 'add') return this.openCatalog(null);
+      // con un ambiente abierto, «+ Tarjeta» agrega a ESE ambiente (antes la ponía en el inicio y cerraba el ambiente)
+      if (k === 'add') return this.rdraft ? this.openCatalog(null, 'room-top') : this.openCatalog(null);
       if (k === 'copy') return this.copyFrom(this.K === 'tablet' ? 'phone' : 'tablet');
       const fix = () => {
         if (this.rscope && !this.rdraft) this.rscope = false;
@@ -2135,7 +2151,9 @@
         this.saving = true;
         try {
           const before = JSON.stringify(this.v);
-          const res = await this.hass.callWS({ type: 'matterai/views/save', view: this.payload() });
+          const sent = this.payload();
+          const res = await this.hass.callWS({ type: 'matterai/views/save', view: sent });
+          if (((sent.plan || {}).floors || []).length !== (((res || {}).plan || {}).floors || []).length) this.toast('Home Assistant no guardó los pisos del plano: se actualizó MatterAI pero falta reiniciar Home Assistant (Ajustes → Sistema → Reiniciar).', 9000);
           // si mientras se guardaba no se tocó nada, queda igual a lo guardado; si se siguió editando, eso va en el próximo guardado
           if (JSON.stringify(this.v) === before) { this.v = Editor.normalize(clone(res)); this.saved = clone(this.v); this.undo = this.undo.slice(-80); }
           else { this.saved = Editor.normalize(clone(res)); this.autosave(); }

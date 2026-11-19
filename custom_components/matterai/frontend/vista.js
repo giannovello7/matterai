@@ -973,14 +973,16 @@
           }
           if (c.style === 'greet') { // el saludo de arriba hecho tarjeta: se mueve y se le cambia el ancho como a cualquiera
             const H = (X.layout && X.layout.header) || {};
-            return `<div class="v-card v-grc">${greetHTML(m, H.name)}<span class="v-hsp"></span>${c.bell === false ? '' : bellHTML(m)}${c.menu === false ? '' : `<button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`}</div>`;
+            const kp = c.kpis ? [{ kind: 'lights' }, { kind: 'acs' }, m.power ? { kind: 'power' } : { kind: 'temp' }] : null;
+            if (kp) { X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = kp; }
+            return `<div class="v-card v-grc${kp ? ' wk' : ''}"><div class="v-grr">${greetHTML(m, H.name)}<span class="v-hsp"></span>${c.clock === false ? '' : whenHTML()}${c.weather === false ? '' : wxChip(m, true)}${c.bell === false ? '' : bellHTML(m)}${c.menu === false ? '' : `<button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`}</div>${kp ? `<div class="v-kpis n3">${kp.map((it, i) => kpi(m, it, i)).join('')}</div>` : ''}</div>`;
           }
           if (c.style === 'tiles') {
             return `<div class="v-ctiles" data-scr="agenda"><div class="v-ct"><b>${d.getDate()}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long' }))}</span></div><div class="v-ct"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { month: 'long' }))}</span></div></div>`;
           }
           return `<div class="v-clock" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span>${w ? `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || 'sun')}${esc(Math.round(Number(w.attributes.temperature)))}°</button>` : ''}</div>`;
         }
-        case 'plan': return planHTML(m, c.zoom, c.hint !== false, c.floors_pos);
+        case 'plan': return planHTML(m, c.zoom, c.hint === true, c.floors_pos); // el cartel de ayuda, sólo si se pide
         case 'weather': {
           const w = (c.entity && st(c.entity)) || m.weather;
           if (!w) return editing() ? `${t}<p class="v-empty">La casa no tiene clima: agregá una integración del clima (Met.no).</p>` : '';
@@ -1209,6 +1211,8 @@
       const how = ns ? `${ns} aviso${ns === 1 ? '' : 's'} para revisar` : 'Todo funcionando bien';
       return `<button class="v-greet" data-scr="avisos"><b>${esc(hi)}${name ? `, ${esc(name)}` : ''}</b><span>${esc(how)}${lit ? ` · ${lit} luz${lit === 1 ? '' : 'es'} prendida${lit === 1 ? '' : 's'}` : ''}</span></button>`;
     }
+    function whenHTML() { const d = new Date(); return `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>`; }
+    function wxChip(m, compact) { const w = m.weather; if (!w) return ''; return `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(WX_TXT[w.state] || '')}</small>`}</button>`; }
     function bellHTML(m) { const ns = notes(m).length; return `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>`; }
     function head(m, compact) {
       const d = new Date(), w = m.weather, ns = notes(m).length, H = (X.layout && X.layout.header) || {};
@@ -1217,7 +1221,7 @@
       if (!H.greet && ['clock', 'weather', 'bell', 'menu'].every((k) => H[k] === false)) return editing() ? '<span class="v-hoff">Parte de arriba oculta · tocá acá para volver a mostrarla</span>' : '';
       if (H.greet) {
         const greet = greetHTML(m, H.name);
-        return `${greet}<span class="v-hsp"></span>
+        return `${greet}<span class="v-hsp"></span>${H.clock === true ? whenHTML() : ''}${H.weather === true ? wxChip(m, compact) : ''}
         ${on('bell') ? `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>` : ''}
         ${on('menu') ? `<button class="v-sq" data-scr="menu" aria-label="Menú">${ic('menu')}</button>` : ''}`;
       }
@@ -1249,10 +1253,10 @@
       const hsty = hh && hh !== 'full' ? ` style="--bh:${rowsPx(hh)}px"` : '';
       // en el editor, como Lovelace: la tarjeta entera se arrastra; ✎ la edita (o tocarla) y ⋮ tiene duplicar, copiar y borrar
       const ins = ctx.edit && ctx.edit.onAdd && !ctx.embed ? '<button class="v-eins" data-eins title="Agregar una tarjeta acá" aria-label="Agregar una tarjeta acá">+</button>' : '';
-      const tool = `${ins}<span class="v-ecard">${editing() && ctx.edit.onSpan && !ctx.embed ? `<button data-eact="w" class="v-ewbtn" title="Ancho: tocá para cambiarlo (¼, ½, ¾, completo)" aria-label="Cambiar el ancho">${{ 1: '¼', 2: '½', 3: '¾', 4: '↔' }[spanOf(b)]}</button>` : ''}<button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
+      const tool = `${ins}<span class="v-ecard">${editing() && ctx.edit.onSpan ? `<button data-eact="w" class="v-ewbtn" title="Ancho: tocá para cambiarlo (¼, ½, ¾, completo)" aria-label="Cambiar el ancho">${{ 1: '¼', 2: '½', 3: '¾', 4: '↔' }[spanOf(b)]}</button>` : ''}<button data-eact="edit" title="Editar" aria-label="Editar">${ic('edit')}</button><button data-eact="menu" title="Más opciones" aria-label="Más opciones">${ic('dots')}</button></span>`;
       const tag = `${esc((CATALOG[b.type] || {}).name || b.type)}${(b.show || []).length ? (shown ? ' · condicional' : ' · oculta ahora') : ''}`;
-      const hgrip = editing() && ctx.edit.onRows && !ctx.embed && !b.fill ? '<span class="v-hrsz" data-hrsz title="Arrastrá para cambiar el alto (tocá dos veces: automático)"><i></i></span>' : '';
-      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${hsty}>${editing() ? `<span class="v-btag">${tag}${hh ? ` · alto ${hh === 'full' ? 'pantalla' : rowsPx(hh)}` : ''}</span>${tool}${ctx.edit.onSpan && !ctx.embed && !b.fill ? '<span class="v-rsz" data-rsz title="Arrastrá para cambiar el ancho"><i></i></span>' : ''}${hgrip}` : ''}${inner}</section>`;
+      const hgrip = editing() && ctx.edit.onRows && !b.fill ? '<span class="v-hrsz" data-hrsz title="Arrastrá para cambiar el alto (tocá dos veces: automático)"><i></i></span>' : '';
+      return `<section class="v-b t-${b.type}${cls}${sel ? ' sel' : ''}" data-block="${esc(b.id)}"${hsty}>${editing() ? `<span class="v-btag">${tag}${hh ? ` · alto ${hh === 'full' ? 'pantalla' : rowsPx(hh)}` : ''}</span>${tool}${ctx.edit.onSpan && !b.fill ? '<span class="v-rsz" data-rsz title="Arrastrá para cambiar el ancho"><i></i></span>' : ''}${hgrip}` : ''}${inner}</section>`;
     }
     /** Alto fijo de una tarjeta: filas (2…20) o 'full' (lo que queda de pantalla); 0 = el de su contenido. */
     function hOf(b) { if (b.h === 'full') return 'full'; const n = Math.round(+b.h || 0); return n >= 2 ? Math.min(20, n) : 0; }
@@ -2211,7 +2215,8 @@
     return {
       setView(v) { X.view = v || null; X.cache = {}; X.shell = null; render(); },
       view: () => X.view,
-      shown: (id) => X.shown[id] || null, // lo que muestra cada tarjeta (para pasar de automático a armada a mano)
+      // lo que muestra cada tarjeta (para pasar de automático a armada a mano); también las de adentro del ambiente abierto
+      shown: (id) => X.shown[id] || (X.xtra && X.xtra.top && X.xtra.top.shown ? X.xtra.top.shown(id) : null) || null,
       layout: () => X.layout || layout(M() || { rooms: [], access: [], cams: [], roomOf: {}, scenes: [] }),
       render,
       setCtx(patch) { Object.assign(ctx, patch); X.cache = {}; X.shell = null; render(); },
