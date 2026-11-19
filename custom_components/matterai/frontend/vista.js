@@ -1656,7 +1656,7 @@
         }
       }
       if (X.sheet === 'roomedit' && ctx.edit && ctx.edit.room) h = roomEditHTML(ctx.edit.room);
-      { const ws = X.el.querySelector('#v-sheet'); if (ws && ws.classList) ws.classList.toggle('rpage', X.sheet === 'roomedit' && !!(ctx.edit && ctx.edit.room && ctx.edit.room.open === 'page')); }
+      { const ws = X.el.querySelector('#v-sheet'); if (ws && ws.classList) ws.classList.toggle('rpage', X.sheet === 'roomedit' && !!(ctx.edit && ctx.edit.room && ctx.edit.room.open !== 'sheet')); }
       if (X.sheet === 'rutinas') {
         const b = (X.layout.blocks || []).find((y) => y.id === X.sheetArg), list = b ? routineList(b.cfg || {}, 200) : [];
         const on = list.filter((x) => (st(x.entity) || {}).state === 'on').length;

@@ -111,6 +111,10 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
 - **Tocá cualquier cosa** en la pantalla del medio (una tarjeta, un ambiente, un dato del resumen, la parte de arriba o la barra de abajo) y se abre su ventana con 3 pestañas: **Contenido** (qué muestra), **Aspecto** (cómo se ve, su ancho y dónde va) y **Cuándo se ve** (mostrarla sólo si…).
 - **Ancho de cada tarjeta**: ¼, ½, ¾ o completo; las angostas se acomodan una al lado de la otra.
 - **Quién lo ve** (2.34.2): arriba, debajo del nombre del dashboard, dice qué equipos lo usan («Lo ven: Tablet living (tablet)…») o «⚠ Ningún equipo usa este dashboard». Si un equipo muestra otra cosa que el editor, casi siempre es porque tiene asignado otro dashboard: se cambia en la página Dashboards.
+- **Ambientes como páginas (2.36, como las áreas de Home Assistant)**:
+  - En el equipo, cada ambiente se abre como una página completa: «‹» vuelve al inicio, y arriba están los demás ambientes para saltar de uno a otro (un puntito avisa si tienen luces prendidas).
+  - En el editor, arriba de la pantalla hay pestañas «⌂ Inicio · Living · Cocina…»: tocás un ambiente y se edita a pantalla completa, como una vista de Home Assistant. Pasás de un ambiente a otro sin volver al inicio, y lo que cambiaste queda guardado al pasar.
+  - Si preferís una ventana para un ambiente, se elige en su Aspecto: «Se abre como → Ventana».
 - **2.35.4**:
   - Con un ambiente abierto, «+ Tarjeta» (arriba) agrega a ese ambiente.
   - Una tarjeta nueva adentro de un ambiente arranca con los equipos de ese ambiente (las cortinas del Garage, no las de toda la casa).

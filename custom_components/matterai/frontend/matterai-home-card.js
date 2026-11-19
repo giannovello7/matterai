@@ -785,7 +785,13 @@
   .sheet.rcards>#sheetdyn{position:sticky;top:-10px;z-index:6;margin:-10px -20px 0;padding:10px 20px 2px;background:inherit;-webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px)}
   /* el título del ambiente sin el recuadro oscuro (no gustaba): queda sobre el fondo de la ventana */
   .sheet.rcards .sh-head,:host([look]) .sheet.rcards .sh-head,:host([look][theme]) .app .sheet.rcards .sh-head{position:static!important;background:none!important;box-shadow:none!important;border:0!important}
-  .sheet-wrap.rpage.open .sheet{transform:none!important}.sheet-wrap.rpage .grab{display:none!important}
+  .sheet-wrap.rpage.open .sheet{transform:none!important}
+  /* una página: no se ve el inicio de atrás (fondo propio debajo de la página) */
+  .sheet-wrap.rpage .backdrop,:host([look]) .sheet-wrap.rpage .backdrop,:host([look][theme]) .sheet-wrap.rpage .backdrop,:host([look][theme]) .app .sheet-wrap.rpage .backdrop{background:#10131a!important;opacity:1!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  .rnav{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px;margin-top:-8px}.rnav::-webkit-scrollbar{display:none}
+  .rnav button{all:unset;position:relative;display:inline-flex;align-items:center;gap:6px;flex:none;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.07);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
+  .rnav button .ic{width:16px;height:16px}.rnav button.on{background:var(--accent,#3ee6c4);color:#071018}.rnav button i{width:6px;height:6px;border-radius:50%;background:#ffd36b;box-shadow:0 0 6px #ffd36b}
+  .rback{margin-right:-4px}.sheet-wrap.rpage .grab{display:none!important}
   .sheet-wrap.rpage :is(.rcbox,.camcard.own){max-width:960px}
   .grab{width:44px;height:5px;border-radius:5px;background:rgba(255,255,255,.18);margin:0 auto 14px}
   .sh-head{display:flex;align-items:center;gap:14px;padding-bottom:18px;position:sticky;top:-10px;z-index:2;background:linear-gradient(rgba(14,16,28,.96) 75%,transparent);padding-top:6px}
@@ -1578,7 +1584,7 @@
           const id = String(rc.id || slug(rc.name) || `room${i}`);
           const r = byId[id] || newRoom(id, rc.name, rc.icon);
           if (rc.cameras_position) r.camPos = rc.cameras_position; // top · after (por defecto) · end
-          r.open = rc.open === 'page' ? 'page' : 'sheet'; // cómo se abre: ventana (lo de siempre) o página completa (2.34)
+          r.open = rc.open === 'sheet' ? 'sheet' : 'page'; // cómo se abre: página (lo normal desde la 2.36, como las áreas de HA) o ventana
           r.ord = r.ord || {}; // orden que eligió el instalador: los bloques de la ventana salen en ese orden
           (rc.entities || []).forEach((x) => {
             const eid = entOf(x);
@@ -2731,11 +2737,12 @@
       // esta tarjeta deja sólo el título. Sin el motor (tarjeta suelta en Lovelace), el ambiente de siempre.
       const rr = this._m && this._m.byId && this._m.byId[id];
       this._roomCards = false;
+      this._rpage = !!(rr && rr.open !== 'sheet'); // antes de dibujar: el título lleva «‹» y los demás ambientes
       if (rr && typeof this.roomExtra === 'function') { try { this._roomCards = this.roomExtra(rr, this._els.sheet.querySelector('#sheettop'), this._els.sheet.querySelector('#sheetbot')) === true; } catch (_) { this._roomCards = false; } }
       this._els.sheet.classList.toggle('rcards', this._roomCards); // el título (con la ✕) queda fijo arriba al bajar
       this._renderSheet();
       this._els.sheet.scrollTop = 0;
-      this._els.sheetwrap.classList.toggle('rpage', !!(rr && rr.open === 'page'));
+      this._els.sheetwrap.classList.toggle('rpage', this._rpage);
       this._els.sheetwrap.classList.add('open');
       this._haptic('light');
     }
@@ -2885,9 +2892,11 @@
       }
       const on = r.lightsOn.length > 0;
       const pos = r.camPos === 'top' || r.camPos === 'end' ? r.camPos : 'after';
-      let h = `<div class="grab"></div><div class="sh-head" style="--lc:${r.rgb}"><div class="ri big ${on ? 'on' : ''}">${ic(r.icon)}</div>
+      const pg = this._rpage && this._room === r.id, rooms = (this._m && this._m.rooms) || [];
+      let h = `<div class="grab"></div><div class="sh-head" style="--lc:${r.rgb}">${pg ? `<button class="ib rback" data-action="close" aria-label="Volver">${ic('back')}</button>` : ''}<div class="ri big ${on ? 'on' : ''}">${ic(r.icon)}</div>
         <div class="sh-t"><h2>${esc(r.name)}</h2><div class="sh-sub">${sub.join('')}</div></div>
-        <button class="ib" data-action="close" aria-label="Cerrar">${ic('x')}</button></div>`;
+        ${pg ? '' : `<button class="ib" data-action="close" aria-label="Cerrar">${ic('x')}</button>`}</div>
+        ${pg && rooms.length > 1 ? `<nav class="rnav">${rooms.map((x) => `<button class="${x.id === r.id ? 'on' : ''}" data-action="room" data-id="${esc(x.id)}">${ic(x.icon)}${esc(x.name)}${x.lightsOn && x.lightsOn.length ? '<i></i>' : ''}</button>`).join('')}</nav>` : ''}`;
       const head = h; if (headOnly) return [head, '']; if (pos === 'top') h = '';
       const blk = (icon, title, body, extra = '') => `<div class="blk"><div class="blk-h"><h4>${ic(icon)}${title}</h4>${extra}</div>${body}</div>`;
       // En el orden exacto de la lista del instalador: las entidades seguidas del mismo tipo forman un bloque

@@ -225,6 +225,9 @@
   textarea.code{width:100%;min-height:340px;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#0f1318;color:#e9ecf2;border:1px solid rgba(160,175,200,.25);border-radius:10px;padding:10px;tab-size:2;resize:vertical}
   .catpaste{display:block;width:100%;text-align:left;margin:0 0 10px;padding:10px 12px;border-radius:12px;border:1px dashed #f2b766;background:rgba(242,183,102,.1);color:#e9ecf2;font:inherit;cursor:pointer}
   .mlist small{color:#8f99ab;font-weight:400}
+  .ed-c{flex-wrap:wrap;align-content:flex-start}.ertabs{width:100%;display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;padding:8px 12px 6px;flex:none}.ertabs[hidden]{display:none}
+  .ertabs button{flex:none;border:1px solid rgba(160,175,200,.2);background:#1e242e;color:#c4cad6;border-radius:999px;padding:6px 12px;font:600 12.5px/1 inherit;cursor:pointer;white-space:nowrap}
+  .ertabs button.on{background:#f2b766;border-color:#f2b766;color:#1b1408}
   .pfl{display:flex;gap:6px;flex-wrap:wrap}
   .tname .who{display:block;font-size:11px;color:#8f99ab;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}.tname .who.warn{color:#f2b766}
   .fld input[type=checkbox],.fld input[type=radio]{width:auto;flex:none;accent-color:#f2b766}.fld label.chk{display:flex;gap:8px;align-items:center;font-size:13px;color:#e9ecf2;padding:3px 0;cursor:pointer}
@@ -302,7 +305,7 @@
       root.appendChild(this.host);
       this.wrap = this.host.attachShadow({ mode: 'open' });
       this.wrap.innerHTML = `<style>${CSS}</style><div class="ed" id="ed"><div class="ed-top" id="edt"></div>
-        <div class="ed-c" id="edc"><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div><div class="fold" id="fold" hidden><span>Hasta acá se ve en el equipo sin deslizar</span></div></div><div class="ehint" id="ehint"></div></div>
+        <div class="ed-c" id="edc"><nav class="ertabs" id="edrt"></nav><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div><div class="fold" id="fold" hidden><span>Hasta acá se ve en el equipo sin deslizar</span></div></div><div class="ehint" id="ehint"></div></div>
         <aside class="dlg" id="dlg"><div class="dlg-h" id="dlgh"></div><div class="dlg-b" id="edr"></div><div class="dlg-f" id="dlgf"></div></aside></div><div class="toastE" id="toastE"></div>`;
       this.$ = (s) => this.wrap.querySelector(s);
       // el prearmado necesita el modelo de la casa (ambientes, cámaras, ausente, rutinas): igual que en la app
@@ -815,7 +818,25 @@
     }
 
     /* ───────── dibujo ───────── */
+    /** Las pestañas de arriba de la pantalla: el inicio y cada ambiente (se edita a pantalla completa, como una vista de HA). */
+    drawRoomTabs() {
+      const el = this.$ && this.$('#edrt'); if (!el) return;
+      const rooms = ((this.model() || { rooms: [] }).rooms || []);
+      if (!rooms.length || this.playing) { el.innerHTML = ''; el.hidden = true; return; }
+      el.hidden = false;
+      const cur = this.rdraft ? (this.rdraft._orig || this.rdraft.name) : null;
+      el.innerHTML = `<button class="${cur ? '' : 'on'}" data-rt="">⌂ Inicio</button>${rooms.map((r) => `<button class="${cur === r.name ? 'on' : ''}" data-rt="${esc(r.id)}">${esc(r.name)}</button>`).join('')}`;
+      el.querySelectorAll('[data-rt]').forEach((x) => { x.onclick = async () => {
+        const id = x.dataset.rt;
+        if (this.rdraft && this.roomDirty()) await this.saveRoom(false); // el ambiente que se deja queda guardado
+        if (this.rscope) { this.rscope = false; this.rSnap = null; }
+        if (!id) { this.dlgClose(); this.syncPreview(); return; }
+        this.pick(null, { zone: 'rooms', room: id });
+        this.drawRoomTabs();
+      }; });
+    }
     draw() {
+      this.drawRoomTabs();
       const v = this.v, K = this.K, ori = this.lay().orientation || 'landscape', dirty = this.dirty();
       const other = K === 'tablet' ? 'phone' : 'tablet', hasOther = !!(((v.layouts || {})[other] || {}).blocks || []).length;
       const SIMS = [['night', 'De noche'], ['alarm', 'Alarma disparada'], ['music', 'Música sonando'], ['gate', 'Portón abierto']], simOn = SIMS.filter(([k]) => (this.sim || {})[k]);
@@ -1078,7 +1099,7 @@
         else this.blockAct(id, k);
       });
     }
-    syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.playing ? null : this.editCtx() }); if (!this.playing) this.previewRoom(); }
+    syncPreview() { if (this.vista) this.vista.setCtx({ edit: this.playing ? null : this.editCtx() }); if (!this.playing) this.previewRoom(); this.drawRoomTabs(); }
     /** El ambiente que se edita se ve abierto en la pantalla, como lo ve el cliente (la ventana de la app), con los
      *  cambios que se van haciendo (todavía sin guardar en la casa). */
     previewRoom() {
@@ -1096,7 +1117,7 @@
         if (sig !== this.pcRoomSig) { this.pcRoomSig = sig; pc.setConfig(Object.assign({}, this.cfg, { rooms: list, camera_inline: false })); pc.hass = this.p._hass || this.hass; }
         const m = pc.model && pc.model(), r = m && m.rooms.find((x) => x.name === d.name);
         if (r && (pc._room !== r.id || !this.pcRoomOn)) { pc.openRoom(r.id); }
-        if (pc._els && pc._els.sheetwrap) pc._els.sheetwrap.classList.toggle('rpage', d.open === 'page'); // ventana o página completa
+        if (pc._els && pc._els.sheetwrap) pc._els.sheetwrap.classList.toggle('rpage', d.open !== 'sheet'); // página (lo normal) o ventana
         this.pcRoomOn = true;
         this.roomDrag(pc);
       } catch (_) { /* si algo falla, queda la pantalla como estaba */ }
@@ -1733,8 +1754,8 @@
       const crumb = `<div class="crumb"><button class="eb sm" data-rx="back">‹ Ambientes</button><span>› ${esc(R.name)}</span></div>`;
       if (rtab === 'lay') {
         return `${crumb}${tabs}
-          <div class="fld"><span>Se abre como</span><span class="eseg"><button data-ropen="sheet" class="${R.open === 'page' ? '' : 'on'}">Ventana</button><button data-ropen="page" class="${R.open === 'page' ? 'on' : ''}">Página completa</button></span></div>
-          <p class="hint" style="margin-top:-4px">${R.open === 'page' ? 'Ocupa toda la pantalla, como una página nueva; se vuelve con la ✕.' : 'Una ventana encima del inicio (lo de siempre).'}</p>
+          <div class="fld"><span>Se abre como</span><span class="eseg"><button data-ropen="page" class="${R.open !== 'sheet' ? 'on' : ''}">Página (como Home Assistant)</button><button data-ropen="sheet" class="${R.open === 'sheet' ? 'on' : ''}">Ventana</button></span></div>
+          <p class="hint" style="margin-top:-4px">${R.open !== 'sheet' ? 'Ocupa toda la pantalla, como las áreas de Home Assistant: «‹» vuelve al inicio y arriba están los demás ambientes para saltar de uno a otro.' : 'Una ventana encima del inicio, que se cierra con la ✕.'}</p>
           ${hasCam ? `<div class="fld"><span>Cámaras</span><span class="eseg wrap">${[['top', 'Arriba de todo'], ['after', 'Después de los equipos'], ['end', 'Al final']].map(([k, l]) => `<button data-rcpos="${k}" class="${(R.cameras_position || 'after') === k ? 'on' : ''}">${l}</button>`).join('')}</span></div>` : ''}
           <label class="fld"><span>Ícono</span><select data-rn="icon"><option value="">Automático</option>${ICONS.map((n) => `<option ${R.icon === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
           <label class="chk"><input type="checkbox" data-rlocal ${R.local ? 'checked' : ''}> Tarjetas propias de este ambiente sólo en este dashboard (los demás siguen con las de la casa)</label>
@@ -1767,7 +1788,7 @@
       // las tarjetas van a la casa (todas las pantallas) o, con «versión propia», sólo a este dashboard
       if (!local) { if (hasCards) R.page = page; else delete R.page; } else if (i >= 0 && list[i].page) R.page = list[i].page;
       if (del) { if (i >= 0) list.splice(i, 1); } else if (i >= 0) { list[i] = Object.assign({}, list[i], R); if (!local && !hasCards) delete list[i].page; } else list.push(R);
-      if (!del && i >= 0) { if (!R.open) delete list[i].open; if (!R.cameras_position) delete list[i].cameras_position; } // volvió a lo de siempre
+      if (!del && i >= 0) { if (R.open !== 'sheet') delete list[i].open; if (!R.cameras_position) delete list[i].cameras_position; } // volvió a lo de siempre
       if (!del && list.filter((x) => x.name.toLowerCase() === R.name.toLowerCase()).length > 1) { this.toast('Ya hay un ambiente con ese nombre'); return; }
       const cfg = Object.assign({}, this.cfg, { rooms: list });
       try {
@@ -1894,7 +1915,7 @@
           if (v) o.name = v; else delete o.name;
           L[this.rme] = Object.keys(o).length === 1 ? o.entity : o; redraw();
         }; });
-        W.querySelectorAll('#edr [data-ropen]').forEach((x) => { x.onclick = () => { if (x.dataset.ropen === 'page') R.open = 'page'; else delete R.open; redraw(); }; });
+        W.querySelectorAll('#edr [data-ropen]').forEach((x) => { x.onclick = () => { if (x.dataset.ropen === 'sheet') R.open = 'sheet'; else delete R.open; redraw(); }; });
         W.querySelectorAll('#edr [data-rcpos]').forEach((x) => { x.onclick = () => { if (x.dataset.rcpos === 'after') delete R.cameras_position; else R.cameras_position = x.dataset.rcpos; redraw(); }; });
         W.querySelectorAll('#edr [data-rmv]').forEach((x) => { x.onclick = () => { const i = +x.dataset.rmv, j = i + +x.dataset.d; if (j < 0 || j >= R.entities.length) return; [R.entities[i], R.entities[j]] = [R.entities[j], R.entities[i]]; redraw(); }; });
         W.querySelectorAll('#edr [data-radd]').forEach((x) => { x.onclick = () => this.openCB(x, ROOM_DOMAINS, (id) => {
