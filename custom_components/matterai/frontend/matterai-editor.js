@@ -1974,6 +1974,8 @@
         const k = x.dataset.dx;
         if (k === 'cancel') return this.dlgCancel();
         if (k === 'ok') return this.dlgOk();
+        // una tarjeta de adentro de un ambiente: se borra del ambiente y se vuelve a él (antes se cerraba todo y se perdía)
+        if (k === 'del' && this.sel && this.rscope) { const id = this.sel; this.dlgSnap = null; this.blockAct(id, 'del'); return undefined; }
         if (k === 'del' && this.sel) { const id = this.sel; this.dlgSnap = null; this.sel = null; this.blockAct(id, 'del'); this.dlgClose(); this.autosave(); }
         return undefined;
       }; });
