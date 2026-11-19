@@ -2467,7 +2467,7 @@
         if (d.aspect) FP.aspect = Math.round(+d.aspect * 1000) / 1000;
         this.zsel = null;
         await this.drawPlan(); this.drawPreview();
-        this.toast(`Listo: ${zones.length} ambientes${miss ? `. ${miss} luz${miss > 1 ? 'ces' : ''} no existe${miss > 1 ? 'n' : ''} en la casa: tocá cada ambiente para elegir sus luces` : ''}`);
+        this.toast(`Listo: ${zones.length} ambientes${miss ? `. ${miss} ${miss > 1 ? 'luces no existen' : 'luz no existe'} en la casa: tocá cada ambiente para elegir sus luces` : ''}`);
       };
       inp.click();
     }

@@ -1209,7 +1209,7 @@
       const S = (hass() || {}).states || {}, ae = (card() && card()._config && card()._config.app_entities) || null;
       const lit = Object.keys(S).filter((x) => x.startsWith('light.') && S[x].state === 'on' && (!ae || ae.includes(x))).length;
       const how = ns ? `${ns} aviso${ns === 1 ? '' : 's'} para revisar` : 'Todo funcionando bien';
-      return `<button class="v-greet" data-scr="avisos"><b>${esc(hi)}${name ? `, ${esc(name)}` : ''}</b><span>${esc(how)}${lit ? ` · ${lit} luz${lit === 1 ? '' : 'es'} prendida${lit === 1 ? '' : 's'}` : ''}</span></button>`;
+      return `<button class="v-greet" data-scr="avisos"><b>${esc(hi)}${name ? `, ${esc(name)}` : ''}</b><span>${esc(how)}${lit ? ` · ${lit} ${lit === 1 ? 'luz prendida' : 'luces prendidas'}` : ''}</span></button>`;
     }
     function whenHTML() { const d = new Date(); return `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>`; }
     function wxChip(m, compact) { const w = m.weather; if (!w) return ''; return `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(WX_TXT[w.state] || '')}</small>`}</button>`; }
