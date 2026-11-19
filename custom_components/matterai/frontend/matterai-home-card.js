@@ -859,7 +859,9 @@
   .actv-wrap.open .actv{transform:none;opacity:1}
   /* iPhone (app web): la barra de arriba (hora, batería) va encima de la página; las ventanas a pantalla completa
      (música, actividad…) arrancan debajo de ella. En Android y en Home Assistant ese margen es 0. */
-  @media (max-width:899px){.actv{border-top:var(--ios-top,0px) solid #05060d}:host([theme]) .actv,:host .actv{border-top-color:#0b0d16!important}:host([theme]) .actv.mus,:host .actv.mus{border-top-color:#070912!important}.actv.mus .mu-main>.mu-head,.actv.mus .mu-main .mu-head:first-child{position:sticky;top:0;z-index:4;margin:0 -16px;padding-left:16px;padding-right:16px;background:var(--mu-bg,#070912)}.sheet{max-height:min(90vh,calc(100vh - var(--ios-top,0px) - 10px))!important}}
+  /* (los estilos le ponen «border:0!important» a estas ventanas: por eso no se usa un borde) la ventana arranca debajo de la barra y
+     la franja de la barra queda oscura */
+  @media (max-width:899px){.actv,:host([look]) .actv,:host([look][theme]) .app .actv,:host([look]) .app.fluid .actv{top:var(--ios-top,0px)!important}.actv-wrap.open::before{content:'';position:absolute;left:0;right:0;top:0;height:var(--ios-top,0px);background:#05060d;z-index:1}.actv.mus .mu-main>.mu-head,.actv.mus .mu-main .mu-head:first-child{position:sticky;top:0;z-index:4;margin:0 -16px;padding-left:16px;padding-right:16px;background:var(--mu-bg,#070912)}.sheet{max-height:min(90vh,calc(100vh - var(--ios-top,0px) - 10px))!important}}
   .sheet-wrap.rpage .sheet{max-height:none!important}
   @media (min-width:900px){.actv{inset:4vh auto 4vh 50%;width:min(860px,94vw);transform:translate(-50%,24px);border-radius:30px;border:1px solid rgba(255,255,255,.1);box-shadow:0 30px 90px rgba(0,0,0,.55)}
     .actv-wrap.open .actv{transform:translate(-50%,0)}}
