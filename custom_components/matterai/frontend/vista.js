@@ -613,6 +613,7 @@
           if (d === 'scene' || d === 'script') return c.call(d, 'turn_on', { entity_id: ent });
           if (d === 'button' || d === 'input_button') return c.call(d, 'press', { entity_id: ent });
           if (d === 'alarm_control_panel') return openSheet('alarm', ent);
+          if (['light', 'switch', 'fan', 'input_boolean'].includes(d) && !pendStart([ent])) return undefined; // ya está cambiando: un segundo toque no hace nada
           return c.call('homeassistant', 'toggle', { entity_id: ent });
         }
         case 'more_info': return ent && ctx.openEntity(ent);
@@ -655,7 +656,29 @@
       return { lock, open, moving, word: lock ? (open ? 'Abierta' : 'Cerrada') : moving ? 'Moviendo' : open ? 'Abierto' : 'Cerrado',
         btn: moving ? 'Moviendo…' : lock ? (open ? 'Cerrar' : 'Abrir') : open ? 'Cerrar' : 'Abrir' };
     }
+    const PEND_MS = 8000;
+    /** Un equipo que se tocó y la casa todavía no confirmó: { to: 'on'|'off' } (o null). */
+    function pend(id) {
+      const p = X.pend && X.pend[id]; if (!p) return null;
+      const h = hass(), s = h && h.states && h.states[id];
+      if (Date.now() > p.until || !s || s.last_updated !== p.from) { delete X.pend[id]; return null; }
+      return p;
+    }
+    /** Antes de mandar la orden: si alguno ya está esperando confirmación, no se manda otra (evita el doble toque). */
+    function pendStart(ids, to) {
+      const h = hass(), S = (h && h.states) || {}, list = (ids || []).filter((id) => S[id]);
+      if (list.some((id) => pend(id))) return false;
+      X.pend = X.pend || {};
+      list.forEach((id) => { X.pend[id] = { to: to || (S[id].state === 'on' ? 'off' : 'on'), until: Date.now() + PEND_MS, from: S[id].last_updated }; });
+      X.cache = {}; render();
+      setTimeout(() => { X.cache = {}; render(); }, PEND_MS + 100); // si la casa no contestó, vuelve a mostrar lo real
+      return true;
+    }
     function entState(id) {
+      const r = entState0(id), p = r && pend(id);
+      return p ? Object.assign({}, r, { txt: p.to === 'on' ? 'Encendiendo…' : 'Apagando…', pending: true }) : r;
+    }
+    function entState0(id) {
       const s = st(id); if (!s) return { on: false, txt: 'No disponible' };
       const d = id.split('.')[0], v = s.state;
       if (d === 'cover' || d === 'lock') { const g = gateState(id); return { on: g.open, txt: g.word }; }
@@ -1082,7 +1105,7 @@
           return `<div class="v-card">${t}<div class="v-list2">${ids.map((id, i) => {
             const s = st(id), on = s.state === 'on', a = s.attributes, dim = id.startsWith('light.') && (a.brightness != null || (a.supported_color_modes || []).some((x) => x !== 'onoff'));
             const pct = on && a.brightness != null ? Math.max(1, Math.round((a.brightness / 255) * 100)) : 0;
-            return `<div class="v-lt ${on ? 'on' : ''}"${EL(i)}><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
+            return `<div class="v-lt ${on ? 'on' : ''}"${EL(i)}><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${pend(id) ? (pend(id).to === 'on' ? 'Encendiendo…' : 'Apagando…') : on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
               <button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
               ${dim ? `<input class="v-bri" type="range" min="1" max="100" value="${pct || 50}" data-bri="${esc(id)}" aria-label="Brillo de ${esc(fname(id))}">` : ''}</div>`;
           }).join('')}</div>${elAdd('Agregar una luz')}</div>`;
@@ -1353,7 +1376,8 @@
       if (X.sliding && Date.now() - (X.slideAt || 0) > 3000) X.sliding = false;
       if (!X.el || X.el.hidden || X.sliding || X.dnd) return;
       const m0 = M();
-      if (!m0) { if (X.el.innerHTML === '') X.el.innerHTML = '<p class="v-empty">Conectando con tu casa…</p>'; return; }
+      // la app espera el dashboard de la casa antes de dibujar (si no, se veía un momento el prearmado o el de la vez anterior)
+      if (!m0 || (ctx.waitView && !X.viewSet)) { if (X.el.innerHTML === '' || !X.el.querySelector('.v-empty')) X.el.innerHTML = '<p class="v-empty">Conectando con tu casa…</p>'; return; }
       const m = buildSim(m0);
       const L = X.layout = layout(m), K = kind(), ori = ctx.orientation || L.orientation || 'landscape';
       // en el editor manda lo que se está diseñando; en la tablet de verdad, cómo está parada (o «vertical» si se fijó así)
@@ -1767,7 +1791,7 @@
       const itb = t.closest('[data-it]'); if (itb) { const b = blockOf(itb), it = b && (b.cfg.items || [])[+itb.dataset.it]; if (it) run(it.tap || { type: it.entity ? 'toggle' : 'none' }, it); return; }
       const gate = t.closest('[data-gate]'); if (gate) { vib(); return c.access(gate.dataset.gate); }
       const alb = t.closest('[data-alarm]'); if (alb) return openSheet('alarm', alb.dataset.alarm);
-      const en = t.closest('[data-ent]'); if (en) { const id = en.dataset.ent, d = id.split('.')[0]; vib(); return c.call(d === 'scene' || d === 'script' ? d : 'homeassistant', d === 'scene' || d === 'script' ? 'turn_on' : 'toggle', { entity_id: id }); }
+      const en = t.closest('[data-ent]'); if (en) { const id = en.dataset.ent, d = id.split('.')[0]; if (['light', 'switch', 'fan', 'input_boolean'].includes(d) && !pendStart([id])) return undefined; vib(); return c.call(d === 'scene' || d === 'script' ? d : 'homeassistant', d === 'scene' || d === 'script' ? 'turn_on' : 'toggle', { entity_id: id }); }
       const rs = t.closest('[data-rsheet]'); if (rs) { vib(); return openSheet('rutinas', rs.dataset.rsheet); }
       const rn = t.closest('[data-run]'); if (rn) { vib(); const id = rn.dataset.run; toast(`«${fname(id)}» en marcha`); return id.startsWith('script.') ? c.call('script', 'turn_on', { entity_id: id }) : c.call('automation', 'trigger', { entity_id: id }); }
       const au = t.closest('[data-auto]'); if (au) { vib(); const s = st(au.dataset.auto), dm = au.dataset.auto.split('.')[0]; return c.call(dm === 'switch' ? 'switch' : 'automation', s && s.state === 'on' ? 'turn_off' : 'turn_on', { entity_id: au.dataset.auto }); }
@@ -1796,7 +1820,7 @@
       // el cartel (nombre o íconos) abre el ambiente con todo lo que tiene; la zona prende o apaga sus luces
       const zpin = t.closest('[data-zpin]');
       if (zpin) { const zz = X.zonePolys[+zpin.dataset.zone], r = zz && roomByName(m, zz.room || zz.name); if (r) { vib(); return c.openRoom(r.id); } }
-      const z = t.closest('[data-zone]'); if (z) { const zz = X.zonePolys[+z.dataset.zone]; if (zz && zz.lights.length) { const any = zz.lights.some((id) => (st(id) || {}).state === 'on'); vib(); c.call('homeassistant', any ? 'turn_off' : 'turn_on', { entity_id: zz.lights }); toast(`${zz.name}: ${any ? 'apagado' : 'prendido'}`); } else if (zz && zz.room) { const r = roomByName(m, zz.room); if (r) c.openRoom(r.id); } return; }
+      const z = t.closest('[data-zone]'); if (z) { const zz = X.zonePolys[+z.dataset.zone]; if (zz && zz.lights.length) { const any = zz.lights.some((id) => (st(id) || {}).state === 'on'); if (!pendStart(zz.lights, any ? 'off' : 'on')) return undefined; vib(); c.call('homeassistant', any ? 'turn_off' : 'turn_on', { entity_id: zz.lights }); toast(`${zz.name}: ${any ? 'apagado' : 'prendido'}`); } else if (zz && zz.room) { const r = roomByName(m, zz.room); if (r) c.openRoom(r.id); } return; }
       const room = t.closest('[data-room]'); if (room) { if (X.sheet === 'casa') closeSheet(); return c.openRoom(room.dataset.room); }
       const scr = t.closest('[data-scr]');
       if (scr) {
@@ -2213,7 +2237,7 @@
     X.clockT = setInterval(() => { if (!X.el.hidden) render(); }, 20000);
 
     return {
-      setView(v) { X.view = v || null; X.cache = {}; X.shell = null; render(); },
+      setView(v) { X.view = v || null; X.viewSet = true; X.cache = {}; X.shell = null; render(); },
       view: () => X.view,
       // lo que muestra cada tarjeta (para pasar de automático a armada a mano); también las de adentro del ambiente abierto
       shown: (id) => X.shown[id] || (X.xtra && X.xtra.top && X.xtra.top.shown ? X.xtra.top.shown(id) : null) || null,
