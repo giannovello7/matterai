@@ -787,7 +787,7 @@
   .sheet.rcards .sh-head,:host([look]) .sheet.rcards .sh-head,:host([look][theme]) .app .sheet.rcards .sh-head{position:static!important;background:none!important;box-shadow:none!important;border:0!important}
   .sheet-wrap.rpage.open .sheet{transform:none!important}
   /* una página: no se ve el inicio de atrás (fondo propio debajo de la página) */
-  .sheet-wrap.rpage .backdrop,:host([look]) .sheet-wrap.rpage .backdrop,:host([look][theme]) .sheet-wrap.rpage .backdrop,:host([look][theme]) .app .sheet-wrap.rpage .backdrop{background:#10131a!important;opacity:1!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
+  .sheet-wrap.rpage.open .backdrop,:host([look]) .sheet-wrap.rpage.open .backdrop,:host([look][theme]) .sheet-wrap.rpage.open .backdrop,:host([look][theme]) .app .sheet-wrap.rpage.open .backdrop{background:#10131a!important;opacity:1!important;-webkit-backdrop-filter:none!important;backdrop-filter:none!important}
   .rnav{display:flex;gap:8px;overflow-x:auto;scrollbar-width:none;padding:2px 0 12px;margin-top:-8px}.rnav::-webkit-scrollbar{display:none}
   .rnav button{all:unset;position:relative;display:inline-flex;align-items:center;gap:6px;flex:none;padding:7px 12px;border-radius:999px;background:rgba(255,255,255,.07);font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap}
   .rnav button .ic{width:16px;height:16px}.rnav button.on{background:var(--accent,#3ee6c4);color:#071018}.rnav button i{width:6px;height:6px;border-radius:50%;background:#ffd36b;box-shadow:0 0 6px #ffd36b}
