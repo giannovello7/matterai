@@ -2035,9 +2035,12 @@
     };
     const under = (x, y) => { const rn = X.el.getRootNode ? X.el.getRootNode() : null, d = rn && rn.elementFromPoint ? rn : X.el.ownerDocument; return d.elementFromPoint ? d.elementFromPoint(x, y) : null; };
     const autoScroll = (x, y) => {
+      // lo que se desplaza: la caja con scroll más cercana, aunque esté AFUERA del motor (la ventana de un ambiente, que es
+      // de la tarjeta principal y contiene a este motor). Antes se cortaba en el borde del motor y en los ambientes no
+      // se podía llevar una tarjeta de abajo hasta arriba.
       let sc = under(x, y);
-      while (sc && sc !== X.el && !(sc.scrollHeight > sc.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = sc.parentElement;
-      if (sc === X.el) sc = null;
+      const up = (n) => n.parentElement || (n.getRootNode && n.getRootNode().host) || null;
+      while (sc && !(sc.scrollHeight > sc.clientHeight + 4 && /auto|scroll/.test(getComputedStyle(sc).overflowY))) sc = up(sc);
       const box = sc || X.el.ownerDocument.scrollingElement;
       if (!box || !box.getBoundingClientRect) return;
       const r = sc ? box.getBoundingClientRect() : { top: 0, bottom: X.el.ownerDocument.defaultView.innerHeight };
@@ -2099,6 +2102,8 @@
       dnd.px = x; dnd.py = y;
       { const base = X.el.getBoundingClientRect(); dnd.ghost.g.style.left = `${x - dnd.ghost.dx - base.left}px`; dnd.ghost.g.style.top = `${y - dnd.ghost.dy - base.top}px`; }
       autoScroll(x, y);
+      // con el dedo quieto cerca del borde, sigue desplazando
+      if (!dnd.ast) { const d0 = dnd; d0.ast = setInterval(() => { if (dnd !== d0 || !d0.on) { clearInterval(d0.ast); return; } dragMove(d0.px, d0.py); }, 60); }
       dnd.drop = null;
       if (dnd.kind === 'card') {
         const c = cardDrop(x, y);
@@ -2158,7 +2163,7 @@
       if (ctx.edit && ctx.edit.onDragAt) ctx.edit.onDragAt(e.clientX, e.clientY);
     }, { passive: false });
     const endDnd = (ok) => {
-      const d = dnd; dnd = null;
+      const d = dnd; dnd = null; if (d && d.ast) clearInterval(d.ast);
       if (!d) return;
       clearTimeout(d.lt); if (d.node && d.node.classList) d.node.classList.remove('lift');
       hideLine(); markArea(null); X.el.classList.remove('dnd-card');
