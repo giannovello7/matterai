@@ -228,7 +228,7 @@ Nada más: cada celular se registra solo. El panel sólo reenvía avisos a celul
 - **No veo un cambio del panel en la app**: los dashboards llegan al instante; si cambió la app o la integración, cerrá y abrí la app (o recargá el navegador).
 - **Una tablet aparece dos veces**: Equipos → «Quitar duplicado». Desde la 2.15 la casa reemplaza el vínculo viejo sola.
 - **No llegan los avisos**: revisá en Puesta en marcha «Conectada al panel central» y «Avisos con la app cerrada», y probá con Equipos → Probar.
-- **La app tarda en conectar en la casa**: falta la dirección local o el wifi en «Cambiar datos».
+- **La app tarda en conectar en la casa**: falta la dirección local o el wifi en «Cambiar datos». El cliente también puede tocar, estando en su wifi, **Opciones → Conexión → «Este wifi es el de mi casa»** en la app instalada (queda en ese celular; pide el permiso de ubicación, que el sistema exige para leer el nombre del wifi). Al conectar, la app muestra unos segundos si está «en casa · red local» o «desde afuera · por internet».
 - **Un equipo no aparece en la app**: no está en ningún ambiente (Puesta en marcha te dice cuántos faltan).
 - **Cambios que no quedan guardados (ambientes, pisos del plano) o tarjetas repetidas**: se actualizó MatterAI pero falta **reiniciar Home Assistant**. Desde la 2.37 el editor y el panel lo avisan arriba con el botón «Reiniciar ahora».
 - **Una cámara no se ve en vivo**: el visor necesita la Advanced Camera Card y Frigate funcionando (Mantenimiento lo vigila).

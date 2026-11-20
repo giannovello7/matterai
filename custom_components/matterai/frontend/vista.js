@@ -1116,7 +1116,7 @@
             const pct = on && a.brightness != null ? Math.max(1, Math.round((a.brightness / 255) * 100)) : 0;
             return `<div class="v-lt ${on ? 'on' : ''}"${EL(i)}><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
               <button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
-              ${dim ? `<input class="v-bri" type="range" min="1" max="100" value="${pct || 50}" data-bri="${esc(id)}" aria-label="Brillo de ${esc(fname(id))}">` : ''}</div>`;
+              ${dim ? `<input class="v-bri" type="range" min="1" max="100" value="${pct || 1}" style="--p:${pct}%" data-bri="${esc(id)}" aria-label="Brillo de ${esc(fname(id))}">` : ''}</div>`;
           }).join('')}</div>${elAdd('Agregar una luz')}</div>`;
         }
         case 'energy': {
@@ -1385,6 +1385,7 @@
       // mientras se arrastra un brillo no se redibuja (si no, se suelta solo). Si el «soltar» se perdió (la ventana se
       // cerró con el dedo apoyado), a los 3 s se destraba: si no, la pantalla quedaba congelada hasta cerrar la app
       if (X.sliding && Date.now() - (X.slideAt || 0) > 3000) X.sliding = false;
+      if (X.xtra && X.el && X.el.hidden && !X.sliding && !X.dnd) refreshXtra(); // el inicio tapado por el ambiente: el ambiente igual se actualiza
       if (!X.el || X.el.hidden || X.sliding || X.dnd) return;
       const m0 = M();
       // la app espera el dashboard de la casa antes de dibujar (si no, se veía un momento el prearmado o el de la vez anterior)
@@ -1538,7 +1539,7 @@
       const x = X.xtra; if (!x) return;
       const p = roomPage(x.r.name), L = X.layout || {}, blocks = roomBlocks(x.r, p);
       const sig = JSON.stringify([blocks, L.theme, L.style, editing(), editing() && ctx.edit.selected]);
-      if (!force && x.sig === sig) return;
+      if (!force && x.sig === sig) { x.top.render(); return; } // mismas tarjetas: se redibujan con los estados nuevos (al instante)
       x.sig = sig;
       x.top.setCtx({ edit: ctx.edit });
       x.top.setView({ blocks, theme: L.theme, style: L.style, plan: L.plan });
@@ -1895,6 +1896,12 @@
     }, true);
     // brillo de las luces: se manda al soltar el deslizador
     el.addEventListener('pointerdown', (e) => { if (!editing() && e.target.closest && e.target.closest('[data-bri]')) { X.sliding = true; X.slideAt = Date.now(); setTimeout(() => { if (X.sliding && Date.now() - X.slideAt >= 3000) { X.sliding = false; render(); } }, 3100); } }, true);
+    // mientras se arrastra: la barra se llena y el porcentaje cambia en el momento (la orden sale al soltar)
+    el.addEventListener('input', (e) => {
+      const r = e.target.closest && e.target.closest('[data-bri]'); if (!r) return;
+      r.style.setProperty('--p', `${r.value}%`);
+      const tx = r.parentNode && r.parentNode.querySelector('.v-tx > span'); if (tx) tx.textContent = `${r.value}%`;
+    });
     el.addEventListener('change', (e) => {
       const r = e.target.closest && e.target.closest('[data-bri]'); X.sliding = false;
       if (!r || editing()) return;

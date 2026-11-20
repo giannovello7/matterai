@@ -775,7 +775,7 @@
   /* Hoja de ambiente */
   .sheet-wrap{position:fixed;inset:0;z-index:20;pointer-events:none}
   .backdrop{position:absolute;inset:0;background:rgba(3,4,10,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);opacity:0;transition:opacity .35s}
-  .sheet{position:absolute;left:0;right:0;bottom:0;max-height:90vh;overflow:auto;overscroll-behavior:contain;padding:10px 20px 26px;border-radius:30px 30px 0 0;
+  .sheet{position:absolute;left:0;right:0;bottom:0;max-height:90vh;overflow-x:hidden;overflow-y:auto;overscroll-behavior:contain;padding:10px 20px 26px;border-radius:30px 30px 0 0;
     background:rgba(14,16,28,.92);border:1px solid rgba(255,255,255,.1);border-bottom:0;-webkit-backdrop-filter:blur(30px) saturate(1.4);backdrop-filter:blur(30px) saturate(1.4);
     transform:translateY(105%);transition:transform .45s cubic-bezier(.2,.9,.2,1);color:var(--txt);font-family:inherit;box-shadow:0 -30px 80px rgba(0,0,0,.5)}
   .sheet-wrap.open{pointer-events:auto}.sheet-wrap.open .backdrop{opacity:1}.sheet-wrap.open .sheet{transform:none}
