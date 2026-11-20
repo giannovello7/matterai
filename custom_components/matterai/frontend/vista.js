@@ -1503,6 +1503,11 @@
       editMarks();
       spreadPins();
       refreshXtra();
+      if (!ctx.embed && X.el.querySelector && X.el.insertAdjacentHTML) {
+        const fm = X.el.querySelector('.v-fmenu'), need = !editing() && !!ctx.openMenu && !X.el.querySelector('[data-scr="menu"]:not(.v-fmenu)');
+        if (need && !fm) X.el.insertAdjacentHTML('beforeend', `<button class="v-fmenu" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`);
+        else if (!need && fm && fm.parentNode) fm.parentNode.removeChild(fm);
+      }
     }
     /* ── tarjetas de adentro de los ambientes: la ventana del ambiente (de la tarjeta) le pide al motor que las dibuje ── */
     /** La página de un ambiente: lo que se está editando, la versión propia de este dashboard o la de la casa. */
