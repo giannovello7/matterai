@@ -26,6 +26,7 @@
     sensor: ['Sensores', 'sensor'], binary_sensor: ['Puertas, ventanas y detectores', 'openings'], scene: ['Escenas', 'scenes'], script: ['Scripts', 'scenes'], weather: ['Clima', 'weather'],
     calendar: ['Calendarios', 'agenda'], valve: ['Válvulas de riego', 'irrigation'] };
   const MAX_CARDS = 60;
+  const FRONT_VERSION = '2.37.0'; // la cambia tools/version.py
   const ROOM_MAX = 24; // tarjetas por ambiente (sus equipos son tarjetas desde la 2.35) // tarjetas por diseño: el mismo tope que la casa (views.py MAX_BLOCKS)
   const ACTION_TYPES = [['none', 'Nada'], ['toggle', 'Prender / apagar / abrir'], ['more_info', 'Ver más (ventana del equipo)'], ['room', 'Abrir un ambiente'], ['screen', 'Abrir una pantalla'], ['service', 'Llamar a un servicio']];
   const KPI_KINDS = [['alarm', 'Alarma'], ['lights', 'Luces prendidas'], ['temp', 'Temperatura adentro'], ['acs', 'Aires'], ['curtains', 'Cortinas'], ['power', 'Consumo'], ['people', 'Quién está'], ['entity', 'Un equipo (portón, sensor…)']];
@@ -225,6 +226,7 @@
   textarea.code{width:100%;min-height:340px;box-sizing:border-box;font:12.5px/1.45 ui-monospace,Menlo,Consolas,monospace;background:#0f1318;color:#e9ecf2;border:1px solid rgba(160,175,200,.25);border-radius:10px;padding:10px;tab-size:2;resize:vertical}
   .catpaste{display:block;width:100%;text-align:left;margin:0 0 10px;padding:10px 12px;border-radius:12px;border:1px dashed #f2b766;background:rgba(242,183,102,.1);color:#e9ecf2;font:inherit;cursor:pointer}
   .mlist small{color:#8f99ab;font-weight:400}
+  #edrst{width:100%}.rstb{margin:8px 12px 0;padding:10px 14px;border-radius:12px;background:rgba(240,138,124,.14);border:1px solid rgba(240,138,124,.5);color:#ffd9d2;font-size:13px;display:flex;gap:10px;align-items:center;flex-wrap:wrap}
   .ed-c{flex-wrap:wrap;align-content:flex-start}.ertabs{width:100%;display:flex;gap:6px;overflow-x:auto;scrollbar-width:thin;padding:8px 12px 6px;flex:none}.ertabs[hidden]{display:none}
   .ertabs button{flex:none;border:1px solid rgba(160,175,200,.2);background:#1e242e;color:#c4cad6;border-radius:999px;padding:6px 12px;font:600 12.5px/1 inherit;cursor:pointer;white-space:nowrap}
   .ertabs button.on{background:#f2b766;border-color:#f2b766;color:#1b1408}
@@ -292,6 +294,7 @@
       if (!v) { this.p._toast('Ese dashboard no existe'); return; }
       this.who = Editor.whoUses(lst, this.viewId);
       this.cfg = cfg.config || {};
+      this.srvVersion = cfg.version || null;
       this.v = Editor.v2(Editor.normalize(clone(v)));
       this.K = this.k0 || v.kind || 'phone';
       this.saved = clone(this.v);
@@ -305,7 +308,7 @@
       root.appendChild(this.host);
       this.wrap = this.host.attachShadow({ mode: 'open' });
       this.wrap.innerHTML = `<style>${CSS}</style><div class="ed" id="ed"><div class="ed-top" id="edt"></div>
-        <div class="ed-c" id="edc"><nav class="ertabs" id="edrt"></nav><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div><div class="fold" id="fold" hidden><span>Hasta acá se ve en el equipo sin deslizar</span></div></div><div class="ehint" id="ehint"></div></div>
+        <div class="ed-c" id="edc"><div id="edrst" hidden></div><nav class="ertabs" id="edrt"></nav><div class="fwrap" id="fwrap"><div class="frame" id="frame"></div><div class="fold" id="fold" hidden><span>Hasta acá se ve en el equipo sin deslizar</span></div></div><div class="ehint" id="ehint"></div></div>
         <aside class="dlg" id="dlg"><div class="dlg-h" id="dlgh"></div><div class="dlg-b" id="edr"></div><div class="dlg-f" id="dlgf"></div></aside></div><div class="toastE" id="toastE"></div>`;
       this.$ = (s) => this.wrap.querySelector(s);
       // el prearmado necesita el modelo de la casa (ambientes, cámaras, ausente, rutinas): igual que en la app
@@ -818,9 +821,16 @@
     }
 
     /* ───────── dibujo ───────── */
+    /** Home Assistant con la parte que guarda de una versión anterior: se actualizó MatterAI pero falta reiniciar. Así se
+     *  perdían cambios (ambientes, pisos del plano): se avisa grande y se ofrece reiniciar. */
+    restartBanner() {
+      if (!this.srvVersion || this.srvVersion === FRONT_VERSION) return '';
+      return `<div class="rstb">⚠ Home Assistant tiene MatterAI ${esc(this.srvVersion)} y estas pantallas son de la ${FRONT_VERSION}: <b>falta reiniciar Home Assistant</b>. Hasta reiniciar, algunos cambios no se guardan bien. <button class="eb sm pri" data-e="restart">Reiniciar ahora</button></div>`;
+    }
     /** Las pestañas de arriba de la pantalla: el inicio y cada ambiente (se edita a pantalla completa, como una vista de HA). */
     drawRoomTabs() {
       const el = this.$ && this.$('#edrt'); if (!el) return;
+      { const rb = this.$('#edrst'); if (rb) { rb.innerHTML = this.restartBanner(); rb.hidden = !rb.innerHTML; } }
       const rooms = ((this.model() || { rooms: [] }).rooms || []);
       if (!rooms.length || this.playing) { el.innerHTML = ''; el.hidden = true; return; }
       el.hidden = false;
@@ -1015,7 +1025,7 @@
       const R = this.rdraft;
       return { selected: this.sel, el: this.el != null ? this.el : null, zone: this.zone || null, pz: this.pz != null ? this.pz : null,
         onPin: (i, pos) => this.change(() => { const z = (this.fp().zones || [])[i]; if (z) { z.pin = pos; this.pz = i; } }),
-        floor: this.floor || 0, onFloor: (i) => { this.floor = i; this.pz = null; this.zsel = null; this.drawing = null; this.syncPreview(); if (this.pe) this.drawPlan(); this.drawProps(); this.bind(); }, onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' || a === 'menu' ? this.pick(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
+        floor: this.floor || 0, onFloor: (i) => { this.floor = i; this.pz = null; this.zsel = null; this.drawing = null; this.syncPreview(); if (this.pe) this.drawPlan(); this.drawProps(); this.bind(); }, onSelect: (x, sub) => this.pick(x, sub), onAction: (id, a) => (this.inRoom(id) ? (a === 'edit' ? this.pick(id) : a === 'menu' ? this.roomCardMenu(id) : (this.enterRoomCard(id), this.blockAct(id, a))) : a === 'edit' ? this.pick(id) : a === 'menu' ? this.cardMenu(id) : this.blockAct(id, a)),
         onElem: (id, a, i) => this.onElem(id, a, i),
         onMove: (from, where) => this.moveTo(from, where), onAdd: (col, zone, at) => this.openCatalog(col, zone, at),
         viewH: this.deviceSize()[1], onDragAt: (x, y) => this.dragAt(x, y), onDragEnd: () => this.dragEnd(),
@@ -1037,6 +1047,7 @@
         this.drawProps(); this.drawDlg(); this.syncPreview(); this.bind(); this.draw();
         return;
       }
+      if (!id && !(sub && sub.zone) && this.rdraft) { if (this.rscope) this.dlgOk(); return; } // el ambiente sigue abierto
       if (this.rscope) { this.rscope = false; this.rSnap = null; }
       if (!id && !(sub && sub.zone)) { if (this.dlgOpen()) this.dlgOk(); return; }
       if (this.dlgOpen() && (id !== this.sel || ((sub && sub.zone) || null) !== (this.zone || null))) { this.dlgSnap = null; this.autosaveAfter = true; } // otra tarjeta: la anterior queda
@@ -1073,6 +1084,30 @@
       }, 60);
     }
     /** ⋮ de una tarjeta: editar, duplicar, copiar a otro dashboard, columna y borrar. */
+    /** ⋮ de una tarjeta de adentro de un ambiente: lo mismo que en el dashboard, y todo queda en el ambiente. */
+    roomCardMenu(id) {
+      const R = this.rdraft, L = R && R.cards, i = L ? L.findIndex((x) => x.id === id) : -1; if (i < 0) return;
+      const b = L[i], CAT = window.MaeVista.CATALOG, nm = (CAT[b.type] || {}).name || b.type;
+      this.modal(`${nm}${b.title && b.title !== nm ? ` · ${b.title}` : ''} · ${esc(R.name)}`, `<div class="mlist">
+        <button data-rm="edit" class="mfull">✎ Editar</button>
+        <span class="msep">Agregar</span><button data-rm="above">＋ Una tarjeta arriba</button><button data-rm="below">＋ Una tarjeta abajo</button>
+        <span class="msep">Mover y copiar</span><button data-rm="up" ${i ? '' : 'disabled'}>↑ Más arriba</button><button data-rm="down" ${i < L.length - 1 ? '' : 'disabled'}>↓ Más abajo</button>
+        <button data-rm="dup">⧉ Duplicar</button><button data-rm="clip">⎘ Copiar</button>
+        <span class="msep">Avanzado</span><button data-rm="code" class="mfull">{ } Editar como texto</button>
+        <button data-rm="del" class="warn mfull">✕ Sacar la tarjeta del ambiente</button></div>`, (e) => {
+        const x = e.target.closest('[data-rm]'); if (!x) return;
+        this.closeCatalog();
+        const k = x.dataset.rm, j = R.cards.findIndex((y) => y.id === id); if (j < 0) return;
+        if (k === 'edit') return this.pick(id);
+        if (k === 'above' || k === 'below') return this.openCatalog(null, 'room-top', { target: id, after: k === 'below' });
+        if (k === 'up' || k === 'down') return this.change(() => { const t = j + (k === 'up' ? -1 : 1); if (t < 0 || t >= R.cards.length) return; [R.cards[j], R.cards[t]] = [R.cards[t], R.cards[j]]; });
+        if (k === 'dup') { if (R.cards.length >= ROOM_MAX) { this.toast(`Llegaste al máximo de ${ROOM_MAX} tarjetas en un ambiente.`); return; } return this.change(() => { const nb = clone(R.cards[j]); nb.id = this.newId(nb.type); R.cards.splice(j + 1, 0, nb); }); }
+        if (k === 'clip') { const c = clone(R.cards[j]); delete c.zone; try { localStorage.setItem('matterai.editor.clip', JSON.stringify({ card: c, at: Date.now() })); this.toast(`Tarjeta «${b.title || nm}» copiada: pegala desde «+ Tarjeta» (acá, en otro ambiente o en el inicio)`); } catch (_) { this.toast('No se pudo copiar'); } return undefined; }
+        if (k === 'code') { this.enterRoomCard(id); return this.codeCard(id); }
+        if (k === 'del') { this.change(() => { R.cards.splice(j, 1); }); this.toast(`«${b.title || nm}» sacada del ambiente · Ctrl+Z para deshacer`); }
+        return undefined;
+      });
+    }
     cardMenu(id) {
       const b = this.blocks().find((x) => x.id === id); if (!b) return;
       const K = this.K, CAT = window.MaeVista.CATALOG;
@@ -1177,13 +1212,9 @@
       this.rdraft = i >= 0 ? clone(list[i]) : { name: this.roomEd || 'Ambiente nuevo', entities: [] };
       this.rdraft._orig = i >= 0 ? list[i].name : null;
       const own = (this.v.room_pages || {})[this.rdraft.name], page = own || this.rdraft.page || {};
-      if (page.v === 2) this.rdraft.cards = (page.top || []).map((b) => Object.assign(clone(b), { zone: 'top' }));
-      else {
-        // como lo dibuja la app: sus tarjetas de arriba, las de sus equipos y las de abajo, todas en una sola lista
-        const mr = ((this.model() || { rooms: [] }).rooms || []).find((x) => x.name === this.rdraft.name);
-        const auto = window.MaeVista.roomAutoCards ? window.MaeVista.roomAutoCards(mr) : [];
-        this.rdraft.cards = [...(page.top || []), ...auto, ...(page.bottom || [])].map((b) => Object.assign(clone(b), { zone: 'top' }));
-      }
+      // exactamente lo que dibuja la app (la misma cuenta, así no hay tarjetas de más ni ids distintos)
+      const mr = ((this.model() || { rooms: [] }).rooms || []).find((x) => x.name === this.rdraft.name);
+      this.rdraft.cards = window.MaeVista.roomCompose(mr, page).map((b) => Object.assign(clone(b), { zone: 'top' }));
       this.rdraft.local = !!own; this.rdraft._origLocal = !!own; this.rdraft._origCards = JSON.stringify(this.rdraft.cards);
       delete this.rdraft.page;
       return this.rdraft;
@@ -1793,6 +1824,12 @@
       const cfg = Object.assign({}, this.cfg, { rooms: list });
       try {
         await this.hass.callWS({ type: 'matterai/config/save', config: cfg });
+        try { // ¿quedó guardado? (una Home Assistant sin reiniciar lo recortaba sin decir nada)
+          const back = await this.hass.callWS({ type: 'matterai/config' }), got = ((back.config || {}).rooms || []).find((x) => x.name === R.name);
+          const want = ((R.page || {}).top || []).map((b) => b.id).join(), have = (((got || {}).page || {}).top || []).map((b) => b.id).join();
+          if (back.version) this.srvVersion = back.version;
+          if (!del && !local && want !== have) this.toast('Home Assistant no guardó bien este ambiente: falta reiniciar Home Assistant (arriba está el botón).', 10000);
+        } catch (_) { /* sin comprobación */ }
         this.cfg = cfg; if (this.card && this.card.setConfig) this.card.setConfig(Object.assign({}, cfg));
         // si cambió el nombre, las tarjetas y el plano de este dashboard lo siguen
         if (orig && !del && orig !== R.name) {
@@ -2132,6 +2169,7 @@
       if (k === 'list') { this.showList = !this.showList; try { localStorage.setItem('matterai.editor.list', this.showList ? '1' : '0'); } catch (_) { /* sin almacenamiento */ } this.draw(); this.sizeFrame(); return; }
       // con un ambiente abierto, «+ Tarjeta» agrega a ESE ambiente (antes la ponía en el inicio y cerraba el ambiente)
       if (k === 'add') return this.rdraft ? this.openCatalog(null, 'room-top') : this.openCatalog(null);
+      if (k === 'restart') { if (!confirm('¿Reiniciar Home Assistant ahora? Tarda uno o dos minutos; después recargá esta página.')) return undefined; try { await this.hass.callService('homeassistant', 'restart', {}); this.toast('Reiniciando Home Assistant… en un par de minutos recargá la página', 9000); } catch (e) { this.toast(`No se pudo: ${e.message || e}`); } return undefined; }
       if (k === 'copy') return this.copyFrom(this.K === 'tablet' ? 'phone' : 'tablet');
       const fix = () => {
         if (this.rscope && !this.rdraft) this.rscope = false;

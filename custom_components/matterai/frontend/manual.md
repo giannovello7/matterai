@@ -61,6 +61,17 @@ Qué dispositivos de Home Assistant usa la app. Se elige por **dispositivo** (tr
 - **Accesos a la casa**: cada equipo tiene el suyo. **Desvincular** corta sólo ese equipo (celular perdido, empleado que ya no está).
 - **Celulares y tablets**: si está **conectado ahora**, la versión de la app (avisa si hay una más nueva; se actualiza sola cada vez que el equipo abre la app), el **perfil** (completo, sin seguridad para los chicos, o sólo luces y clima), **pedir huella** para la alarma, cerraduras y portón, y **Probar** (mostrar un aviso, prender la pantalla o recargar la app).
 
+## Agregar dispositivos (desde la app, con Matte o paso a paso)
+El cliente suma equipos solo, sin entrar a Home Assistant. Lo pueden hacer **el titular** (un celular con perfil «Completo» que no sea invitado) y vos; los demás ven «no tenés permiso».
+- **Dónde**: menú de la app → **Agregar dispositivo**, o diciéndole a Matte «voy a agregar dispositivos nuevos» (por voz o escrito). Si la casa tiene clave de IA, Matte lo guía conversando; si no, se abre el asistente en pantallas. Desde cualquier pantalla, «Necesito ayuda» pasa a Matte con lo hecho.
+- **Zigbee** (Zigbee2MQTT o ZHA, se detecta solo; si hay los dos, se abren los dos): la unión se abre **3 minutos** (máximo 254 segundos) con cuenta regresiva y se cierra sola al vencer, al terminar o si se corta la app. La app muestra «Esperando…», «Configurando…» y lo que encontró, con marca y modelo. Si no lo reconoce, lo puede sacar.
+- **Después**: elige el **ambiente** (o crea uno), le pone **nombre** («Sensor puerta Cocina», también cambia los nombres internos si es nuevo) y marca las **automatizaciones sugeridas** que quiera: aviso si queda abierta, luz al abrir de noche, luces por presencia, botón para las luces, consumo alto o fin de lavarropas, avisos de temperatura, humedad, agua o humo, prender/apagar el aire. Se crean como automatizaciones del cliente (las ve, cambia y borra en Automatizaciones) y respetan lo que apagaste para el cliente. Matte nunca crea una sin que el cliente diga que sí.
+- **Matter**: «Ya está en Apple, Google, Alexa o SmartThings» → el cliente genera un código para compartir en esa app y lo escribe (se suma por la red, sin Bluetooth). **Equipo nuevo**: en la app de Android, «Escanear su QR» (usa Google Play Services, Android 8 o más nuevo). Para **Thread** revisa que haya border router y red preferida, y le pasa la red de la casa al celular. El código nunca se guarda.
+- **Z-Wave** (integración Z-Wave JS): «Buscar equipos» 3 minutos, igual que Zigbee. Si el equipo tiene seguridad S2 y pide el **PIN**, la app lo pide (los 5 primeros números del código DSK impreso en el equipo o en la caja). Con **QR SmartStart** (número que empieza con 90) el equipo queda anotado y se une solo al ponerle corriente. Si no se une porque estuvo en otra red, **«No se une: sacarlo de otra red»** lo excluye primero. El PIN y el QR no se guardan.
+- **WiFi, Bluetooth y otros locales** (Shelly, ESPHome, HomeKit, impresoras, Chromecast…): cuando la casa lo encuentra aparece en la lista y se agrega con un toque. Si pide datos (contraseña, código de HomeKit de 8 números, clave de ESPHome) la app los pide en el momento; no se guardan. Lo que necesite otros pasos lo terminás vos.
+- **Campanita**: lo que la casa encuentra sola (los «Descubiertos» de Integraciones) y los equipos que entran sin ambiente aparecen en la campanita del titular: **Agregar**, **Ignorar** (el ignorar de HA: se recupera en Integraciones → Ignoradas) o **Más tarde**. Varios juntos van en una sola entrada. En la lista se pueden activar los avisos al celular (vienen apagados).
+- **Registro**: todo queda en Seguridad → Registro: quién abrió la unión, qué equipo entró, ambiente, nombre, automatizaciones creadas, descubrimientos agregados o ignorados.
+
 ## El dashboard en la app de Home Assistant
 
 Para los clientes que usan la app de Home Assistant (y no queremos que cambien de app): el mismo dashboard que arman en el editor se ve también ahí.
@@ -119,6 +130,8 @@ Funciona como el de Home Assistant (Lovelace): **lo que ves es lo que se edita**
   - Con un ambiente abierto, «+ Tarjeta» (arriba) agrega a ese ambiente.
   - Una tarjeta nueva adentro de un ambiente arranca con los equipos de ese ambiente (las cortinas del Garage, no las de toda la casa).
   - Las tarjetas de adentro de un ambiente también se agrandan arrastrando, de ancho y de alto.
+  - Con un ambiente abierto, todo es de ese ambiente (2.37): su **⋮** tiene lo mismo que en el inicio (editar, agregar arriba o abajo, mover, duplicar, copiar, editar como texto y sacar), **Guardar** de una tarjeta vuelve al ambiente y tocar un lugar vacío no lo cierra. Para salir, la pestaña **⌂ Inicio**.
+  - Las tarjetas de los equipos del ambiente ya no salen repetidas y se pueden sacar como cualquier otra.
   - La tarjeta «Reloj y clima → Saludo completo» suma la hora, el clima y, si se quiere, los datos de la casa.
   - La parte de arriba con saludo muestra la hora y el clima si se marcan.
   - El cartel de ayuda del plano viene apagado.
@@ -217,6 +230,7 @@ Nada más: cada celular se registra solo. El panel sólo reenvía avisos a celul
 - **No llegan los avisos**: revisá en Puesta en marcha «Conectada al panel central» y «Avisos con la app cerrada», y probá con Equipos → Probar.
 - **La app tarda en conectar en la casa**: falta la dirección local o el wifi en «Cambiar datos».
 - **Un equipo no aparece en la app**: no está en ningún ambiente (Puesta en marcha te dice cuántos faltan).
+- **Cambios que no quedan guardados (ambientes, pisos del plano) o tarjetas repetidas**: se actualizó MatterAI pero falta **reiniciar Home Assistant**. Desde la 2.37 el editor y el panel lo avisan arriba con el botón «Reiniciar ahora».
 - **Una cámara no se ve en vivo**: el visor necesita la Advanced Camera Card y Frigate funcionando (Mantenimiento lo vigila).
 
 # Para vos (instalador)

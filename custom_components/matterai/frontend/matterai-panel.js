@@ -8,6 +8,7 @@
  *     Salud y avisos, Mantenimiento (watchdog), Copias de seguridad, Plantillas, Conexiones, Voz, Ficha de la casa.
  */
 (() => {
+  const FRONT_VERSION = '2.37.0'; // la cambia tools/version.py
   const BASE = '/matterai_static';
   const loadScript = (src) => new Promise((res, rej) => {
     if (document.querySelector(`script[data-mae="${src}"]`)) return res();
@@ -322,6 +323,14 @@
         this._saved = JSON.stringify(r.config); this._draft = r.config;
         $('hname').textContent = r.name ? `· ${r.name}` : '';
         $('ver').textContent = `v${r.version}`;
+        // se actualizó MatterAI pero Home Assistant sigue con la versión anterior: se pierden cambios hasta reiniciar
+        if (r.version && r.version !== FRONT_VERSION && !this.shadowRoot.querySelector('#rstb')) {
+          const d = document.createElement('div'); d.id = 'rstb';
+          d.style.cssText = 'margin:10px 16px 0;padding:12px 16px;border-radius:12px;background:rgba(240,138,124,.14);border:1px solid rgba(240,138,124,.55);display:flex;gap:12px;align-items:center;flex-wrap:wrap;font-size:14px';
+          d.innerHTML = `<span style="flex:1">⚠ Home Assistant tiene MatterAI ${esc(r.version)} y el panel es de la ${FRONT_VERSION}: <b>falta reiniciar Home Assistant</b> para terminar de actualizar. Hasta entonces algunos cambios no se guardan.</span><button id="rstgo" style="padding:8px 14px;border-radius:10px;border:0;background:#f2b766;color:#1b1408;font-weight:700;cursor:pointer">Reiniciar ahora</button>`;
+          $('main').parentNode.insertBefore(d, $('main'));
+          d.querySelector('#rstgo').onclick = async () => { if (!confirm('¿Reiniciar Home Assistant ahora? Tarda uno o dos minutos.')) return; try { await this._hass.callService('homeassistant', 'restart', {}); d.querySelector('span').textContent = 'Reiniciando Home Assistant… en un par de minutos recargá la página.'; } catch (e) { alert(`No se pudo: ${e.message || e}`); } };
+        }
       } catch (e) {
         $('main').innerHTML = `<div class="box"><h2>No se pudo cargar</h2><p>${esc(e.message || e)}</p></div>`;
         return;

@@ -307,6 +307,17 @@
     }
     return out.slice(0, 24);
   }
+  /** Las tarjetas de un ambiente. Ya editado (v2): las guardadas, tal cual. Una Home Assistant que se actualizó pero no se
+   *  reinició borraba la marca «v»: las tarjetas de sus equipos (ids «ra-…») igual lo delatan (antes se duplicaban).
+   *  Nunca editado: las de arriba, las de sus equipos y las de abajo, sin repetir una que ya está (la cámara de antes). */
+  function roomCompose(r, p) {
+    const top = (p && p.top) || [], bot = (p && p.bottom) || [];
+    if (p && (p.v === 2 || top.some((b) => /^ra-/.test(String(b.id))))) return top;
+    const ents = (b) => { const f = (b && b.cfg) || {}; return [...(f.entities || []), ...((f.items || []).map((x) => x && x.entity)), f.entity].filter(Boolean); };
+    const mine = [...top, ...bot];
+    const auto = roomAutoCards(r).filter((a) => !mine.some((b) => b.type === a.type && (['frigate', 'lights', 'covers', 'scenes'].includes(a.type) || ents(a).some((e) => ents(b).includes(e)))));
+    return [...top, ...auto, ...bot];
+  }
   /* el estilo que usa cada plantilla (si no se dice, el de su mismo nombre) */
   const TPL_STYLE = { plano: 'matterai', facil: 'apple', seguridad: 'control4', pared: 'liquid', confort: 'relieve' };
   function template(k, kind, m, legacy, S, floorplan) {
@@ -1212,6 +1223,8 @@
       const c = card(), out = [];
       if (m.alarm && m.alarm.state === 'triggered') out.push({ key: 'alarm-trig', lvl: 'r', ic: 'alert', t: 'Se disparó la alarma', d: fname(m.alarm.entity_id), a: 'Ver', run: () => c.openPanel('open') });
       (c.suggestions ? c.suggestions() : []).forEach((s) => out.push({ key: 'sug:' + s.key, lvl: 'w', ic: s.icon === 'shield' ? 'shield' : 'bulb', t: s.title, d: s.text, a: s.btn, sug: s.key }));
+      // equipos nuevos que encontró la casa (sólo el titular y el instalador; en la app)
+      if (window.MaeAlta && window.MaeAlta.notes) window.MaeAlta.notes().forEach((n) => out.push(n));
       m.openAcc.forEach((id) => out.push({ key: `open-${id}-${(st(id) || {}).last_changed}`, lvl: 'w', ic: 'gate', t: `${fname(id)} abierto`, d: 'Tocá para cerrarlo', a: 'Cerrar', run: () => c.access(id) }));
       const S = (hass() || {}).states || {};
       Object.keys(S).forEach((id) => {
@@ -1511,10 +1524,7 @@
     }
     /** Las tarjetas de un ambiente: las guardadas (v2: todo el ambiente son tarjetas, en el orden que eligió el
      *  instalador) o, si nunca se editó, las de sus equipos armadas solas, con las viejas de arriba y de abajo. */
-    function roomBlocks(r, p) {
-      if (p && p.v === 2) return p.top || [];
-      return [...((p && p.top) || []), ...roomAutoCards(r), ...((p && p.bottom) || [])];
-    }
+    function roomBlocks(r, p) { return roomCompose(r, p); }
     function mountXtra(r, top, bot) {
       closeXtra();
       if (!top || ctx.embed) return false;
@@ -1754,6 +1764,7 @@
         const re = t.closest('[data-rme]'); if (re && ctx.edit.onRoom) return ctx.edit.onRoom(re.dataset.rme, +re.dataset.i);
         if (t.closest('[data-radd]') && ctx.edit.onRoom) return ctx.edit.onRoom('add');
         { const ri = t.closest('#v-sheet [data-ri]'); if (ri && ctx.edit.onRoom) return ctx.edit.onRoom('pick', +ri.dataset.ri); }
+        { const ea0 = t.closest('[data-eact]'), b0 = t.closest('[data-block]'); if (ea0 && b0 && ctx.edit.onAction) return ctx.edit.onAction(b0.dataset.block, ea0.dataset.eact); }
         if (t.closest('#v-sheet')) { if (t.id === 'v-sheet' && ctx.edit.onRoom) ctx.edit.onRoom('close'); return; }
         if (t.closest('#v-head')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'header' });
         if (t.closest('#v-allb')) return ctx.edit.onSelect && ctx.edit.onSelect(null, { zone: 'allb' });
@@ -2254,5 +2265,5 @@
     };
   }
 
-  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, TPL_STYLE, rowsPx, roomAutoCards, migrateLayout, toSections, SEC_W, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
+  root.MaeVista = { create, defaults, template, TEMPLATE_LIST, TPL_STYLE, rowsPx, roomAutoCards, roomCompose, migrateLayout, toSections, SEC_W, TABLET_PRESETS, colWidths, CATALOG, SCREEN_NAMES, CONDITIONS, DOCK, DOCK_DEF, ICONS, icon: ic, uid, STYLE_LIST, GRAD_LIST };
 })(typeof window !== 'undefined' ? window : globalThis);
