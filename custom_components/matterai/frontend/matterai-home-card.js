@@ -3043,6 +3043,7 @@
         const r = await this._hass.callWS({ type: 'matterai/voice', text });
         if (this._vo !== vo) return;
         vo.state = r.ok === false ? 'error' : 'done'; vo.say = r.say || 'Listo.'; vo.actions = r.actions || [];
+        if (r.abrir === 'alta') this._openAlta(r.texto_alta || text);
       } catch (e) {
         if (this._vo !== vo) return;
         vo.state = 'error'; vo.say = MatterAIHomeCard.voiceErr(e);
@@ -3152,6 +3153,10 @@
       for (let i = 0; i < u8.length; i += 0x8000) bin += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
       return btoa(bin);
     }
+    /** «Voy a agregar dispositivos nuevos»: la app abre el asistente de alta (con Matte, si la casa tiene IA). */
+    _openAlta(texto) {
+      setTimeout(() => this.dispatchEvent(new CustomEvent('matterai-alta', { bubbles: true, composed: true, detail: { texto } })), 900);
+    }
     async _voiceSendAudio(audio) {
       const vo = this._vo; if (!vo) return;
       vo.state = 'thinking'; this._voiceRender();
@@ -3160,6 +3165,7 @@
         if (this._vo !== vo) return;
         vo.text = r.text || '';
         vo.state = r.ok === false ? 'error' : 'done'; vo.say = r.say || 'Listo.'; vo.actions = r.actions || [];
+        if (r.abrir === 'alta') this._openAlta(r.texto_alta || r.text || '');
       } catch (e) {
         if (this._vo !== vo) return;
         vo.state = 'error'; vo.say = MatterAIHomeCard.voiceErr(e);

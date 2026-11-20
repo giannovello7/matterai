@@ -118,6 +118,15 @@ def collect(hass: HomeAssistant, cors: dict[str, Any] | None = None) -> dict[str
     add("push", "app", "Avisos con la app cerrada", "Los celulares con la app 1.13 o más nueva se registran solos (necesita el panel central).",
         push > 0, "app", detail=f"{push} equipos con avisos" if push else "")
 
+    alta = rt.get("alta")
+    if alta is not None:
+        coords = alta.detectar_coordinador()["coordinadores"]
+        matter = bool(hass.config_entries.async_entries("matter"))
+        quiere = list(dict.fromkeys(c["nombre"] for c in coords)) + (["Matter"] if matter else [])
+        add("alta", "app", "El cliente puede agregar equipos", "Menú de la app → «Agregar dispositivo» (o pedírselo a Matte). Necesita un coordinador Zigbee (Zigbee2MQTT o ZHA), Z-Wave JS y/o la integración Matter (lo WiFi o Bluetooth que encuentra la casa se agrega igual); para Thread, una red Thread preferida. Con la clave de IA, Matte lo guía conversando.",
+            bool(quiere), "house", optional=True,
+            detail=("Listo para: " + ", ".join(quiere) + ", WiFi y Bluetooth" + ("" if o.get("ai_key") else " · sin clave de IA: sólo el asistente en pantallas")) if quiere else "Sin coordinador Zigbee ni Matter")
+
     # 4 · automatizaciones
     manager = hass.data.get("matterai_escenas")
     n_rules = len(manager.rules) if manager is not None else 0

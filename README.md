@@ -378,6 +378,40 @@ data:
 `brightness` usa `value` (0 a 1), `open` usa `path` (`/automatizaciones`, `/actividad`, `/musica`, `/opciones`, `/ayuda`) y `tts` usa `message`.
 Con la app cerrada también entiende las notificaciones de la app oficial: `message: TTS` (con `data.tts_text`), `command_screen_on` y `command_webview`.
 
+## Agregar dispositivos (Matte y el asistente en pantallas)
+
+El cliente suma equipos Zigbee, Z-Wave, Matter (wifi y Thread), WiFi, Bluetooth y lo que la casa encuentre en la red local desde la app, conversando con Matte o paso a paso. **Una sola implementación** en `custom_components/matterai/alta/` y dos interfaces:
+
+| Archivo | Qué hace |
+|---|---|
+| `alta/core.py` | coordinadores (Zigbee2MQTT por MQTT, uno o varios base_topic; ZHA), unión con vencimiento, detección del equipo nuevo, ambiente, nombre, quitar, permisos |
+| `alta/capacidades.py` | qué es el equipo, en castellano (tipo principal + todas sus funciones) |
+| `alta/plantillas.py` | automatizaciones sugeridas: siempre desde plantillas con parámetros validados; se guardan en el motor de automatizaciones (`escenas/`) como reglas del cliente |
+| `alta/zwave.py` | Z-Wave JS: incluir (con la seguridad S2 y el PIN), QR SmartStart y excluir |
+| `alta/matter.py` | estado de Matter y Thread, código compartido desde otra app (`commission_with_code`, sólo red), equipo nuevo desde el celular (`commission_on_network`) |
+| `alta/descubrimientos.py` | la campanita: descubrimientos de HA + equipos sin ambiente; agregar, ignorar (nativo) o más tarde; avisos al celular agrupados |
+| `alta/herramientas.py` | las herramientas (las mismas para Matte y la app), con permisos y errores en castellano |
+| `alta/matte.py` | la conversación con Matte (mismo modelo y clave que la voz), con varias vueltas de herramientas |
+| `alta/ws.py` | comandos WebSocket |
+
+Herramientas: `detectar_coordinador`, `habilitar_union(segundos, red)`, `deshabilitar_union`, `esperar_dispositivo_nuevo(timeout)`, `capacidades(device_id)`, `quitar_dispositivo`, `listar_areas`, `asignar_area`, `renombrar`, `sugerir_automatizaciones`, `crear_automatizacion(plantilla, parametros)`, `estado_matter`, `preparar_matter`, `comisionar_matter(codigo)`, `pin_zwave`, `qr_zwave`, `excluir_zwave`, `preparar_wifi`, `listar_descubiertos`, `agregar_descubierto(id, datos)`, `ignorar_descubierto`, `mas_tarde_descubierto`, `terminar`.
+
+**Decisiones tomadas (lo que la especificación no definía; elegí lo más simple):**
+- **Titular** = un celular vinculado con perfil «Completo» que no es invitado (y el instalador). No hay una marca nueva de «titular».
+- **Sin clave de IA**: «agregar dispositivo» por voz abre el asistente en pantallas; Matte conversando necesita la clave.
+- **Dos coordinadores** (Zigbee2MQTT y ZHA, o dos Zigbee2MQTT): la unión se abre en todos.
+- **Zigbee2MQTT**: el payload sale de la versión que publica `bridge/info` (2.x `{"time": N}`; 1.x `{"value": true, "time": N}`); si no se sabe la versión, las dos claves (cada versión lee la suya). Se espera la confirmación en `bridge/response/permit_join` 4 s; si no llega, se sigue igual.
+- **Confirmación de automatizaciones con Matte**: se puede crear sólo una plantilla que se sugirió en un turno anterior (el cliente tuvo que contestar). En el asistente, las casillas y el botón son la confirmación.
+- **Avisos de automatizaciones** (temperatura, consumo…): van a los celulares con la app registrados al crearla; un celular nuevo hay que sumarlo editándola en Automatizaciones. Sin celulares, quedan como notificación de HA.
+- **«Más tarde»** deja la entrada en la lista pero no la cuenta en el numerito de la campanita.
+- **Avisos al celular de equipos nuevos**: apagados de fábrica; cada celular los activa en la lista de la campanita. Los que aparecen en 10 s van en un solo aviso.
+- **Descubrimientos que piden datos** (contraseña, código de HomeKit, clave de ESPHome): la app muestra los campos del formulario de HA y los manda; no se guardan. Lo que pida otros pasos (elegir en un mapa, iniciar sesión en una nube) lo termina el instalador.
+- **Z-Wave S2**: se conceden todas las clases de seguridad que pide el equipo (como «por defecto» en HA) y, si pide el PIN, se le pide al cliente. «Abrir la unión» sin red elegida abre Zigbee y Z-Wave juntos.
+- **QR Z-Wave**: se escribe o pega el número (la app todavía no lo escanea).
+- **Matter nuevo con QR**: sólo Android 8 o más nuevo, con Google Play Services (como la app de HA). En iPhone por ahora sólo el código compartido desde otra app.
+- **Códigos de vinculación**: no se guardan ni se escriben en los logs de MatterAI, ni quedan en la conversación con Matte después de usarse. El registro de depuración del propio Home Assistant para WebSocket (apagado de fábrica) sí copia cada mensaje que llega.
+- **Panel central**: sin cambios (lo nuevo queda en el registro de auditoría de la casa).
+
 ## Comandos (WebSocket)
 
 | Comando | Quién | Para qué |
@@ -404,6 +438,12 @@ Con la app cerrada también entiende las notificaciones de la app oficial: `mess
 | `matterai/app/actions` (`since`) | cualquier usuario | qué equipo dio cada orden (Actividad) |
 | `matterai/app/notify_action` (`action`) | equipos de la casa | botón del portero desde la pantalla de la app |
 | `matterai/app/devices` · `matterai/app/device_set` | admin | listar equipos y cambiar su perfil / huella |
+| `matterai/alta/permiso` | cualquier usuario | si ve «Agregar dispositivo» |
+| `matterai/alta/tool` (`herramienta`, `args`) | titular o admin | una herramienta del alta (si abre la unión y se corta la conexión, se cierra) |
+| `matterai/alta/subscribe` | titular o admin | estado en vivo: cuenta regresiva, «Esperando…», «Configurando…» |
+| `matterai/alta/matte` (`session_id`, `texto` o `audio`, `auto`) | titular o admin | un turno de la conversación con Matte |
+| `matterai/alta/descubrimientos` (`device_id`) · `alta/descubrimientos_push` | titular o admin | la campanita en vivo; avisos al celular |
+| `matterai/alta/matter_red` (`pin`, `ip`) · `alta/thread_red` | titular o admin | Matter nuevo desde el celular; red Thread de la casa para el celular |
 
 ## Pruebas
 

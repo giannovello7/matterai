@@ -376,6 +376,15 @@ class VoiceBrain:
     async def async_handle(self, text: str, config: dict[str, Any], context: Context) -> dict[str, Any]:
         from .local_voice import interpret  # noqa: PLC0415
 
+        from .alta.matte import es_pedido_de_alta  # noqa: PLC0415
+
+        if es_pedido_de_alta(text):  # «voy a agregar dispositivos nuevos»: lo sigue Matte (o el asistente en pantallas)
+            from .alta.core import puede_agregar  # noqa: PLC0415
+
+            user = await self.hass.auth.async_get_user(context.user_id) if context and context.user_id else None
+            if user is not None and puede_agregar(self.hass, user):
+                return {"ok": True, "say": "Dale, vamos a agregar equipos.", "actions": [], "source": "local", "abrir": "alta", "texto_alta": text}
+            return {"ok": True, "say": "Agregar equipos lo puede hacer sólo el titular de la casa o el instalador.", "actions": [], "source": "local"}
         rooms = house_catalog(self.hass, config)
         allowed_ids = {e["id"] for r in rooms for e in r["equipos"]}
         data, source = None, "local"

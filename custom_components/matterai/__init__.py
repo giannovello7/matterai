@@ -226,6 +226,27 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(async_at_started(hass, _start_watchdog))
     entry.async_on_unload(rt["watchdog"].stop)
+
+    # agregar dispositivos nuevos (Matte y el asistente en pantallas)
+    from .alta.core import Alta  # noqa: PLC0415
+
+    rt["alta"] = Alta(hass)
+    rt["alta"].start()
+    from .alta.descubrimientos import Descubrimientos  # noqa: PLC0415
+
+    rt["descubrimientos"] = Descubrimientos(hass)
+    await rt["descubrimientos"].async_load()
+    async def _start_desc(_hass: HomeAssistant) -> None:
+        rt["descubrimientos"].start()
+
+    entry.async_on_unload(async_at_started(hass, _start_desc))
+    entry.async_on_unload(rt["descubrimientos"].stop)
+
+    async def _start_alta(_hass: HomeAssistant) -> None:
+        await rt["alta"].async_start_mqtt()
+
+    entry.async_on_unload(async_at_started(hass, _start_alta))
+    entry.async_on_unload(rt["alta"].stop)
     await hass.config_entries.async_forward_entry_setups(entry, ALL_PLATFORMS)
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
@@ -256,7 +277,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for unsub in rt["views"].preview_timers.values():
             unsub()
         rt["views"].preview_timers.clear()
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy", "views"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy", "views", "alta", "matte", "descubrimientos"):
         rt.pop(key, None)
     return True
 
