@@ -667,7 +667,7 @@
       return { lock, open, moving, word: lock ? (open ? 'Abierta' : 'Cerrada') : moving ? 'Moviendo' : open ? 'Abierto' : 'Cerrado',
         btn: moving ? 'Moviendo…' : lock ? (open ? 'Cerrar' : 'Abrir') : open ? 'Cerrar' : 'Abrir' };
     }
-    const PEND_MS = 8000;
+    const PEND_MS = 4000, TAP_GUARD_MS = 1000;
     /** Un equipo que se tocó y la casa todavía no confirmó: { to: 'on'|'off' } (o null). */
     function pend(id) {
       const p = X.pend && X.pend[id]; if (!p) return null;
@@ -678,16 +678,14 @@
     /** Antes de mandar la orden: si alguno ya está esperando confirmación, no se manda otra (evita el doble toque). */
     function pendStart(ids, to) {
       const h = hass(), S = (h && h.states) || {}, list = (ids || []).filter((id) => S[id]);
-      if (list.some((id) => pend(id))) return false;
+      if (list.some((id) => { const p = pend(id); return p && Date.now() - p.at < TAP_GUARD_MS; })) return false; // doble toque
       X.pend = X.pend || {};
-      list.forEach((id) => { X.pend[id] = { to: to || (S[id].state === 'on' ? 'off' : 'on'), until: Date.now() + PEND_MS, from: S[id].last_updated }; });
-      X.cache = {}; render();
-      setTimeout(() => { X.cache = {}; render(); }, PEND_MS + 100); // si la casa no contestó, vuelve a mostrar lo real
+      list.forEach((id) => { X.pend[id] = { to: to || (S[id].state === 'on' ? 'off' : 'on'), at: Date.now(), until: Date.now() + PEND_MS, from: S[id].last_updated }; });
       return true;
     }
     function entState(id) {
       const r = entState0(id), p = r && pend(id);
-      return p ? Object.assign({}, r, { txt: p.to === 'on' ? 'Encendiendo…' : 'Apagando…', pending: true }) : r;
+      return p ? Object.assign({}, r, { pending: true }) : r; // el texto es siempre el estado real
     }
     function entState0(id) {
       const s = st(id); if (!s) return { on: false, txt: 'No disponible' };
@@ -1116,7 +1114,7 @@
           return `<div class="v-card">${t}<div class="v-list2">${ids.map((id, i) => {
             const s = st(id), on = s.state === 'on', a = s.attributes, dim = id.startsWith('light.') && (a.brightness != null || (a.supported_color_modes || []).some((x) => x !== 'onoff'));
             const pct = on && a.brightness != null ? Math.max(1, Math.round((a.brightness / 255) * 100)) : 0;
-            return `<div class="v-lt ${on ? 'on' : ''}"${EL(i)}><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${pend(id) ? (pend(id).to === 'on' ? 'Encendiendo…' : 'Apagando…') : on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
+            return `<div class="v-lt ${on ? 'on' : ''}"${EL(i)}><div class="v-row"><span class="v-bic">${ic('bulb')}</span><span class="v-tx" data-more="${esc(id)}"><b>${esc(nameIn(c, id) || fname(id))}</b><span>${on ? (pct ? `${pct}%` : 'Prendida') : 'Apagada'}</span></span>
               <button class="v-pw ${on ? 'on' : ''}" data-ent="${esc(id)}" aria-label="Prender o apagar"></button></div>
               ${dim ? `<input class="v-bri" type="range" min="1" max="100" value="${pct || 50}" data-bri="${esc(id)}" aria-label="Brillo de ${esc(fname(id))}">` : ''}</div>`;
           }).join('')}</div>${elAdd('Agregar una luz')}</div>`;
