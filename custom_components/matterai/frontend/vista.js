@@ -1733,7 +1733,12 @@
         ${body || '<p class="v-empty">Todavía no tiene equipos.</p>'}
         <button class="v-eadd" data-radd>+ Agregar un equipo</button>${R.dirty ? `<button class="v-rsave" data-rme="save">Guardar ambiente</button>` : ''}`;
     }
-    function openSheet(k, arg) { X.sheet = k; X.sheetArg = arg || null; X.el.querySelector('#v-sheet').classList.add('show'); renderSheet(); }
+    function openSheet(k, arg) {
+      const was = !!X.sheet;
+      X.sheet = k; X.sheetArg = arg || null; X.el.querySelector('#v-sheet').classList.add('show'); renderSheet();
+      const M = window.MaeMotion, sin = X.el.querySelector('#v-sheet .v-sin');
+      if (M && sin && !was && !editing()) { M.open(sin); M.dragClose(sin, '.v-grab,.v-sh', () => { if (!editing()) closeSheet(); }); } // nace de lo que tocaste; se baja con el dedo
+    }
     function closeSheet() { X.sheet = null; const s = X.el.querySelector('#v-sheet'); if (s) s.classList.remove('show'); }
     function openPinMenu(rid) {
       const m = M(), r = m && m.byId[rid]; if (!r || !ctx.onPin) return;

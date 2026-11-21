@@ -2744,6 +2744,7 @@
       this._els.sheet.scrollTop = 0;
       this._els.sheetwrap.classList.toggle('rpage', this._rpage);
       this._els.sheetwrap.classList.add('open');
+      if (window.MaeMotion) window.MaeMotion.stagger(this._els.sheet, 40); // las tarjetas del ambiente entran una tras otra
       this._haptic('light');
     }
     _closeRoom() {

@@ -189,3 +189,20 @@ async def test_misunderstood_phrases_are_logged(hass: HomeAssistant, hass_ws_cli
     await ws.send_json({"id": 11, "type": "matterai/voice_log", "clear": True})
     assert (await ws.receive_json())["result"]["items"] == []
     assert rt["voice"].log.items == []
+
+
+async def test_varias_ordenes_en_una_frase(hass: HomeAssistant) -> None:
+    """«apagá el velador y bajá la persiana del quincho»: las dos; si una no se entiende, se sigue como antes."""
+    from custom_components.matterai.local_voice import interpret_many, split_orders
+
+    _states(hass)
+    rooms = house_catalog(hass, CONFIG)
+    assert split_orders("Prendé las luces del quincho y la cocina") == ["prende las luces del quincho y la cocina"]
+    assert split_orders("Apagá el velador, y después bajá la persiana") == ["apaga el velador", "baja la persiana"]
+    res = interpret_many(hass, rooms, "apagá el velador y bajá la persiana del quincho")
+    servs = sorted((a["servicio"] if "servicio" in a else str(a)) for a in res["acciones"])
+    assert len(res["acciones"]) == 2, res
+    assert "velador" in str(res["acciones"][0]) and "persiana_quincho" in str(res["acciones"][1]), servs
+    assert not res["respuesta"].count("Listo,") > 1
+    one = interpret_many(hass, rooms, "Prendé las luces del quincho y la cocina")
+    assert one == interpret(hass, rooms, "Prendé las luces del quincho y la cocina")

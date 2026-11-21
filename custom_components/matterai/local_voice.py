@@ -320,3 +320,28 @@ def interpret(hass: HomeAssistant, rooms: list[dict[str, Any]], text: str, memo:
         pct_txt = f" al {int(pct)}%" if pct is not None and verb_on else ""
         return {"acciones": acts, "respuesta": f"Listo, {'prendí' if verb_on else 'apagué'} {what}{pct_txt}{_place(rms if not named else [])}."}
     return None
+
+
+# ---------- varias órdenes en una frase: «apagá todo y cerrá el portón», «prendé el aire, bajá las persianas» ----------
+_VERB = r"(?:prend|encend|enciend|apag|cerr|cierr|abr|activ|desactiv|pone|pon\b|baj|subi|sube|par[ae]\b|paus|deten|frena|arm|desarm|bloque|desbloque|silenci|deja)"
+_SPLIT = re.compile(r"\s*(?:,|;|\by\b|\bdespues\b|\bluego\b|\btambien\b)\s*(?:(?:y|despues|luego|tambien)\s+)*(?=" + _VERB + ")")
+
+
+def split_orders(text: str) -> list[str]:
+    """Parte la frase donde empieza otra orden (un verbo después de «y», una coma, «después»…)."""
+    t = unicodedata.normalize("NFD", str(text or "").lower())
+    t = "".join(c for c in t if unicodedata.category(c) != "Mn")
+    return [p.strip() for p in _SPLIT.split(t) if p.strip()]
+
+
+def interpret_many(hass: HomeAssistant, rooms: list[dict[str, Any]], text: str, memo: dict[str, Any] | None = None) -> dict[str, Any] | None:
+    """Como interpret, pero si la frase trae varias órdenes las resuelve todas (o ninguna, si alguna no se entiende)."""
+    parts = split_orders(text)
+    if len(parts) >= 2:
+        res = [interpret(hass, rooms, p, memo) for p in parts]
+        if all(r and r.get("acciones") for r in res):
+            says = [str(r.get("respuesta") or "").strip() for r in res]
+            says = [says[0]] + [re.sub(r"^Listo,\s*", "", s) for s in says[1:]]
+            say = " ".join(s[:1].upper() + s[1:] for s in says if s)
+            return {"acciones": [a for r in res for a in r["acciones"]], "respuesta": say}
+    return interpret(hass, rooms, text, memo)

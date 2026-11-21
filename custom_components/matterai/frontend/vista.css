@@ -1318,3 +1318,5 @@ html.mae-ed.mae-light,html.mae-ed.mae-light body{background:#f2f3f5!important}
 .v-fmenu{position:fixed;top:calc(var(--st,env(safe-area-inset-top,0px)) + 10px);right:12px;z-index:30;width:44px;height:44px;border-radius:14px;display:grid;place-items:center;
   background:rgba(20,24,32,.72);color:#fff;border:1px solid rgba(255,255,255,.14);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);box-shadow:0 6px 18px rgba(0,0,0,.3);cursor:pointer}
 .v-fmenu .ic,.v-fmenu svg{width:22px;height:22px}
+/* las ventanas se bajan con el dedo desde arriba (motion.js de la app) */
+.v-sin .v-grab,.v-sin .v-sh{touch-action:none}

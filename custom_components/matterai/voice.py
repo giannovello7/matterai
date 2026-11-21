@@ -374,7 +374,7 @@ class VoiceBrain:
         return call.input if isinstance(call.input, dict) else json.loads(call.input)
 
     async def async_handle(self, text: str, config: dict[str, Any], context: Context) -> dict[str, Any]:
-        from .local_voice import interpret  # noqa: PLC0415
+        from .local_voice import interpret_many as interpret  # noqa: PLC0415
 
         from .alta.matte import es_pedido_de_alta  # noqa: PLC0415
 

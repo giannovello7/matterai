@@ -112,7 +112,7 @@ Escenas y automatizaciones MatterAI, pensadas para que las entienda cualquiera: 
 ## Conexión, Seguridad, Voz y Ficha de la casa
 - **Conexión**: cómo llega la app a la casa (dirección remota, local y acceso desde la app web).
 - **Seguridad**: el registro de todo lo importante (quién vinculó, desvinculó, abrió, cambió perfiles), el acceso de soporte del instalador y los pedidos de privacidad de los clientes.
-- **Voz**: control por voz de la app: gratis (en la casa) o con IA (necesita una clave de Anthropic).
+- **Voz**: control por voz de la app: gratis (en la casa) o con IA (necesita una clave de Anthropic). Las dos entienden varias órdenes en una frase («apagá todo y cerrá el portón»).
 - **Ficha de la casa**: nombre, direcciones, soporte y la clave del panel central («Cambiar datos»).
 
 # El editor de dashboards
@@ -189,6 +189,7 @@ Las tarjetas «en automático» se arman solas con lo que tiene la casa. Si eleg
 - **Inicio**: el dashboard de esa persona. En el celular: hora, clima, avisos, resumen, cámara, sus ambientes, escenas y «Toda la casa». En la tablet: el plano que se ilumina, resumen, escenas, rutinas, cámaras, música y la barra de abajo.
 - **Ambientes**: tocar prende o apaga las luces; mantener lo fija en el inicio; entrar muestra todo lo que tiene.
 - **Plano** (tablet): tocar una zona prende su luz; tocar su cartel entra al ambiente. Los íconos muestran lo que está prendido.
+- **Movimiento**: las ventanas nacen desde lo que tocaste y se cierran bajándolas con el dedo; al entrar a un ambiente las tarjetas aparecen en cascada; cuando la casa confirma un cambio, el equipo brilla un instante; el portón, la cerradura, la alarma y las escenas terminan con un tilde y una vibración corta. Si el celular tiene activado «reducir movimiento», no se anima nada.
 - **Música**: como Spotify, sobre Music Assistant: cola, parlantes, pasar la música de uno a otro, volumen grande.
 - **Cámaras**: el visor de Frigate en vivo, con eventos y grabaciones.
 - **Actividad**: qué pasó en la casa, por equipo, día, tipo y ambiente.
@@ -229,6 +230,7 @@ Nada más: cada celular se registra solo. El panel sólo reenvía avisos a celul
 - **Una tablet aparece dos veces**: Equipos → «Quitar duplicado». Desde la 2.15 la casa reemplaza el vínculo viejo sola.
 - **No llegan los avisos**: revisá en Puesta en marcha «Conectada al panel central» y «Avisos con la app cerrada», y probá con Equipos → Probar.
 - **La app tarda en conectar en la casa**: falta la dirección local o el wifi en «Cambiar datos». El cliente también puede tocar, estando en su wifi, **Opciones → Conexión**: ahí ve si está en casa o afuera, las redes de la casa (las tuyas y las suyas) y puede sumar varias con «Agregar el wifi de ahora» (pide el permiso de ubicación, que el sistema exige para leer el nombre del wifi) o «Escribir el nombre» (sirve también estando afuera); las suyas quedan en ese celular y las saca con «Sacar». Al conectar, la app muestra unos segundos si está «en casa · red local» o «desde afuera · por internet».
+- **Arriba dice «Tu casa no responde»**: hace 15 s que la app no llega a Home Assistant: suele ser un corte de luz o de internet en la casa. Si dice «Tu celular no tiene internet», el problema es el celular. Al volver, se reconecta sola.
 - **Un equipo no aparece en la app**: no está en ningún ambiente (Puesta en marcha te dice cuántos faltan).
 - **Cambios que no quedan guardados (ambientes, pisos del plano) o tarjetas repetidas**: se actualizó MatterAI pero falta **reiniciar Home Assistant**. Desde la 2.37 el editor y el panel lo avisan arriba con el botón «Reiniciar ahora».
 - **Una cámara no se ve en vivo**: el visor necesita la Advanced Camera Card y Frigate funcionando (Mantenimiento lo vigila).

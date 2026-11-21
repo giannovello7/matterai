@@ -8,7 +8,7 @@
  *     Salud y avisos, Mantenimiento (watchdog), Copias de seguridad, Plantillas, Conexiones, Voz, Ficha de la casa.
  */
 (() => {
-  const FRONT_VERSION = '2.37.3'; // la cambia tools/version.py
+  const FRONT_VERSION = '2.38.0'; // la cambia tools/version.py
   const BASE = '/matterai_static';
   const loadScript = (src) => new Promise((res, rej) => {
     if (document.querySelector(`script[data-mae="${src}"]`)) return res();
