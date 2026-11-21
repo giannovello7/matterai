@@ -421,10 +421,89 @@ class FDetectController(_Base):
             self._snooze_until = dt_util.utcnow() + timedelta(hours=1)
 
 
+CARS = ("car", "truck", "motorcycle")
+
+
 class FFaceController(_Base):
-    """Bienvenida: llega una persona (cara) o un auto (patente) conocido."""
+    """Bienvenida: llega una persona (cara) o un auto (patente) conocido.
+
+    «Por el celular» (phones): la cámara ve un auto y, unos minutos antes o después, el celular de alguien de la familia
+    llega a casa → «Llegó Sofi en auto», sin necesidad de reconocer la patente. Si nadie llega con ese auto, opcional:
+    «Llegó un auto que no reconozco» con la foto. Por el celular nunca abre solo (sólo ofrece el botón).
+    """
 
     uses_face_sensors = True
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self._cars: list[dict[str, Any]] = []  # autos vistos sin dueño todavía
+        self._homes: list[dict[str, Any]] = []  # personas que llegaron sin auto visto todavía
+
+    def _window(self) -> float:
+        return max(1.0, min(15.0, _f(self.u.get("window_min"), 3))) * 60
+
+    def _phone_people(self) -> list[str]:
+        chosen = [p for p in (self.u.get("phone_people") or []) if isinstance(p, str) and p.startswith("person.")]
+        return chosen or (self.hass.states.async_entity_ids("person") if hasattr(self.hass.states, "async_entity_ids") else [])
+
+    @callback
+    def start(self) -> None:
+        super().start()
+        if self.u.get("phones"):
+            people = self._phone_people()
+            if people:
+                self._unsubs.append(async_track_state_change_event(self.hass, people, self._person_event))
+
+    @callback
+    def _person_event(self, event: Event) -> None:
+        new, old = event.data.get("new_state"), event.data.get("old_state")
+        if new is None or new.state != "home" or (old is not None and old.state in ("home", *UNAVAILABLE)):
+            return
+        now = dt_util.utcnow()
+        self._prune(now)
+        if self._cars:  # el auto se vio un ratito antes
+            car = self._cars.pop(0)
+            self._cancel(f"car_{car['id']}")
+            self._arrived_phone([new.entity_id], car)
+            return
+        self._homes.append({"who": new.entity_id, "at": now})
+
+    def _prune(self, now) -> None:
+        w = self._window()
+        self._homes = [h for h in self._homes if (now - h["at"]).total_seconds() <= w]
+        self._cars = [c for c in self._cars if (now - c["at"]).total_seconds() <= w]
+
+    def _car_seen(self, after: dict[str, Any]) -> None:
+        now = dt_util.utcnow()
+        self._prune(now)
+        car = {"id": str(after.get("id") or now.timestamp()), "at": now, "camera": after.get("camera", ""), "plate": plate_of(after)}
+        if self._homes:  # llegó alguien hace un ratito: es su auto (y los que llegaron con él)
+            who = [h["who"] for h in self._homes]
+            self._homes = []
+            self._arrived_phone(who, car)
+            return
+        self._cars.append(car)
+        self._timer(f"car_{car['id']}", self._window(), lambda: self._car_unknown(car))
+
+    def _car_unknown(self, car: dict[str, Any]) -> None:
+        if car not in self._cars:
+            return
+        self._cars.remove(car)
+        if not self.u.get("unknown_cars") or not self._when_ok() or self._cool("auto desconocido"):
+            return
+        local = dt_util.as_local(dt_util.utcnow())
+        plate = f" (patente {car['plate']})" if car.get("plate") else ""
+        msg = f"Llegó un auto que no reconozco{plate} ({local.hour:02d}:{local.minute:02d})."
+        self.hass.async_create_task(self.notifier.send("🚗 Auto en la entrada", msg, tag="unknown_car", image=self._snapshot(car["id"]), links=self._links(car["id"])))
+        self._record({"at": dt_util.utcnow().isoformat(), "who": "Auto desconocido", "kind": "car", "camera": car["camera"], "id": car["id"]})
+
+    def _arrived_phone(self, people: list[str], car: dict[str, Any]) -> None:
+        names = []
+        for eid in people:
+            st = self.hass.states.get(eid)
+            names.append(str(st.attributes.get("friendly_name") or eid.split(".")[1]) if st else eid.split(".")[1])
+        who = names[0] if len(names) == 1 else ", ".join(names[:-1]) + " y " + names[-1]
+        self._arrived(who, car["camera"], "phone", car["id"] if car["id"] and not car["id"].replace(".", "").isdigit() else None)
 
     def _people(self) -> list[str]:
         if self.u.get("any_known"):
@@ -450,6 +529,9 @@ class FFaceController(_Base):
     def on_frigate(self, kind: str, after: dict[str, Any]) -> None:
         if kind == "end" or not self._camera_ok(after.get("camera", "")) or not self._zone_ok(after):
             return
+        if (self.u.get("phones") and kind == "new" and after.get("label") in CARS and not after.get("false_positive")
+                and not after.get("stationary")):
+            self._car_seen(after)
         face = face_of(after)
         if face and (not self._people() or norm(face) in self._people()):
             self._arrived(self._display(face), after.get("camera", ""), "face", after.get("id"))
@@ -476,11 +558,13 @@ class FFaceController(_Base):
         if sun is not None:
             dark = _f(sun.attributes.get("elevation"), 0) < 3
         alias = self._plates().get(who, "") if kind == "plate" else ""
-        name = who if kind == "face" else (alias or f"el auto {who}")
-        spoken = who if kind == "face" else alias.split(" de ")[-1] if alias else None
+        name = who if kind == "face" else f"{who} en auto" if kind == "phone" else (alias or f"el auto {who}")
+        spoken = who if kind in ("face", "phone") else alias.split(" de ")[-1] if alias else None
         done: list[str] = []
         unlock = self.u.get("unlock")
         mode = self.u.get("unlock_mode", "ask")
+        if kind == "phone" and mode == "auto":
+            mode = "ask"  # por el celular nunca abre solo: cualquier auto + un celular cerca no alcanza
         if unlock and mode == "auto":
             self._unlock(unlock)
             done.append("abrí")

@@ -174,6 +174,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     rt["asistente"] = Asistente(hass, lambda: _matte_key(hass))
     await rt["asistente"].async_load()
+    entry.async_on_unload(rt["asistente"].start_weekly())  # los domingos: ideas nuevas según la rutina de la casa
     if opts.get(CONF_CENTRAL_KEY):
         hb = Heartbeat(
             hass,

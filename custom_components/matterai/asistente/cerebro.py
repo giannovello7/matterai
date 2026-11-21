@@ -56,6 +56,18 @@ Automatizaciones, escenas y recordatorios (lo más importante):
   Acciones: {type: device, entity, svc: dominio.servicio, params: {brightness_pct, temperature, position, _off_after (minutos)...}}, {type: area, domain, op: on/off/open/close/pause, area: area_id | all}, {type: scene, entity}, {type: notify, target: mobile_app_x, message, title}, {type: delay, h, m, s}, {type: rule, op: run/enable/disable, rule_id}.
   Días: mon tue wed thu fri sat sun. Los recordatorios llegan solos al celular de quien los pidió.
 
+Llegadas y cámaras:
+- «Avisame cuando llegue alguien en auto»: proponé una regla kind fface (Llegadas) con ui.phones true (la cámara ve un auto y el celular de alguien de la familia llega a casa → «Llegó Sofi en auto»), ui.cameras con la cámara de la entrada (catalogo_reglas → camaras_frigate) y, si quiere, ui.unknown_cars true para avisar autos que no reconoce. También sirve para caras (ui.people) y patentes (ui.plates «AB123CD = Auto de Juan»). Matte nunca arma aperturas automáticas: si quiere abrir, va ui.unlock con el botón del aviso (es delicado: se confirma en la app).
+- «¿A qué hora llegó Sofi?», «¿cuántas veces se abrió el portón hoy?», «¿cuándo fue la última vez que hubo movimiento?»: historial.
+
+Acomodar la casa (cuando te lo piden o cuando algo no te deja responder bien):
+- revisar_casa devuelve lo que falta o anda mal (personas sin celular, celulares sin persona, ambientes sin sensor de movimiento, equipos sin ambiente o con nombres poco claros, equipos que no responden, pilas bajas, cámaras sin Frigate). Contalo de a UNA cosa, empezando por lo que más ayuda, y proponé el arreglo: renombrar un equipo (accion renombrar con entity_id y nuevo_nombre: nombres claros en castellano, «Luz techo living»), ponerle ambiente (accion ambiente con entity_id y area_id), o explicá qué conviene comprar o qué tiene que hacer el instalador (vincular un celular a una persona, sumar un sensor).
+
+Rutina (etapa 3):
+- estudiar_rutina mira el historial de las últimas semanas: lo que más se usa, lo que se repite casi todos los días a la misma hora (sugerencias, ya agrupadas) y a qué hora llega o se va cada uno. Usalo cuando pregunten «¿qué ideas tenés?», «¿qué podemos automatizar?», o cuando te pidan ordenar el inicio.
+- Contá UNA o DOS ideas por vez, las más útiles, en palabras simples («Casi todas las noches a eso de las 23:30 apagás el living y la cocina: ¿querés que lo haga sola, o un botón “Buenas noches”?»). Según lo que elija, proponer una regla auto (disparador time con days) o una scene. Nunca sugieras lo que ya rechazó ni lo que ya está automatizado.
+- «Armame un inicio con lo que más uso» (o si te parece útil y lo acepta): proponer con accion dashboard y equipos (los entity_id más usados, hasta 8). Matte le arma su propio inicio con «Lo que más usás» arriba; el anterior queda guardado.
+
 Memoria:
 - Recordá lo que sirve para ayudar mejor: rutinas, gustos, nombres, quién es quién, cómo le dicen a cada cosa («la luz grande» = el techo del living). Llamá a recordar en el momento, con una frase corta y clara; de_la_casa true si es de todos (horarios de la casa, mascotas, quién vive) y false si es de la persona que habla.
 - Nunca guardes claves, tarjetas, documentos, salud ni temas delicados salvo que te lo pidan explícitamente.
@@ -78,9 +90,18 @@ TOOLS: list[dict[str, Any]] = [
     {"name": "ver_automatizaciones", "description": "Lista de automatizaciones, escenas y recordatorios de la casa (id, nombre, tipo, si está activa).", "input_schema": {"type": "object", "properties": {}}},
     {"name": "ver_automatizacion", "description": "El detalle de una automatización (su modelo completo, para proponer un cambio).",
      "input_schema": {"type": "object", "required": ["rule_id"], "properties": {"rule_id": {"type": "string"}}}},
-    {"name": "proponer", "description": "Propone crear, cambiar, pausar, activar o borrar una automatización, escena o recordatorio. NO lo aplica: queda esperando el «dale» de la persona.",
+    {"name": "historial", "description": "Qué pasó con un equipo, sensor o persona en las últimas horas (cuándo cambió y a qué estado).",
+     "input_schema": {"type": "object", "required": ["entity_id"], "properties": {"entity_id": {"type": "string"}, "horas": {"type": "integer", "description": "cuántas horas para atrás (1 a 168, por defecto 24)"}}}},
+    {"name": "estudiar_rutina", "description": "Estudia el historial de la casa: lo más usado, lo que se repite a la misma hora (sugerencias agrupadas) y llegadas/salidas de cada persona.",
+     "input_schema": {"type": "object", "properties": {"dias": {"type": "integer", "description": "cuántos días para atrás (7 a 30, por defecto 14)"}}}},
+    {"name": "revisar_casa", "description": "Revisa qué le falta o anda mal a la casa para que Matte la entienda mejor (para «acomodemos la casa»).", "input_schema": {"type": "object", "properties": {}}},
+    {"name": "proponer", "description": "Propone crear, cambiar, pausar, activar o borrar una automatización, escena o recordatorio, o renombrar un equipo o ponerle ambiente. NO lo aplica: queda esperando el «dale» de la persona.",
      "input_schema": {"type": "object", "required": ["accion", "titulo", "explicacion"], "properties": {
-         "accion": {"type": "string", "enum": ["crear", "cambiar", "pausar", "activar", "borrar"]},
+         "accion": {"type": "string", "enum": ["crear", "cambiar", "pausar", "activar", "borrar", "renombrar", "ambiente", "dashboard"]},
+         "equipos": {"type": "array", "items": {"type": "string"}, "description": "para dashboard: los entity_id de «Lo que más usás» (hasta 8)"},
+         "entity_id": {"type": "string", "description": "para renombrar o ponerle ambiente"},
+         "nuevo_nombre": {"type": "string", "description": "para renombrar"},
+         "area_id": {"type": "string", "description": "para ponerle ambiente (de catalogo_reglas → ambientes)"},
          "titulo": {"type": "string", "description": "nombre corto, como lo vería la familia («Siesta de Tomi»)"},
          "explicacion": {"type": "string", "description": "qué hace (o qué cambia), en palabras simples, en una o dos oraciones"},
          "rule_id": {"type": "string", "description": "para cambiar, pausar, activar o borrar"},
@@ -394,7 +415,126 @@ class Asistente:
             "ambientes": [{"area_id": a.id, "nombre": a.name} for a in ar.async_get(self.hass).async_list_areas()],
             "celulares": cel,
             "delicados_se_confirman_en_la_app": delicados,
+            "camaras_frigate": self._frigate_info(),
         }
+
+    def _frigate_info(self) -> dict[str, Any]:
+        hub = getattr(self.hass.data.get(ESCENAS), "frigate", None)
+        if hub is None:
+            return {"hay": False}
+        i = hub.info()
+        return {"hay": True, "conectado": i.get("connected"), "camaras": i.get("cameras"), "zonas": i.get("zones"), "caras": i.get("faces"), "patentes": i.get("plates")}
+
+    async def _t_historial(self, ctx, args):
+        from datetime import timedelta  # noqa: PLC0415
+
+        from ..selection import is_allowed  # noqa: PLC0415
+
+        eid = str(args.get("entity_id") or "")
+        st = self.hass.states.get(eid)
+        if st is None or (not eid.startswith(("person.", "zone.")) and not is_allowed(self.hass, eid)):
+            return {"ok": False, "error": "No encuentro ese equipo."}
+        if "recorder" not in self.hass.config.components:
+            return {"ok": False, "error": "Esta casa no guarda historial."}
+        from homeassistant.components.recorder import get_instance, history  # noqa: PLC0415
+
+        horas = max(1, min(168, int(args.get("horas") or 24)))
+        start = dt_util.utcnow() - timedelta(hours=horas)
+
+        def _q():
+            return history.state_changes_during_period(self.hass, start, entity_id=eid, include_start_time_state=False, no_attributes=True)
+
+        res = await get_instance(self.hass).async_add_executor_job(_q)
+        cambios = []
+        for x in (res or {}).get(eid, [])[-60:]:
+            t = dt_util.as_local(x.last_changed)
+            cambios.append(f"{DIAS[t.weekday()][:3]} {t.day}/{t.month} {t.hour:02d}:{t.minute:02d} → {x.state}")
+        return {"equipo": st.attributes.get("friendly_name") or eid, "ahora": st.state, "ultimas_horas": horas, "cambios": cambios,
+                "nota": "Sin cambios en ese período." if not cambios else ""}
+
+    async def _t_revisar_casa(self, ctx, args):
+        from datetime import timedelta  # noqa: PLC0415
+
+        from homeassistant.helpers import area_registry as ar  # noqa: PLC0415
+        from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
+        from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+
+        from ..escenas.notify import APP_ID  # noqa: PLC0415
+        from ..selection import is_allowed  # noqa: PLC0415
+
+        S, ent_reg, dev_reg, area_reg = self.hass.states, er.async_get(self.hass), dr.async_get(self.hass), ar.async_get(self.hass)
+        out: list[dict[str, Any]] = []
+
+        def add(tipo, que, sugerencia, items=None):
+            out.append({"tipo": tipo, "que": que, "sugerencia": sugerencia, **({"equipos": items[:15]} if items else {})})
+
+        personas = S.async_all("person")
+        sin_cel = [p.attributes.get("friendly_name") or p.entity_id for p in personas if not p.attributes.get("device_trackers")]
+        if not personas:
+            add("personas", "No hay personas cargadas: Matte no puede saber quién está en casa.", "Que el instalador cree una persona por integrante y le vincule su celular con la app MatterAI.")
+        elif sin_cel:
+            add("personas", f"Sin celular vinculado: {', '.join(sin_cel)}.", "Que el instalador les vincule el celular (con la app MatterAI instalada) para saber cuándo llegan y se van.")
+        con_persona = {p.attributes.get("user_id") for p in personas}
+        sueltos = [e.data.get("device_name") or "un celular" for e in self.hass.config_entries.async_entries("mobile_app")
+                   if e.data.get("app_id") == APP_ID and e.data.get("user_id") not in con_persona]
+        if sueltos:
+            add("celulares", f"Celulares con la app que no están vinculados a ninguna persona: {', '.join(sueltos)}.", "Que el instalador los asigne a la persona que corresponde.")
+
+        def area_of(entry):
+            if entry.area_id:
+                return entry.area_id
+            dev = dev_reg.async_get(entry.device_id) if entry.device_id else None
+            return dev.area_id if dev else None
+
+        motion_areas: set[str] = set()
+        light_areas: set[str] = set()
+        sin_area: list[str] = []
+        feos: list[dict[str, str]] = []
+        for entry in list(ent_reg.entities.values()):
+            st = S.get(entry.entity_id)
+            if st is None or entry.disabled or entry.hidden or entry.entity_category or not is_allowed(self.hass, entry.entity_id):
+                continue
+            aid = area_of(entry)
+            if st.domain == "binary_sensor" and st.attributes.get("device_class") in ("motion", "occupancy", "presence") and aid:
+                motion_areas.add(aid)
+            if st.domain in ("light", "switch", "cover", "climate", "media_player", "lock", "binary_sensor", "camera"):
+                if aid and st.domain == "light":
+                    light_areas.add(aid)
+                if not aid:
+                    sin_area.append(entry.entity_id)
+                name = str(st.attributes.get("friendly_name") or "")
+                if (not name or "_" in name or "0x" in name.lower() or name.lower() == entry.entity_id.split(".")[1].replace("_", " ")
+                        or any(w in name for w in ("Light", "Switch", "Occupancy", "Motion", "Contact"))):
+                    feos.append({"id": entry.entity_id, "nombre": name})
+        sin_mov = sorted(area_reg.async_get_area(a).name for a in light_areas if a not in motion_areas and area_reg.async_get_area(a))
+        if sin_mov:
+            add("sensores", f"Ambientes con luces pero sin sensor de movimiento: {', '.join(sin_mov)}.", "Un sensor de movimiento por ambiente deja apagar luces solas y saber si hay alguien.")
+        if feos:
+            add("nombres", f"{len(feos)} equipos con nombres poco claros.", "Renombrarlos en castellano (accion renombrar), de a uno, preguntando cómo le dicen en la casa.", feos)
+        if sin_area:
+            add("ambientes", f"{len(sin_area)} equipos sin ambiente.", "Ponerles ambiente (accion ambiente) así se pueden manejar por ambiente.", [{"id": e} for e in sin_area])
+        viejo = dt_util.utcnow() - timedelta(hours=24)
+        caidos = [{"id": st.entity_id, "nombre": st.attributes.get("friendly_name")} for st in S.async_all()
+                  if st.state == "unavailable" and st.last_changed < viejo and is_allowed(self.hass, st.entity_id) and st.domain not in ("update", "button", "event")]
+        if caidos:
+            add("sin_respuesta", f"{len(caidos)} equipos no responden hace más de un día.", "Revisar si están enchufados o con pila; si no vuelven, avisarle al instalador.", caidos)
+        pilas = []
+        for st in S.async_all("sensor"):
+            if st.attributes.get("device_class") == "battery" and is_allowed(self.hass, st.entity_id):
+                try:
+                    if float(st.state) < 20:
+                        pilas.append({"id": st.entity_id, "nombre": st.attributes.get("friendly_name"), "pila": st.state})
+                except ValueError:
+                    continue
+        if pilas:
+            add("pilas", f"{len(pilas)} equipos con poca pila.", "Cambiarles la pila pronto.", pilas)
+        fr = self._frigate_info()
+        if S.async_entity_ids("camera") and not (fr.get("hay") and fr.get("conectado")):
+            add("camaras", "Hay cámaras pero no llegan detecciones de Frigate.", "Sin Frigate no se puede avisar quién llegó en auto ni detectar personas. Lo configura el instalador.")
+        manager = self.hass.data.get(ESCENAS)
+        if fr.get("conectado") and manager and not any(r.get("kind") == "fface" and (r.get("ui") or {}).get("phones") for r in manager.rules.values()):
+            add("llegadas", "Las cámaras andan, pero no hay aviso de quién llega en auto.", "Proponé una regla de llegadas por el celular (kind fface, ui.phones true) con la cámara de la entrada.")
+        return {"pendientes": out, "nota": "Todo en orden." if not out else "Contalo de a una cosa, empezando por la primera."}
 
     def _manager(self):
         m = self.hass.data.get(ESCENAS)
@@ -423,6 +563,10 @@ class Asistente:
 
     async def _t_proponer(self, ctx, args):
         accion = args.get("accion")
+        if accion in ("renombrar", "ambiente"):
+            return self._proponer_equipo(ctx, args)
+        if accion == "dashboard":
+            return self._proponer_dashboard(ctx, args)
         manager = self._manager()
         actor = self._actor(ctx)
         admin = bool(getattr(actor, "is_admin", False))
@@ -439,12 +583,14 @@ class Asistente:
             if accion == "cambiar":
                 if prev.get("kind") not in KINDS_MATTE:
                     return {"ok": False, "error": "Ese tipo se cambia en el panel de Automatizaciones; desde acá se puede pausar, activar o borrar."}
+                new_ui = raw.get("ui") if isinstance(raw.get("ui"), dict) else {}
                 raw = {"icon": prev.get("icon"), "color": prev.get("color"), "kind": prev.get("kind"), "name": prev.get("name"), "enabled": prev.get("enabled", True), **raw, "id": prev["id"]}
+                raw["ui"] = {**(prev.get("ui") or {}), **new_ui}  # lo que Matte no menciona queda como estaba
             raw.setdefault("name", args.get("titulo"))
-            if raw.get("kind") == "reminder":
+            if raw.get("kind") in ("reminder", "fface"):
                 ui = raw.setdefault("ui", {})
                 if not ui.get("recipients"):
-                    ui["recipients"] = self._mis_celulares(ctx["uid"])
+                    ui["recipients"] = self._mis_celulares(ctx["uid"])  # el aviso le llega a quien lo pidió
             regla = compile_rule(raw)
             if accion == "crear" and not admin and regla["kind"] in manager.settings.get("client_off", []):
                 return {"ok": False, "error": "Tu instalador no habilitó ese tipo de automatización en esta casa."}
@@ -462,6 +608,204 @@ class Asistente:
         s["propuestas"][pid] = p
         ctx["nuevas"].append(pid)
         return {"propuesta_id": pid, "sensible": p["sensible"], "siguiente": "Contale la propuesta en simple y preguntá si le da el «dale». No la apliques en este turno."}
+
+    def _proponer_equipo(self, ctx, args) -> dict[str, Any]:
+        from homeassistant.helpers import area_registry as ar  # noqa: PLC0415
+        from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+
+        from ..alta.core import puede_agregar  # noqa: PLC0415
+
+        if ctx["user"] is None or not puede_agregar(self.hass, ctx["user"]):
+            return {"ok": False, "error": "Los nombres y ambientes de los equipos los cambia el titular de la casa (desde la app) o el instalador."}
+        eid = str(args.get("entity_id") or "")
+        ent = er.async_get(self.hass).async_get(eid)
+        if ent is None:
+            return {"ok": False, "error": "Ese equipo no se puede cambiar desde acá (pedíselo al instalador)."}
+        if args["accion"] == "renombrar":
+            nuevo = " ".join(str(args.get("nuevo_nombre") or "").split())[:60]
+            if len(nuevo) < 2:
+                return {"ok": False, "error": "Falta el nombre nuevo."}
+            extra: dict[str, Any] = {"nuevo_nombre": nuevo}
+        else:
+            area = ar.async_get(self.hass).async_get_area(str(args.get("area_id") or ""))
+            if area is None:
+                return {"ok": False, "error": "Ese ambiente no existe (mirá catalogo_reglas → ambientes)."}
+            extra = {"area_id": area.id, "area": area.name}
+        s = ctx["s"]
+        pid = secrets.token_hex(3)
+        s["propuestas"][pid] = {"id": pid, "accion": args["accion"], "titulo": str(args.get("titulo") or "")[:80], "explicacion": str(args.get("explicacion") or "")[:400],
+                                "rule_id": None, "regla": None, "entity_id": eid, **extra, "turno": s["turno"], "estado": "pendiente", "sensible": False}
+        ctx["nuevas"].append(pid)
+        return {"propuesta_id": pid, "siguiente": "Contale el cambio y preguntá si le da el «dale». No lo apliques en este turno."}
+
+    def _aplicar_equipo(self, user, p: dict[str, Any]) -> dict[str, Any]:
+        from homeassistant.helpers import device_registry as dr  # noqa: PLC0415
+        from homeassistant.helpers import entity_registry as er  # noqa: PLC0415
+
+        from ..alta.core import puede_agregar  # noqa: PLC0415
+        from ..audit import log as audit_log  # noqa: PLC0415
+
+        if user is None or not puede_agregar(self.hass, user):
+            return {"ok": False, "error": "Los nombres y ambientes los cambia el titular de la casa o el instalador."}
+        reg = er.async_get(self.hass)
+        ent = reg.async_get(p["entity_id"])
+        if ent is None:
+            return {"ok": False, "error": "Ese equipo ya no está."}
+        if p["accion"] == "renombrar":
+            reg.async_update_entity(ent.entity_id, name=p["nuevo_nombre"])
+            say = f"Listo, ahora se llama «{p['nuevo_nombre']}»."
+        else:
+            if ent.device_id:
+                dr.async_get(self.hass).async_update_device(ent.device_id, area_id=p["area_id"])
+            else:
+                reg.async_update_entity(ent.entity_id, area_id=p["area_id"])
+            say = f"Listo, quedó en {p['area']}."
+        p["estado"] = "hecha"
+        try:
+            audit_log(self.hass, "matte", "equipo renombrado" if p["accion"] == "renombrar" else "ambiente asignado", p["entity_id"],
+                      f"Matte · {getattr(user, 'name', '')}", p.get("nuevo_nombre") or p.get("area") or "")
+        except Exception:  # noqa: BLE001 - la auditoría nunca frena el cambio
+            pass
+        return {"ok": True, "say": say}
+
+    # ------------------------------------------------------------ rutina y dashboard
+    def _reglas_con_horario(self) -> list[dict[str, Any]]:
+        manager = self.hass.data.get(ESCENAS)
+        out: list[dict[str, Any]] = []
+        for r in (manager.rules.values() if manager else []):
+            if not r.get("enabled", True):
+                continue
+            ui = r.get("ui") or {}
+            ents: set[str] = set()
+
+            def walk(n):
+                if isinstance(n, dict):
+                    for k, v in n.items():
+                        if k in ("entity_id", "entity", "entities") and isinstance(v, (str, list)):
+                            ents.update([v] if isinstance(v, str) else [x for x in v if isinstance(x, str)])
+                        else:
+                            walk(v)
+                elif isinstance(n, list):
+                    for v in n:
+                        walk(v)
+
+            walk([r.get("actions"), ui.get("actions"), ui.get("entities")])
+            horas = [str(t.get("at"))[:5] for t in r.get("triggers") or [] if isinstance(t, dict) and (t.get("platform") or t.get("trigger")) == "time" and t.get("at")]
+            for h in horas:
+                out.append({"nombre": r.get("name"), "hora": h, "equipos": sorted(ents)})
+        return out
+
+    async def rutina(self, dias: int = 14) -> dict[str, Any]:
+        from .rutina import estudiar  # noqa: PLC0415
+
+        if "recorder" not in self.hass.config.components:
+            return {"ok": False, "error": "Esta casa no guarda historial: no se puede estudiar la rutina."}
+        rooms = self._rooms()
+        nombres = {e["id"]: e["nombre"] for r in rooms for e in r["equipos"]}
+        ents = [e for e in nombres if e.split(".")[0] in ("light", "switch", "fan", "cover", "climate", "media_player", "input_boolean", "scene", "script")]
+        for st in self.hass.states.async_all("person"):
+            ents.append(st.entity_id)
+            nombres[st.entity_id] = st.attributes.get("friendly_name") or st.entity_id
+        return await estudiar(self.hass, max(7, min(30, int(dias or 14))), ents[:120], nombres, self._reglas_con_horario())
+
+    async def _t_estudiar_rutina(self, ctx, args):
+        return await self.rutina(int(args.get("dias") or 14))
+
+    def _proponer_dashboard(self, ctx, args) -> dict[str, Any]:
+        if ctx["user"] is None:
+            return {"ok": False, "error": "El inicio de cada persona se arma desde su app: pedímelo desde «Hablar con Matte»."}
+        equipos = [e for e in dict.fromkeys(args.get("equipos") or []) if isinstance(e, str) and e in ctx["allowed"]][:8]
+        if len(equipos) < 2:
+            return {"ok": False, "error": "Necesito al menos dos equipos del catálogo para armar «Lo que más usás»."}
+        s = ctx["s"]
+        pid = secrets.token_hex(3)
+        s["propuestas"][pid] = {"id": pid, "accion": "dashboard", "titulo": str(args.get("titulo") or "Tu inicio")[:80], "explicacion": str(args.get("explicacion") or "")[:400],
+                                "rule_id": None, "regla": None, "equipos": equipos, "turno": s["turno"], "estado": "pendiente", "sensible": False}
+        ctx["nuevas"].append(pid)
+        return {"propuesta_id": pid, "siguiente": "Contale cómo va a quedar su inicio y preguntá si le da el «dale». No lo apliques en este turno."}
+
+    def _aplicar_dashboard(self, user, p: dict[str, Any]) -> dict[str, Any]:
+        import voluptuous as vol  # noqa: PLC0415
+
+        from ..views import DESIGN_KEYS, VIEW_SCHEMA, _notify, _user_devices  # noqa: PLC0415
+
+        rt = self.hass.data.get(DOMAIN) or {}
+        v = rt.get("views")
+        if v is None or user is None:
+            return {"ok": False, "error": "Los dashboards no están andando en esta casa."}
+        devs = _user_devices(self.hass, {user.id})
+        cur = next((v.views[v.assign[d]] for d in devs if v.assign.get(d) in v.views), None) or v.views.get(v.users.get(user.id) or "") or v.views.get(v.default or "")
+        bloque = {"id": "matte-usados", "type": "buttons", "title": "Lo que más usás", "cfg": {"style": "devices", "cols": 2, "items": [{"entity": e} for e in p["equipos"]]}}
+
+        def meter(blocks: list | None) -> list:
+            blocks = [b for b in (blocks or []) if b.get("id") != "matte-usados"]
+            if not blocks:
+                return [{"id": "matte-kpis", "type": "kpis", "cfg": {"auto": True}}, bloque,
+                        {"id": "matte-escenas", "type": "scenes", "cfg": {"auto": True}}, {"id": "matte-ambientes", "type": "rooms", "cfg": {"auto": True}}]
+            first = blocks[0]
+            b = {**bloque, **{k: first[k] for k in ("sec", "col") if first.get(k) is not None}}
+            return [first, b, *blocks[1:]]
+
+        base = {k: cur[k] for k in DESIGN_KEYS if cur and k in cur} if cur else {"kind": "phone"}
+        base["blocks"] = meter(base.get("blocks"))
+        if isinstance(base.get("layouts"), dict):
+            base["layouts"] = {k: ({**lay, "blocks": meter(lay.get("blocks"))} if isinstance(lay, dict) and lay.get("blocks") else lay) for k, lay in base["layouts"].items()}
+        propio = cur is not None and v.users.get(user.id) == cur.get("id")
+        base["name"] = (cur.get("name") if propio else f"Inicio de {user.name}")[:40]
+        if propio:
+            base["id"] = cur["id"]  # su propio inicio: se actualiza (la versión anterior queda en el historial)
+        try:
+            clean = VIEW_SCHEMA(base)
+        except vol.Invalid as err:
+            return {"ok": False, "error": f"No pude armar el inicio: {err}"}
+        view = v.put(clean, by=f"Matte · {user.name}")
+        if not propio:
+            v.set_user(user.id, view["id"])
+            for d in devs:
+                v.set_assign(d, view["id"])
+        _notify(self.hass, devs)
+        p["estado"] = "hecha"
+        return {"ok": True, "say": "Listo, tu inicio ya tiene «Lo que más usás» arriba de todo." + ("" if propio else " El anterior quedó guardado: tu instalador lo puede volver a poner.")}
+
+    # ------------------------------------------------------------ ideas de la semana
+    def start_weekly(self):
+        """Los domingos a las 19: si la rutina muestra algo nuevo para automatizar, Matte avisa (una vez por idea)."""
+        from homeassistant.helpers.event import async_track_time_change  # noqa: PLC0415
+
+        async def _tick(now) -> None:
+            if dt_util.as_local(now).weekday() == 6:
+                await self.ideas_de_la_semana()
+
+        return async_track_time_change(self.hass, _tick, hour=19, minute=0, second=0)
+
+    async def ideas_de_la_semana(self) -> dict[str, Any] | None:
+        from ..escenas.notify import app_targets  # noqa: PLC0415
+
+        if not self.disponible:
+            return None
+        try:
+            r = await self.rutina(14)
+        except Exception:  # noqa: BLE001 - sin historial no hay ideas
+            _LOGGER.debug("Matte: no se pudo estudiar la rutina", exc_info=True)
+            return None
+        if r.get("ok") is False:
+            return None
+        vistas = set(self.memoria.data.setdefault("ideas_avisadas", []))
+        rech = " ".join(self.memoria.rechazos(None)).lower()
+        nuevas = [g for g in r.get("sugerencias") or [] if g["frase"] not in vistas and g["constancia"] >= 0.6 and g["frase"].lower() not in rech]
+        if not nuevas:
+            return None
+        g = nuevas[0]
+        self.memoria.data["ideas_avisadas"] = [*vistas, *(x["frase"] for x in nuevas)][-100:]
+        self.memoria._save()  # noqa: SLF001
+        msg = f"{g['frase']}. ¿Querés que lo haga sola la casa? Tocá para verlo con Matte."
+        for target in app_targets(self.hass):
+            try:
+                await self.hass.services.async_call("notify", target, {"title": "💡 Una idea para tu casa", "message": msg,
+                                                                       "data": {"url": "/?matte=ideas", "tag": "matterai-matte-ideas"}}, blocking=False)
+            except Exception:  # noqa: BLE001 - un aviso que no sale no rompe nada
+                _LOGGER.debug("Matte: no salió el aviso a %s", target, exc_info=True)
+        return g
 
     def _mis_celulares(self, uid: str | None) -> list[str]:
         from homeassistant.util import slugify  # noqa: PLC0415
@@ -498,6 +842,10 @@ class Asistente:
     async def _aplicar_propuesta(self, user, p: dict[str, Any]) -> dict[str, Any]:
         from ..escenas.manager import InvalidRule  # noqa: PLC0415
 
+        if p["accion"] in ("renombrar", "ambiente"):
+            return self._aplicar_equipo(user, p)
+        if p["accion"] == "dashboard":
+            return self._aplicar_dashboard(user, p)
         manager = self._manager()
         actor = user if user is not None else SimpleNamespace(id=None, name="Matte", is_admin=False)
         try:

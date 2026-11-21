@@ -12,8 +12,16 @@ import re
 from typing import Any
 
 ESCENAS_DOMAIN = "matterai_escenas"
-KINDS_MATTE = ("scene", "auto", "period", "reminder")
-ICONS = {"scene": "mdi:gesture-tap", "auto": "mdi:creation", "period": "mdi:clock-time-eight-outline", "reminder": "mdi:bell-ring-outline"}
+KINDS_MATTE = ("scene", "auto", "period", "reminder", "fface")
+ICONS = {"scene": "mdi:gesture-tap", "auto": "mdi:creation", "period": "mdi:clock-time-eight-outline", "reminder": "mdi:bell-ring-outline",
+         "fface": "mdi:face-recognition"}
+# «Llegadas» (Caras y patentes conocidas): los mismos valores por defecto que el panel (newDraft → fface)
+FFACE_BASE = {
+    "any_known": False, "people": [], "plates": [], "cameras": [], "zones": [], "when": "always", "from": "07:00", "to": "23:00", "cooldown_min": 30,
+    "notify": True, "recipients": [], "message": "Llegó {nombre}", "silent": False, "unlock": None, "unlock_mode": "ask", "unlock_name": "Abrir", "code": "",
+    "disarm": False, "alarm": None, "lights": [], "lights_dark": True, "speakers": [], "tts": None, "welcome": "Bienvenido, {nombre}", "rules_run": [],
+    "phones": False, "phone_people": [], "unknown_cars": False, "window_min": 3,
+}
 ALL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 AREA_SVC = {"on": "turn_on", "off": "turn_off", "open": "open_cover", "close": "close_cover", "pause": "media_pause"}
 _HM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -238,6 +246,16 @@ def compile_rule(d: dict[str, Any]) -> dict[str, Any]:
             {"conditions": [{"condition": "trigger", "id": "on"}], "sequence": [turn("turn_on")]},
             {"conditions": [{"condition": "trigger", "id": "off"}], "sequence": [turn("turn_off")]},
         ]}]
+    elif kind == "fface":
+        u = {**FFACE_BASE, **{k: v for k, v in u.items() if k in FFACE_BASE}}
+        if u.get("unlock_mode") == "auto":
+            raise ReglaError("Matte no arma aperturas automáticas: el portón o la puerta se abren con el botón del aviso")
+        for key in ("people", "plates", "cameras", "zones", "phone_people", "lights", "speakers", "recipients", "rules_run"):
+            if not isinstance(u.get(key), list):
+                raise ReglaError(f"Llegadas: {key} va como lista")
+        if not (u["phones"] or u["any_known"] or u["people"] or u["plates"]):
+            raise ReglaError("Llegadas: elegí por el celular (phones), caras (people), patentes (plates) o cualquier conocido")
+        out["ui"] = u
     elif kind == "reminder":
         base = {"text": "", "date": "", "time": "", "repeat": "none", "days": [], "recipients": [], "critical": False, "nag_min": 0}
         u = {**base, **u}
@@ -268,7 +286,10 @@ def es_sensible(hass, rule: dict[str, Any]) -> bool:
             for v in node:
                 yield from walk(v)
 
-    for n in walk([rule.get("actions"), rule.get("ui", {}).get("actions") if isinstance(rule.get("ui"), dict) else None]):
+    ui = rule.get("ui") if isinstance(rule.get("ui"), dict) else {}
+    if rule.get("kind") == "fface" and (ui.get("unlock") or ui.get("disarm")):
+        return True
+    for n in walk([rule.get("actions"), ui.get("actions")]):
         svc = n.get("service") or n.get("svc") or n.get("action")
         ents = (n.get("target") or {}).get("entity_id") if isinstance(n.get("target"), dict) else n.get("entity")
         ents = ents if isinstance(ents, list) else [ents] if isinstance(ents, str) else []

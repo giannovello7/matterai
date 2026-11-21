@@ -754,7 +754,8 @@ class RuleManager:
             for key, domains in (("unlock", {"lock", "button", "input_button", "switch", "script", "cover"}), ("siren", {"siren", "switch", "light"})):
                 if ui.get(key) and str(ui[key]).split(".")[0] not in domains:
                     raise InvalidRule("Hay un equipo que no corresponde")
-            if kind == KIND_FFACE and not ui.get("people") and not ui.get("plates") and not ui.get("any_known"):
+            _str_list(ui, "phone_people")
+            if kind == KIND_FFACE and not ui.get("people") and not ui.get("plates") and not ui.get("any_known") and not ui.get("phones"):
                 raise InvalidRule("Elegí las personas o patentes (o «cualquier persona conocida»)")
             old = self.rules.get(rule["id"])
             rule["history"] = (old or {}).get("history", []) if old and old.get("kind") == kind else []

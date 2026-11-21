@@ -285,8 +285,14 @@ async def test_es_el_asistente_de_home_assistant(hass, monkeypatch) -> None:
     assert await async_setup_component(hass, "homeassistant", {})
     assert await async_setup_component(hass, "conversation", {})
     a, fake, _ = await _casa(hass, monkeypatch)
+    monkeypatch.setattr(hass.data[DOMAIN]["voice"], "api_key", "clave-de-prueba")
+    on = async_mock_service(hass, "light", "turn_on")
+    # lo simple, gratis y sin la IA (como el micrófono de la app)
+    r0 = await conversation.async_converse(hass, "prendé la luz del living", None, Context(), language="es", agent_id="conversation.matte")
+    await hass.async_block_till_done()
+    assert len(on) == 1 and not fake.calls and r0.response.speech["plain"]["speech"]
     fake.steps = [[_txt("¡Hola! Acá estoy.")], [_txt("Sigo acá.")]]
-    r = await conversation.async_converse(hass, "hola Matte", None, Context(), language="es", agent_id="conversation.matte")
+    r = await conversation.async_converse(hass, "contame algo lindo", None, Context(), language="es", agent_id="conversation.matte")
     assert r.response.speech["plain"]["speech"] == "¡Hola! Acá estoy."
     r2 = await conversation.async_converse(hass, "¿seguís?", r.conversation_id, Context(), language="es", agent_id="conversation.matte")
     assert r2.conversation_id == r.conversation_id and len(a.sesiones[r.conversation_id]["messages"]) == 4

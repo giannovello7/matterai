@@ -1,6 +1,8 @@
 """Matte como asistente de Home Assistant: los parlantes Voice, el reloj y la app de HA le hablan al mismo Matte.
 
 Se elige en Ajustes → Asistentes de voz → (el asistente) → Agente de conversación: «Matte».
+Igual que el micrófono de la app: lo simple («prendé la luz del living») lo resuelve el modo gratis al instante y
+sin costo; lo demás va a Matte (Claude), y si hay una charla abierta con Matte, todo sigue con él.
 El que habla por un parlante no tiene usuario: Matte recuerda lo de la casa y arma con permisos de cliente
 (nunca de administrador); lo delicado (cerraduras, alarma, portones) se confirma sólo en la app.
 """
@@ -37,14 +39,19 @@ class MatteAgent(conversation.ConversationEntity):
         return MATCH_ALL
 
     async def async_process(self, user_input: conversation.ConversationInput) -> conversation.ConversationResult:
-        a = (self.hass.data.get(DOMAIN) or {}).get("asistente")
-        user = None
-        if user_input.context and user_input.context.user_id:
-            user = await self.hass.auth.async_get_user(user_input.context.user_id)
-        if a is None:
-            out = {"say": "Matte no está activado en esta casa.", "session_id": user_input.conversation_id}
+        rt = self.hass.data.get(DOMAIN) or {}
+        a, brain = rt.get("asistente"), rt.get("voice")
+        cid = user_input.conversation_id
+        charla = bool(a and cid and cid in a.sesiones)  # hay una charla abierta con Matte: sigue con él
+        if brain is not None and rt.get("dashboard") is not None:
+            out = await brain.async_handle(user_input.text, rt["dashboard"].config, user_input.context, cid if charla else None)
+            say, sid = out.get("say"), out.get("session_id")
+        elif a is not None:
+            user = await self.hass.auth.async_get_user(user_input.context.user_id) if user_input.context and user_input.context.user_id else None
+            out = await a.conversar(user, user_input.text, cid, "voz")
+            say, sid = out.get("say"), out.get("session_id")
         else:
-            out = await a.conversar(user, user_input.text, user_input.conversation_id, "voz")
+            say, sid = "Matte no está activado en esta casa.", None
         response = intent.IntentResponse(language=user_input.language)
-        response.async_set_speech(out.get("say") or "Listo.")  # si propuso algo, Matte ya preguntó: la respuesta «sí» llega en el próximo pedido
-        return conversation.ConversationResult(response=response, conversation_id=out.get("session_id") or user_input.conversation_id)
+        response.async_set_speech(say or "Listo.")  # si propuso algo, Matte ya preguntó: el «sí» llega en el próximo pedido
+        return conversation.ConversationResult(response=response, conversation_id=sid or cid)

@@ -41,7 +41,8 @@ class Memoria:
     async def async_load(self) -> None:
         raw = await self._store.async_load()
         if isinstance(raw, dict):
-            self.data = {"casa": list(raw.get("casa") or []), "personas": dict(raw.get("personas") or {}), "rechazos": dict(raw.get("rechazos") or {})}
+            self.data = {"casa": list(raw.get("casa") or []), "personas": dict(raw.get("personas") or {}), "rechazos": dict(raw.get("rechazos") or {}),
+                         "ideas_avisadas": list(raw.get("ideas_avisadas") or [])}  # ideas de la semana ya avisadas (no se repiten)
 
     def _save(self) -> None:
         self._store.async_delay_save(lambda: self.data, 2)

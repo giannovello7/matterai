@@ -322,7 +322,7 @@ function ruleSummary(h, r, rules) {
     }
     case 'tv': return [u.cine ? 'modo cine' : '', (u.companions || []).length ? 'barra de sonido' : '', (u.presence || []).length || (u.empty_motion || []).length ? 'se apaga sin nadie' : '', u.bedtime ? `hora de dormir ${u.bed_at}` : '', u.night_vol ? `volumen máx. ${u.vol_max}%` : '', (u.pause_on || []).length ? 'pausa con el timbre' : ''].filter(Boolean).join(' · ');
     case 'fdetect': return `${(u.labels || []).map((l) => FLABELS[l] || l).join(', ')} en ${(u.zones || []).length ? u.zones.join(', ') : (u.cameras || []).length ? u.cameras.join(', ') : 'todas las cámaras'}${u.when === 'night' ? ' · de noche' : u.when === 'hours' ? ` · ${u.from}-${u.to}` : ''}${u.only_away ? ' · sin nadie en casa' : ''}`;
-    case 'fface': return `${u.any_known ? 'Cualquier conocido' : [...(u.people || []), ...(u.plates || []).map((p) => p.split('=')[0].trim())].join(', ')}${u.unlock ? (u.unlock_mode === 'auto' ? ' · abre solo' : ' · abrir con un botón') : ''}`;
+    case 'fface': return `${u.phones ? 'Autos de la familia (por el celular)' : ''}${u.phones && (u.any_known || (u.people || []).length || (u.plates || []).length) ? ' · ' : ''}${u.any_known ? 'Cualquier conocido' : [...(u.people || []), ...(u.plates || []).map((p) => p.split('=')[0].trim())].join(', ')}${u.unlock ? (u.unlock_mode === 'auto' ? ' · abre solo' : ' · abrir con un botón') : ''}`;
     case 'gate': {
       const now = r.gate_moving === 'opening' ? 'abriendo' : r.gate_moving === 'closing' ? 'cerrando' : r.gate_closed === true ? 'cerrado' : r.gate_closed === false ? 'abierto' : '';
       return [now, r.gate_travel ? `tarda ${r.gate_travel} s${r.gate_learned && !+u.travel_s ? ' (aprendido)' : ''}` : '', +u.open_alert_min ? `avisa a los ${u.open_alert_min} min` : '', u.night_close ? `cierra solo a las ${u.night_at}` : ''].filter(Boolean).join(' · ');
@@ -855,7 +855,7 @@ function draftError(d) {
       if (!u.labels.length) return 'Elegí qué detectar';
       return '';
     case 'fface':
-      if (!u.any_known && !u.people.length && !u.plates.length) return 'Elegí las personas o patentes (o «cualquier persona conocida»)';
+      if (!u.any_known && !u.people.length && !u.plates.length && !u.phones) return 'Elegí las personas, patentes, «cualquier persona conocida» o «por el celular»';
       if (u.disarm && !u.alarm) return 'Elegí la alarma';
       return '';
     case 'gate':
@@ -1092,6 +1092,7 @@ function newDraft(kind, extra = {}) {
       any_known: false, people: [], plates: [], cameras: [], zones: [], when: 'always', from: '07:00', to: '23:00', cooldown_min: 30,
       notify: true, recipients: [], message: 'Llegó {nombre}', silent: false, unlock: null, unlock_mode: 'ask', unlock_name: 'Abrir', code: '',
       disarm: false, alarm: null, lights: [], lights_dark: true, speakers: [], tts: null, welcome: 'Bienvenido, {nombre}', rules_run: [],
+      phones: false, phone_people: [], unknown_cars: false, window_min: 3,
     },
     doorbell: {
       face_sensor: null,
@@ -2007,7 +2008,7 @@ class MatterAIEscenasCard extends HTMLElement {
       <div class="sec"><div><div class="h">📹 Cámaras (Frigate)</div></div></div>
       <div class="card">
         ${it('newkind', 'data-v="fdetect"', 'mdi:cctv', '#F76F6F', 'Detección con cámaras', 'Personas, autos, animales o paquetes en una zona: aviso con foto, luces y sirena')}
-        ${it('newkind', 'data-v="fface"', 'mdi:face-recognition', '#3DBE8B', 'Caras y patentes conocidas', 'Llega alguien de la familia o su auto: aviso, abrir, luces y bienvenida')}
+        ${it('newkind', 'data-v="fface"', 'mdi:face-recognition', '#3DBE8B', 'Caras y patentes conocidas', 'Llega alguien de la familia o su auto (por la cara, la patente o su celular): aviso, abrir, luces y bienvenida')}
       </div>
       <div class="sec"><div><div class="h">🌱 Jardín</div></div></div>
       <div class="card">${it('idea', `data-v="${riego}"`, 'mdi:sprinkler-variant', '#3FB8E0', 'Riego por zonas', 'Bomba y electroválvulas, horarios, lluvia y humedad del suelo')}</div>`
@@ -2383,20 +2384,26 @@ class MatterAIEscenasCard extends HTMLElement {
     const u = d.ui; const h = this._hass; const fi = this._frigateInfo();
     const sec = (n, t, s2) => this._num2(null, n, t, s2);
     const tts = listOf(h, 'tts');
+    if (!Array.isArray(u.phone_people)) u.phone_people = []; // reglas de antes de «por el celular»
     const people = [...new Set([...fi.faces, ...u.people])];
     const zones = [...new Set([...fi.zones, ...u.zones])];
     const cams = [...new Set([...fi.cameras, ...u.cameras])];
     const rules = (this._rules || []).filter((r) => r.id !== d.id && ['scene', 'auto'].includes(r.kind));
-    const who = u.any_known ? 'alguien conocido' : [...u.people, ...u.plates.map((p) => `el auto ${p.split('=')[0].trim()}`)].join(', ') || '…';
+    const who = [u.phones ? 'el auto de alguien de la familia (la cámara ve un auto y su celular llega a casa)' : '', u.any_known ? 'alguien conocido' : [...u.people, ...u.plates.map((p) => `el auto ${p.split('=')[0].trim()}`)].join(', ')].filter(Boolean).join(' o ') || '…';
     const does = [u.notify ? 'te avisa' : '', u.unlock ? (u.unlock_mode === 'auto' ? `abre (${u.unlock_name})` : `te ofrece un botón «${u.unlock_name}»`) : '', u.disarm ? 'desarma la alarma' : '', u.lights.length ? `prende luces${u.lights_dark ? ' si es de noche' : ''}` : '', u.speakers.length ? 'le da la bienvenida por el parlante' : '', u.rules_run.length ? 'ejecuta escenas' : ''].filter(Boolean);
     let n = 0;
     return `<div class="today"><div class="mode" style="margin:0"><ha-icon icon="mdi:information-outline"></ha-icon><div><b>Cómo funciona</b><br>
         Cuando una cámara reconoce a ${esc(who)}${u.when === 'hours' ? ` (de ${u.from} a ${u.to})` : ''}: ${does.join(', ') || '…'}. No se repite por la misma persona durante ${durText(u.cooldown_min)}. Queda el registro de quién llegó y a qué hora.</div></div></div>
       ${fi.loaded && !fi.connected ? '<div class="hint" style="color:#e0832b;margin:8px 4px">No llegan eventos de Frigate por MQTT: se usarán sólo los sensores «último rostro reconocido» (sin patentes ni foto).</div>' : ''}
-      ${this._histBox(d, (e) => `${e.kind === 'plate' ? '🚗' : '👤'} ${esc(e.who)} · ${whenText(e.at)}${e.camera ? ` · ${esc(e.camera)}` : ''}${e.opened ? ' · 🔓' : ''}`)}
+      ${this._histBox(d, (e) => `${['plate', 'phone', 'car'].includes(e.kind) ? '🚗' : '👤'} ${esc(e.who)}${e.kind === 'phone' ? ' en auto' : ''} · ${whenText(e.at)}${e.camera ? ` · ${esc(e.camera)}` : ''}${e.opened ? ' · 🔓' : ''}`)}
 
       ${sec(++n, 'Quién')}
-      <div class="field">${this._sw('any_known', 'Cualquier persona conocida', u.any_known)}
+      <div class="field">${this._sw('phones', '📱 Autos de la familia, por el celular', u.phones)}
+        ${u.phones ? `<div class="hint">La cámara ve un auto y, ${u.window_min} minutos antes o después, el celular de alguien llega a casa: «Llegó Sofi en auto». No hace falta reconocer la patente. Por el celular nunca abre solo: si elegís abrir, te llega el botón.</div>
+          <div class="lbl" style="margin-top:10px">Personas</div>${this._entBtn('d', 'ui.phone_people', u.phone_people, ['person'], 'Todas las de la casa', true)}
+          <div class="lbl" style="margin-top:10px">Ventana</div>${this._chips('d', 'ui.window_min', u.window_min, [[2, '2 min'], [3, '3 min'], [5, '5 min'], [10, '10 min']])}
+          <div style="margin-top:10px">${this._sw('unknown_cars', '🚗 Avisar si llega un auto que no reconozco (con la foto)', u.unknown_cars)}</div>` : ''}
+        <div style="margin-top:14px">${this._sw('any_known', 'Cualquier persona conocida', u.any_known)}</div>
         ${u.any_known ? '<div class="hint">Sirve como registro de quién llega (familia, la persona de limpieza, el jardinero…).</div>' : `
           <div class="lbl" style="margin-top:12px">👤 Personas</div>${people.length ? this._chips('d', 'ui.people', u.people, people.map((p) => [p, p]), true) : ''}${this._addTxt('people', 'Nombre como está en Frigate')}
           <div class="lbl" style="margin-top:14px">🚗 Patentes (Frigate 0.16+)</div>

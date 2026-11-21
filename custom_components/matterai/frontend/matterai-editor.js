@@ -26,7 +26,7 @@
     sensor: ['Sensores', 'sensor'], binary_sensor: ['Puertas, ventanas y detectores', 'openings'], scene: ['Escenas', 'scenes'], script: ['Scripts', 'scenes'], weather: ['Clima', 'weather'],
     calendar: ['Calendarios', 'agenda'], valve: ['Válvulas de riego', 'irrigation'] };
   const MAX_CARDS = 60;
-  const FRONT_VERSION = '2.39.0'; // la cambia tools/version.py
+  const FRONT_VERSION = '2.40.0'; // la cambia tools/version.py
   const ROOM_MAX = 24; // tarjetas por ambiente (sus equipos son tarjetas desde la 2.35) // tarjetas por diseño: el mismo tope que la casa (views.py MAX_BLOCKS)
   const ACTION_TYPES = [['none', 'Nada'], ['toggle', 'Prender / apagar / abrir'], ['more_info', 'Ver más (ventana del equipo)'], ['room', 'Abrir un ambiente'], ['screen', 'Abrir una pantalla'], ['service', 'Llamar a un servicio']];
   const KPI_KINDS = [['alarm', 'Alarma'], ['lights', 'Luces prendidas'], ['temp', 'Temperatura adentro'], ['acs', 'Aires'], ['curtains', 'Cortinas'], ['power', 'Consumo'], ['people', 'Quién está'], ['entity', 'Un equipo (portón, sensor…)']];
