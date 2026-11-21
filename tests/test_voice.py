@@ -91,6 +91,8 @@ async def _setup(hass: HomeAssistant):
     await hass.async_block_till_done()
     rt = hass.data[DOMAIN]
     await rt["dashboard"].async_save(CONFIG)
+    # estas pruebas son de la IA «de una orden» (el respaldo cuando Matte no está): Matte tiene las suyas
+    rt["asistente"]._api_key_fn = lambda: None
     return rt
 
 

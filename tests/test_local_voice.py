@@ -133,6 +133,7 @@ async def _setup(hass, mode, key="sk-ant-prueba"):
     await hass.async_block_till_done()
     rt = hass.data[DOMAIN]
     await rt["dashboard"].async_save(CONFIG)
+    rt["asistente"]._api_key_fn = lambda: None  # la IA «de una orden» (respaldo); Matte tiene sus pruebas
     return rt
 
 

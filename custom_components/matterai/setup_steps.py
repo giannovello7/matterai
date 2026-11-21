@@ -33,6 +33,7 @@ GROUPS = [
 MANUAL = [
     ("m_push", "entrega", "Probar un aviso en su celular", "Equipos → «Probar…» → «Mostrar un aviso», y uno con la app cerrada (por ejemplo, abrir el portón).", False),
     ("m_explain", "entrega", "Explicarle la app", "Inicio, ambientes (tocar = luces, mantener = fijar), escenas, avisos, voz y Opciones → Conexión.", False),
+    ("m_matte", "entrega", "Matte en los parlantes de voz (si tiene)", "Con clave de IA cargada: Ajustes → Asistentes de voz → el asistente de la casa → Agente de conversación: «Matte». Así los parlantes Voice y el reloj le hablan al mismo Matte de la app. Contale al cliente que Matte pregunta antes de armar algo y que en la app ve y borra lo que sabe.", True),
     ("m_tablet", "entrega", "Dejar la tablet de pared lista", "Opciones de la app → Pantalla: modo tablet, fijar la app, protector de pantalla y «Escuchar «Mate»».", True),
     ("m_guest", "entrega", "Accesos de invitado (si los pidió)", "Equipos → Acceso de invitado, o el portón para invitados en Automatizaciones.", True),
     ("m_notes", "entrega", "Guardar los datos de la casa en tu gestor", "Dirección remota, usuario de Home Assistant y clave del panel central de esta casa.", False),

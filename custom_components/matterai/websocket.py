@@ -195,7 +195,7 @@ async def ws_heartbeat(hass: HomeAssistant, connection: websocket_api.ActiveConn
     connection.send_result(msg["id"], {"ok": await hb.async_send() if hb else None, "error": hb.last_error if hb else "Sin panel central"})
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/voice", vol.Required("text"): vol.All(str, vol.Length(min=1, max=500))})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/voice", vol.Required("text"): vol.All(str, vol.Length(min=1, max=500)), vol.Optional("session_id"): vol.Any(None, vol.All(str, vol.Length(max=64)))})
 @websocket_api.async_response
 async def ws_voice(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     """Pedido por voz (ya pasado a texto en el celular). Se ejecuta con los permisos de quien habla."""
@@ -204,11 +204,11 @@ async def ws_voice(hass: HomeAssistant, connection: websocket_api.ActiveConnecti
     if brain is None:
         connection.send_error(msg["id"], "no_voice", "El control por voz no está activado en esta casa")
         return
-    result = await brain.async_handle(msg["text"], rt["dashboard"].config, connection.context(msg))
+    result = await brain.async_handle(msg["text"], rt["dashboard"].config, connection.context(msg), msg.get("session_id"))
     connection.send_result(msg["id"], result)
 
 
-@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/voice_audio", vol.Required("audio"): str})
+@websocket_api.websocket_command({vol.Required("type"): f"{DOMAIN}/voice_audio", vol.Required("audio"): str, vol.Optional("session_id"): vol.Any(None, vol.All(str, vol.Length(max=64)))})
 @websocket_api.async_response
 async def ws_voice_audio(hass: HomeAssistant, connection: websocket_api.ActiveConnection, msg: dict) -> None:
     """Audio grabado en el celular (PCM 16 bits, 16 kHz, mono, en base64) → texto con el motor de voz de HA → pedido."""
@@ -234,7 +234,7 @@ async def ws_voice_audio(hass: HomeAssistant, connection: websocket_api.ActiveCo
         }.get(heard["error"], "No te escuché bien, probá de nuevo.")
         connection.send_result(msg["id"], {"ok": False, "say": say, "actions": [], "text": "", "error": heard["error"]})
         return
-    result = await brain.async_handle(heard["text"], rt["dashboard"].config, connection.context(msg))
+    result = await brain.async_handle(heard["text"], rt["dashboard"].config, connection.context(msg), msg.get("session_id"))
     connection.send_result(msg["id"], {**result, "text": heard["text"]})
 
 
@@ -449,5 +449,6 @@ from .views import WS_COMMANDS as VIEWS_WS  # noqa: E402
 from .media import WS_COMMANDS as MEDIA_WS  # noqa: E402
 from .setup_steps import WS_COMMANDS as SETUP_WS  # noqa: E402
 from .alta.ws import WS_COMMANDS as ALTA_WS  # noqa: E402
+from .asistente.ws import WS_COMMANDS as MATTE_WS  # noqa: E402
 
-COMMANDS = (ws_entities_list, ws_entities_save, *APP_WS, *PAIR_WS, *AUDIT_WS, *PRIVACY_WS, *VIEWS_WS, *MEDIA_WS, *SETUP_WS, *ALTA_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
+COMMANDS = (ws_entities_list, ws_entities_save, *APP_WS, *PAIR_WS, *AUDIT_WS, *PRIVACY_WS, *VIEWS_WS, *MEDIA_WS, *SETUP_WS, *ALTA_WS, *MATTE_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)

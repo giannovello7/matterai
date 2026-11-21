@@ -3041,16 +3041,31 @@
       // deja el micrófono trabado para la vez siguiente (Safari de iPhone y Android): sólo se corta si sigue escuchando
       this._voiceRelease(vo, 1500);
       try {
-        const r = await this._hass.callWS({ type: 'matterai/voice', text });
+        const r = await this._hass.callWS({ type: 'matterai/voice', text, ...this._matteSid() });
         if (this._vo !== vo) return;
         vo.state = r.ok === false ? 'error' : 'done'; vo.say = r.say || 'Listo.'; vo.actions = r.actions || [];
         if (r.abrir === 'alta') this._openAlta(r.texto_alta || text);
+        this._matteAfter(r, text);
       } catch (e) {
         if (this._vo !== vo) return;
         vo.state = 'error'; vo.say = MatterAIHomeCard.voiceErr(e);
       }
       this._voiceRender();
       this._voiceSpeak(vo.say, () => this._voiceAutoClose(1600));
+    }
+    /* Matte (la IA de la casa) recuerda la charla: si contestó con una pregunta o una propuesta, el próximo toque del
+     * micrófono sigue esa misma charla («sí, dale», «a las 15 mejor»). Una charla vieja (más de 5 min) no sigue. */
+    _matteSid() {
+      const m = this._matte;
+      return m && m.sid && Date.now() - m.t < 5 * 60e3 ? { session_id: m.sid } : {};
+    }
+    _matteAfter(r, text) {
+      if (!r || r.source !== 'matte' || !r.session_id) return;
+      this._matte = r.pregunta || (r.propuestas && r.propuestas.length) ? { sid: r.session_id, t: Date.now() } : null;
+      // una propuesta se confirma con un toque: la app abre la charla con los botones Sí / Cambiar / No
+      if (r.propuestas && r.propuestas.length) {
+        try { window.dispatchEvent(new CustomEvent('matterai-matte', { detail: { sid: r.session_id, text, say: r.say, propuestas: r.propuestas } })); } catch (_) { /* sin la app */ }
+      }
     }
     static voiceErr(e) {
       return e && e.code === 'unknown_command' ? 'La casa todavía no tiene la voz lista: hay que reiniciar Home Assistant.'
@@ -3162,11 +3177,12 @@
       const vo = this._vo; if (!vo) return;
       vo.state = 'thinking'; this._voiceRender();
       try {
-        const r = await this._hass.callWS({ type: 'matterai/voice_audio', audio });
+        const r = await this._hass.callWS({ type: 'matterai/voice_audio', audio, ...this._matteSid() });
         if (this._vo !== vo) return;
         vo.text = r.text || '';
         vo.state = r.ok === false ? 'error' : 'done'; vo.say = r.say || 'Listo.'; vo.actions = r.actions || [];
         if (r.abrir === 'alta') this._openAlta(r.texto_alta || r.text || '');
+        this._matteAfter(r, r.text || '');
       } catch (e) {
         if (this._vo !== vo) return;
         vo.state = 'error'; vo.say = MatterAIHomeCard.voiceErr(e);

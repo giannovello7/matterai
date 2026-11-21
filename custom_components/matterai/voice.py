@@ -373,7 +373,19 @@ class VoiceBrain:
             return {"acciones": [], "respuesta": text_out or NOT_UNDERSTOOD}
         return call.input if isinstance(call.input, dict) else json.loads(call.input)
 
-    async def async_handle(self, text: str, config: dict[str, Any], context: Context) -> dict[str, Any]:
+    async def _matte(self, text: str, context: Context, session_id: str | None) -> dict[str, Any] | None:
+        """Lo que el intérprete gratis no resuelve (o una charla en curso) lo sigue Matte, con memoria y conversación."""
+        from .const import DOMAIN  # noqa: PLC0415
+
+        a = (self.hass.data.get(DOMAIN) or {}).get("asistente")
+        if a is None or not a.disponible:
+            return None
+        user = await self.hass.auth.async_get_user(context.user_id) if context and context.user_id else None
+        out = await a.conversar(user, text, session_id, "voz")
+        return {"ok": out.get("ok", True), "say": out.get("say") or "Listo.", "actions": out.get("acciones") or [], "source": "matte",
+                "session_id": out.get("session_id"), "propuestas": out.get("propuestas") or [], "pregunta": bool(out.get("pregunta"))}
+
+    async def async_handle(self, text: str, config: dict[str, Any], context: Context, session_id: str | None = None) -> dict[str, Any]:
         from .local_voice import interpret_many as interpret  # noqa: PLC0415
 
         from .alta.matte import es_pedido_de_alta  # noqa: PLC0415
@@ -385,6 +397,10 @@ class VoiceBrain:
             if user is not None and puede_agregar(self.hass, user):
                 return {"ok": True, "say": "Dale, vamos a agregar equipos.", "actions": [], "source": "local", "abrir": "alta", "texto_alta": text}
             return {"ok": True, "say": "Agregar equipos lo puede hacer sólo el titular de la casa o el instalador.", "actions": [], "source": "local"}
+        if session_id and self.uses_ai:  # una charla con Matte que sigue («sí, armala», «y la del living también»)
+            res = await self._matte(text, context, session_id)
+            if res is not None:
+                return res
         rooms = house_catalog(self.hass, config)
         allowed_ids = {e["id"] for r in rooms for e in r["equipos"]}
         data, source = None, "local"
@@ -396,6 +412,11 @@ class VoiceBrain:
                 _LOGGER.exception("Voz: el intérprete gratis falló con «%s»", text)
                 data = None
         if data is None and self.uses_ai:
+            res = await self._matte(text, context, None)
+            if res is not None:
+                if self.mode != "ai":
+                    self._note(text, "ia", res["say"])
+                return res
             data, source = await self._ask_ai(text, rooms), "ia"
             if self.mode != "ai":
                 self._note(text, "ia", str(data.get("respuesta") or data.get("error") or ""))

@@ -168,6 +168,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
         rt["voice"].log = VoiceLog(hass)
         await rt["voice"].log.async_load()
+    # Matte: la IA de la casa (conversa, recuerda y arma automatizaciones con permiso). Sin clave, avisa.
+    from .alta.matte import api_key as _matte_key  # noqa: PLC0415
+    from .asistente.cerebro import Asistente  # noqa: PLC0415
+
+    rt["asistente"] = Asistente(hass, lambda: _matte_key(hass))
+    await rt["asistente"].async_load()
     if opts.get(CONF_CENTRAL_KEY):
         hb = Heartbeat(
             hass,
@@ -247,7 +253,10 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     entry.async_on_unload(async_at_started(hass, _start_alta))
     entry.async_on_unload(rt["alta"].stop)
-    await hass.config_entries.async_forward_entry_setups(entry, ALL_PLATFORMS)
+    # Matte como asistente de HA (parlantes Voice, reloj, app de HA): «conversation» carga antes que MatterAI
+    # (after_dependencies), así que si la casa lo tiene (siempre en una instalación normal) ya está acá
+    rt["matte_agent"] = "conversation" in hass.config.components
+    await hass.config_entries.async_forward_entry_setups(entry, [*ALL_PLATFORMS, *(["conversation"] if rt["matte_agent"] else [])])
 
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
     return True
@@ -259,7 +268,7 @@ async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry) -> Non
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     rt0 = hass.data.get(DOMAIN, {})
-    if not await hass.config_entries.async_unload_platforms(entry, ALL_PLATFORMS):
+    if not await hass.config_entries.async_unload_platforms(entry, [*ALL_PLATFORMS, *(["conversation"] if rt0.get("matte_agent") else [])]):
         return False
     if rt0.get("escenas_on"):
         await async_unload_escenas(hass)
@@ -277,7 +286,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for unsub in rt["views"].preview_timers.values():
             unsub()
         rt["views"].preview_timers.clear()
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy", "views", "alta", "matte", "descubrimientos"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "asistente", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy", "views", "alta", "matte", "descubrimientos"):
         rt.pop(key, None)
     return True
 
