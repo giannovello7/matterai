@@ -1155,6 +1155,11 @@
   .ib.mic.hf{box-shadow:0 0 0 2px rgba(62,230,196,.7),0 0 18px rgba(62,230,196,.5);animation:hfpulse 2.4s ease-in-out infinite}
   @keyframes hfpulse{50%{box-shadow:0 0 0 2px rgba(62,230,196,.35),0 0 8px rgba(62,230,196,.2)}}
   .vo-a{display:flex;align-items:center;gap:6px;font-size:13px;color:#3ee6c4}.vo-a .ic{width:14px;height:14px}
+  .vo-ds{display:flex;flex-direction:column;gap:6px;align-items:stretch;min-width:min(320px,80vw)}
+  .vo-d{display:flex;align-items:center;gap:8px;padding:8px 12px;border-radius:12px;background:rgba(62,230,196,.1);color:#bff7ea;font-size:14px;text-align:left}
+  .vo-d .ic{width:16px;height:16px;color:#3ee6c4;flex:none}.vo-d.bad{background:rgba(255,120,90,.12);color:#ffd2c6}.vo-d.bad .ic{color:#ff8a6b}
+  .vo-more{display:inline-flex;align-items:center;gap:8px;padding:10px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.16);background:rgba(255,255,255,.06);color:inherit;font:inherit;font-size:14px;cursor:pointer}
+  .vo-more .ic{width:16px;height:16px}
   .toast{position:fixed;left:50%;bottom:28px;z-index:40;transform:translate(-50%,30px);opacity:0;pointer-events:none;display:flex;align-items:center;gap:10px;padding:12px 18px;border-radius:999px;
     background:rgba(20,23,38,.92);border:1px solid rgba(255,255,255,.12);color:var(--txt);font-size:13.5px;box-shadow:0 18px 50px rgba(0,0,0,.45);transition:all .35s cubic-bezier(.2,.9,.2,1);
     -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);font-family:inherit;white-space:nowrap}
@@ -2988,22 +2993,39 @@
       }
       if (this._hf) this._hfStop();
       try { window.speechSynthesis && window.speechSynthesis.cancel(); } catch (_) { /* sin voz */ }
+      const vo = this._vo = { state: 'listening', text: '', parts: [], rec: null, follow: !!this._voFollow };
+      this._voFollow = false;
+      this._voN = (this._voN || 0) + 1;
+      this._voiceRec(vo, SR, true);
+    }
+    /* El reconocedor del celular corta en la primera pausa. Para no apurar a nadie: después de cada frase se sigue
+     * escuchando un momento (VO_PAUSE); si sigue hablando («y apagá la del living»), se junta todo en un solo pedido. */
+    _voiceRec(vo, SR, first) {
       const rec = new SR();
       rec.lang = 'es-AR'; rec.interimResults = true; rec.continuous = false; rec.maxAlternatives = 1;
-      const vo = this._vo = { state: 'listening', text: '', rec };
+      vo.rec = rec; vo.ended = false; vo.released = false;
       // diagnóstico (Ayuda → Estado): los pasos del micrófono, para ver en qué se queda la segunda vez
       const vlog = (m) => { try { if (window.__maeLog) window.__maeLog('voz', m); } catch (_) { /* nada */ } };
-      this._voN = (this._voN || 0) + 1; vlog(`pedido ${this._voN}: arranca (${SR.name || 'navegador'})`);
+      vlog(`pedido ${this._voN}: ${first ? 'arranca' : 'sigue escuchando'} (${SR.name || 'navegador'})`);
       ['start', 'audiostart', 'soundstart', 'speechstart', 'speechend', 'audioend', 'nomatch'].forEach((k) => { try { rec[`on${k}`] = () => vlog(`pedido ${this._voN}: ${k}`); } catch (_) { /* no lo tiene */ } });
       rec.onresult = (e) => {
+        if (this._vo !== vo || vo.state !== 'listening' || vo.rec !== rec) return;
         let t = ''; let final = false;
         for (let i = e.resultIndex; i < e.results.length; i++) { t += e.results[i][0].transcript; if (e.results[i].isFinal) final = true; }
-        vo.text = (final ? '' : '') + t; this._voiceRender();
-        if (final) { vo.final = true; this._voiceSend(t); }
+        clearTimeout(vo.pauseT); // sigue hablando: todavía no se manda
+        vo.text = [...vo.parts, t.trim()].filter(Boolean).join(' ');
+        if (final && t.trim()) {
+          vo.parts.push(t.trim()); vo.final = true;
+          vo.pauseT = setTimeout(() => { if (this._vo === vo && vo.state === 'listening') this._voiceSend(vo.parts.join(' ')); }, MatterAIHomeCard.VO_PAUSE);
+        }
+        this._voiceRender();
       };
       rec.onerror = (e) => {
         vlog(`pedido ${this._voN}: error ${e && e.error}${e && e.message ? ' ' + e.message : ''}`);
-        if (this._vo !== vo) return;
+        if (this._vo !== vo || vo.rec !== rec) return;
+        if (vo.final) return; // ya hay pedido: el silencio de después no es un error (lo manda la pausa)
+        // seguir la charla con Matte y no decir nada: se cierra sin «no escuché nada»
+        if (vo.follow && (e.error === 'no-speech' || e.error === 'aborted')) { this._voiceStop(true); return; }
         // despertado con «Mate»: el permiso del micrófono ya está dado (Mate estaba escuchando). Si falla al arrancar es
         // que Android todavía no lo soltó: se reintenta solo, sin mostrar «no tengo permiso»
         if (vo.mate && !vo.text && e.error !== 'no-speech' && e.error !== 'aborted' && (this._mateTry || 0) < 3) {
@@ -3021,12 +3043,19 @@
           : e.error === 'no-speech' ? 'No escuché nada. Tocá el micrófono y hablá.' : 'No te pude escuchar, probá de nuevo.';
         this._voiceRender(); this._voiceAutoClose(3500);
       };
-      rec.onend = () => { vlog(`pedido ${this._voN}: fin${vo.text ? ' con texto' : ' sin texto'}`); vo.ended = true; if (this._vo === vo && vo.state === 'listening' && !vo.final) { if (vo.text) this._voiceSend(vo.text); else this._voiceStop(true); } };
+      rec.onend = () => {
+        vlog(`pedido ${this._voN}: fin${vo.text ? ' con texto' : ' sin texto'}`); vo.ended = true;
+        if (this._vo !== vo || vo.state !== 'listening' || vo.rec !== rec) return;
+        if (vo.final) { if (!vo.again) { vo.again = true; setTimeout(() => { vo.again = false; if (this._vo === vo && vo.state === 'listening') this._voiceRec(vo, SR, false); }, 60); } return; } // un ratito más
+        if (vo.text) this._voiceSend(vo.text); else this._voiceStop(true);
+      };
+      if (!first) { try { rec.start(); } catch (_) { /* sigue la pausa: se manda lo que hay */ } return; }
       this._voiceRender(true);
       this._haptic('light');
       clearTimeout(this._voWD);
       this._voWD = setTimeout(() => { // escucha "muda" (pasa en algunos navegadores): se graba y transcribe la casa
         if (this._vo === vo && vo.state === 'listening' && !vo.text) {
+          if (vo.follow) { this._voiceStop(true); return; } // no contestó: se cierra sin error
           this._voiceRelease(vo, 0);
           if (this._canRecord() && !this._isNative()) { this._vo = null; this._recStart(); return; }
           this._voiceFail('No te pude escuchar desde acá.', this._isNative() ? 'Probá de nuevo en un momento.' : this._micBlockedWhy());
@@ -3044,6 +3073,7 @@
         const r = await this._hass.callWS({ type: 'matterai/voice', text, ...this._matteSid() });
         if (this._vo !== vo) return;
         vo.state = r.ok === false ? 'error' : 'done'; vo.say = r.say || 'Listo.'; vo.actions = r.actions || [];
+        vo.ask = r.source === 'matte' && !!r.pregunta && !(r.propuestas && r.propuestas.length);
         if (r.abrir === 'alta') this._openAlta(r.texto_alta || text);
         this._matteAfter(r, text);
       } catch (e) {
@@ -3051,7 +3081,27 @@
         vo.state = 'error'; vo.say = MatterAIHomeCard.voiceErr(e);
       }
       this._voiceRender();
-      this._voiceSpeak(vo.say, () => this._voiceAutoClose(1600));
+      this._voiceSpeak(vo.say, () => this._voiceAfter(vo));
+    }
+    /** Después de responder: si Matte preguntó algo, vuelve a escuchar sola; si no, la respuesta queda el tiempo de leerla. */
+    _voiceAfter(vo) {
+      if (this._vo !== vo) return;
+      if (vo.ask && vo.state === 'done' && !MatterAIHomeCard.iosWeb() && this._speechRec()) { this._voFollow = true; this._voiceStart(); return; }
+      this._voiceAutoClose(MatterAIHomeCard.voReadMs(vo.say, (vo.actions || []).length));
+    }
+    /** Lo que tarda en leerse: 4,5 s como mínimo y 12 como máximo. */
+    static voReadMs(say, n) { return Math.max(4500, Math.min(12000, 1500 + String(say || '').length * 60 + (n || 0) * 700)); }
+    /** Lo hecho, en palabras: «Prender · Luz living». */
+    _voiceDone(actions) {
+      const V = { turn_on: 'Prender', turn_off: 'Apagar', toggle: 'Cambiar', open_cover: 'Abrir', close_cover: 'Cerrar', stop_cover: 'Parar', set_cover_position: 'Mover',
+        set_temperature: 'Temperatura', set_hvac_mode: 'Modo', media_pause: 'Pausar', media_play: 'Seguir', media_stop: 'Parar', media_next_track: 'Siguiente',
+        volume_set: 'Volumen', play_media: 'Poner', play_something: 'Poner música', set_percentage: 'Velocidad', transfer_queue: 'Pasar la música' };
+      const S = (this._hass && this._hass.states) || {};
+      return (actions || []).slice(0, 6).map((a) => {
+        const svc = String(a.service || '').split('.')[1] || '';
+        const names = (a.entities || []).map((e) => (S[e] && S[e].attributes && S[e].attributes.friendly_name) || e).slice(0, 3).join(', ');
+        return `<div class="vo-d ${a.ok ? '' : 'bad'}">${a.ok ? ic('check') : ic('alert')}<span><b>${esc(V[svc] || svc)}</b> ${esc(names)}</span></div>`;
+      }).join('');
     }
     /* Matte (la IA de la casa) recuerda la charla: si contestó con una pregunta o una propuesta, el próximo toque del
      * micrófono sigue esa misma charla («sí, dale», «a las 15 mejor»). Una charla vieja (más de 5 min) no sigue. */
@@ -3067,6 +3117,7 @@
         try { window.dispatchEvent(new CustomEvent('matterai-matte', { detail: { sid: r.session_id, text, say: r.say, propuestas: r.propuestas } })); } catch (_) { /* sin la app */ }
       }
     }
+    static get VO_PAUSE() { return 1300; } // ms de silencio después de una frase antes de mandar el pedido
     static voiceErr(e) {
       return e && e.code === 'unknown_command' ? 'La casa todavía no tiene la voz lista: hay que reiniciar Home Assistant.'
         : e && e.code === 'no_voice' ? 'El control por voz no está activado en esta casa.' : 'No me pude comunicar con la casa.';
@@ -3188,7 +3239,7 @@
         vo.state = 'error'; vo.say = MatterAIHomeCard.voiceErr(e);
       }
       this._voiceRender();
-      this._voiceSpeak(vo.say, () => this._voiceAutoClose(1600));
+      this._voiceSpeak(vo.say, () => this._voiceAfter(vo));
     }
     _voiceSpeak(text, done) {
       const synth = typeof window !== 'undefined' && window.speechSynthesis;
@@ -3308,7 +3359,7 @@
     }
     _voiceRender(open) {
       const el = this._els.vowrap, vo = this._vo; if (!el || !vo) return;
-      const label = { listening: 'Te escucho…', thinking: 'Dale, ya va…', done: '', error: '' }[vo.state];
+      const label = { listening: vo.follow ? 'Te escucho… (contestale a Matte)' : vo.final ? 'Te escucho… ¿algo más?' : 'Te escucho…', thinking: 'Dale, ya va…', done: '', error: '' }[vo.state];
       const ok = (vo.actions || []).filter((a) => a.ok).length;
       el.innerHTML = `<div class="backdrop" data-action="voiceclose"></div><div class="vo ${vo.state}">
         <button class="vo-orb" data-action="${vo.state === 'listening' || vo.state === 'error' ? 'voice' : 'voiceclose'}" aria-label="${vo.state === 'listening' ? 'Terminar' : vo.state === 'error' ? 'Probar de nuevo' : 'Cerrar'}"><i></i><i></i><i></i>${ic(vo.state === 'done' ? 'check' : vo.state === 'error' ? 'alert' : 'mic')}</button>
@@ -3318,7 +3369,8 @@
         ${vo.state === 'error' && vo.why ? `<div class="vo-why">${esc(vo.why)}</div>` : ''}
         ${vo.state === 'error' && vo.go ? `<a class="vo-go" href="${esc(vo.go)}" target="_self">${ic('mic')} Abrir con micrófono</a>` : ''}
         ${vo.state === 'error' ? `<div class="vo-retry">Tocá el círculo para probar de nuevo</div>` : ''}
-        ${vo.state === 'done' && ok ? `<div class="vo-a">${ic('sparkle')} ${ok} ${ok === 1 ? 'acción' : 'acciones'}</div>` : ''}
+        ${vo.state === 'done' && (vo.actions || []).length ? `<div class="vo-ds">${this._voiceDone(vo.actions)}</div>` : vo.state === 'done' && ok ? `<div class="vo-a">${ic('sparkle')} ${ok} ${ok === 1 ? 'acción' : 'acciones'}</div>` : ''}
+        ${vo.state === 'done' ? `<button class="vo-more" data-action="voice">${ic('mic')} Seguir hablando</button>` : ''}
         ${this._hfSupported() ? (this._mateDl != null ? `<button class="vo-hf dl" disabled>${ic('mic')} Bajando la voz de Mate… ${this._mateDl}% <small>(unos 40 MB, una sola vez)</small></button>`
           : `<button class="vo-hf ${this._hfEnabled() ? 'on' : ''}" data-action="handsfree">${ic('mic')} ${this._hfEnabled() ? '«Mate» escuchando en este equipo · apagar' : 'Activar «Mate» en este equipo (decís «Mate» y pedís, sin tocar)'}</button>`) : ''}
       </div>`;
