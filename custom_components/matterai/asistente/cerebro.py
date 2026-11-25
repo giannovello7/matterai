@@ -53,8 +53,13 @@ Automatizaciones, escenas y recordatorios (lo más importante):
 - Las reglas se arman con el modelo del panel (campo regla). Tipos: scene (botón para tocar: ui.actions), auto (ui.triggers + ui.conditions + ui.cond_mode all/any + ui.actions), period (encender equipos en un horario: ui.entities, ui.on y ui.off {type: time, at: HH:MM} o {type: sunrise/sunset, offset: minutos}, ui.days), reminder (ui.text, ui.date AAAA-MM-DD, ui.time HH:MM, ui.repeat none/daily/weekly/monthly/yearly, ui.days para weekly).
   Disparadores: {type: time, at, days}, {type: sun, event: sunrise/sunset, offset, days}, {type: device, entity, to (estado) o dir above/below + value, for_min}, {type: presence, who: person.x | first | last, event: arrive/leave}, {type: interval, every, unit: m/h}.
   Condiciones: {type: time, after, before, days}, {type: sun, when: day/night}, {type: device, entity, state o dir+value}, {type: presence, who: person.x | anyone | nobody, where: home/away}.
-  Acciones: {type: device, entity, svc: dominio.servicio, params: {brightness_pct, temperature, position, _off_after (minutos)...}}, {type: area, domain, op: on/off/open/close/pause, area: area_id | all}, {type: scene, entity}, {type: notify, target: mobile_app_x, message, title}, {type: delay, h, m, s}, {type: rule, op: run/enable/disable, rule_id}.
+  Acciones: {type: device, entity, svc: dominio.servicio, params: {brightness_pct, temperature, position, _off_after (minutos)...}}, {type: area, domain, op: on/off/open/close/pause, area: area_id | all}, {type: scene, entity}, {type: notify, target: mobile_app_x, message, title, foto}, {type: delay, h, m, s}, {type: rule, op: run/enable/disable, rule_id}.
   Días: mon tue wed thu fri sat sun. Los recordatorios llegan solos al celular de quien los pidió.
+
+Avisos con foto:
+- Todo aviso queda también en la campanita de la app de la persona (30 días) y puede llevar la foto del momento. En la acción notify, foto es el id de una cámara (catalogo_reglas → camaras), "no" (sin foto) o nada (la casa elige sola la cámara del sensor). En Llegadas (fface) es ui.foto true / false.
+- Si el aviso es por un auto, una persona, el timbre o movimiento, ponele foto: elegí la cámara que mira ese lugar (la que tiene ese sensor, la del mismo ambiente o la que lo dice en el nombre). Si hay varias posibles, preguntá cuál; si hay una sola, no preguntes. Si la persona no quiere foto, "no". Para avisos sin cámara que sirva (pilas, agua, recordatorios) no pongas nada.
+- Al proponer, decí si va con foto y de qué cámara (lo que devuelve proponer en «foto»).
 
 Llegadas y cámaras:
 - «Avisame cuando llegue alguien en auto»: proponé una regla kind fface (Llegadas) con ui.phones true (la cámara ve un auto y el celular de alguien de la familia llega a casa → «Llegó Sofi en auto»), ui.cameras con la cámara de la entrada (catalogo_reglas → camaras_frigate) y, si quiere, ui.unknown_cars true para avisar autos que no reconoce. También sirve para caras (ui.people) y patentes (ui.plates «AB123CD = Auto de Juan»). Matte nunca arma aperturas automáticas: si quiere abrir, va ui.unlock con el botón del aviso (es delicado: se confirma en la app).
@@ -415,8 +420,56 @@ class Asistente:
             "ambientes": [{"area_id": a.id, "nombre": a.name} for a in ar.async_get(self.hass).async_list_areas()],
             "celulares": cel,
             "delicados_se_confirman_en_la_app": delicados,
+            "camaras": self._camaras(),
             "camaras_frigate": self._frigate_info(),
         }
+
+    def _camaras(self) -> list[dict[str, Any]]:
+        from homeassistant.helpers import area_registry as ar  # noqa: PLC0415
+
+        from ..avisos import area_de, camara_de  # noqa: PLC0415
+
+        areas, out = ar.async_get(self.hass), []
+        de: dict[str, list[str]] = {}
+        for st in self.hass.states.async_all(("binary_sensor", "sensor", "event")):
+            cam = camara_de(self.hass, st.entity_id)
+            if cam:
+                de.setdefault(cam, []).append(st.entity_id)
+        for st in self.hass.states.async_all("camera"):
+            area = areas.async_get_area(area_de(self.hass, st.entity_id) or "")
+            out.append({"id": st.entity_id, "nombre": st.attributes.get("friendly_name") or st.entity_id, "ambiente": area.name if area else None,
+                        "sensores": de.get(st.entity_id, [])[:12]})
+        return out[:40]
+
+    def _elegir_foto(self, raw: dict[str, Any]) -> str | None:
+        """La cámara de los avisos de una regla: la que pidió Matte o, si no dijo nada, la del sensor que dispara.
+        Devuelve cómo contarlo (None = la regla no avisa nada)."""
+        from ..avisos import elegir_camara  # noqa: PLC0415
+
+        ui = raw.get("ui") if isinstance(raw.get("ui"), dict) else {}
+        if raw.get("kind") == "fface":
+            return "sin foto" if ui.get("foto") is False or ui.get("notify") is False else "con la foto de la cámara que lo vio"
+        avisos = [a for a in ui.get("actions") or [] if isinstance(a, dict) and a.get("type") == "notify"]
+        if not avisos:
+            return None
+        sens = [t["entity"] for t in ui.get("triggers") or [] if isinstance(t, dict) and isinstance(t.get("entity"), str)]
+        auto, dicho = elegir_camara(self.hass, sens), "sin foto (no hay una cámara clara para ese sensor: si hay varias, preguntá cuál)"
+        for a in avisos:
+            if a.get("foto") in (None, "", True) and auto:
+                a["foto"] = auto
+            elif a.get("foto") is False:
+                a["foto"] = "no"
+            elif a.get("foto") is True:
+                a.pop("foto")
+            foto = a.get("foto")
+            if foto == "no":
+                dicho = "sin foto, como pidió"
+            elif foto:
+                st = self.hass.states.get(str(foto))
+                if st is None:
+                    raise ReglaError("Esa cámara no existe (mirá catalogo_reglas → camaras).")
+                dicho = f"con foto de «{st.attributes.get('friendly_name') or foto}»"
+        return dicho
 
     def _frigate_info(self) -> dict[str, Any]:
         hub = getattr(self.hass.data.get(ESCENAS), "frigate", None)
@@ -567,6 +620,7 @@ class Asistente:
             return self._proponer_equipo(ctx, args)
         if accion == "dashboard":
             return self._proponer_dashboard(ctx, args)
+        foto: str | None = None
         manager = self._manager()
         actor = self._actor(ctx)
         admin = bool(getattr(actor, "is_admin", False))
@@ -591,6 +645,7 @@ class Asistente:
                 ui = raw.setdefault("ui", {})
                 if not ui.get("recipients"):
                     ui["recipients"] = self._mis_celulares(ctx["uid"])  # el aviso le llega a quien lo pidió
+            foto = self._elegir_foto(raw)
             regla = compile_rule(raw)
             if accion == "crear" and not admin and regla["kind"] in manager.settings.get("client_off", []):
                 return {"ok": False, "error": "Tu instalador no habilitó ese tipo de automatización en esta casa."}
@@ -607,7 +662,7 @@ class Asistente:
              "sensible": bool(regla and es_sensible(self.hass, regla)) or bool(prev and accion in ("borrar", "pausar") and es_sensible(self.hass, prev))}
         s["propuestas"][pid] = p
         ctx["nuevas"].append(pid)
-        return {"propuesta_id": pid, "sensible": p["sensible"], "siguiente": "Contale la propuesta en simple y preguntá si le da el «dale». No la apliques en este turno."}
+        return {"propuesta_id": pid, "sensible": p["sensible"], **({"foto": foto} if foto else {}), "siguiente": "Contale la propuesta en simple y preguntá si le da el «dale». No la apliques en este turno."}
 
     def _proponer_equipo(self, ctx, args) -> dict[str, Any]:
         from homeassistant.helpers import area_registry as ar  # noqa: PLC0415

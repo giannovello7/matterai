@@ -38,6 +38,7 @@ from .doorbell import DoorbellController
 from .frigate import FDetectController, FFaceController, FrigateHub
 from .gate import GateController
 from .guest import DOMAINS as GUEST_DOMAINS, GUEST_PATH as GUEST_LINK, MAX_INVITES, GuestController, base_url, clean_invite
+from .notify import con_campanita
 from .night import NightController
 from .reminder import CalAlertController, ReminderController
 from .tv import TvController
@@ -317,6 +318,7 @@ class RuleRunner:
         return bool(self._script and self._script.is_running)
 
     async def _async_make_script(self, seq: list, mode: str) -> Script:
+        seq = con_campanita(self.hass, self.rule, seq)
         seq = await async_validate_actions_config(self.hass, cv.SCRIPT_SCHEMA(seq))
         return Script(
             self.hass,

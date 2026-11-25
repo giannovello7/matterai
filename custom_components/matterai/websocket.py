@@ -446,9 +446,10 @@ from .pairing import WS_COMMANDS as PAIR_WS  # noqa: E402
 from .audit import WS_COMMANDS as AUDIT_WS  # noqa: E402
 from .privacy import WS_COMMANDS as PRIVACY_WS  # noqa: E402
 from .views import WS_COMMANDS as VIEWS_WS  # noqa: E402
+from .avisos import WS_COMMANDS as AVISOS_WS  # noqa: E402
 from .media import WS_COMMANDS as MEDIA_WS  # noqa: E402
 from .setup_steps import WS_COMMANDS as SETUP_WS  # noqa: E402
 from .alta.ws import WS_COMMANDS as ALTA_WS  # noqa: E402
 from .asistente.ws import WS_COMMANDS as MATTE_WS  # noqa: E402
 
-COMMANDS = (ws_entities_list, ws_entities_save, *APP_WS, *PAIR_WS, *AUDIT_WS, *PRIVACY_WS, *VIEWS_WS, *MEDIA_WS, *SETUP_WS, *ALTA_WS, *MATTE_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)
+COMMANDS = (ws_entities_list, ws_entities_save, *APP_WS, *PAIR_WS, *AUDIT_WS, *PRIVACY_WS, *VIEWS_WS, *MEDIA_WS, *AVISOS_WS, *SETUP_WS, *ALTA_WS, *MATTE_WS, ws_watchdog, ws_templates_remap, ws_backup_restore_some, ws_backup_export, ws_backup_restore, ws_backup_send, ws_templates_list, ws_templates_save, ws_templates_use, ws_voice_log, ws_voice_audio, ws_voice, ws_config, ws_config_subscribe, ws_config_save, ws_pairing, ws_status, ws_heartbeat)

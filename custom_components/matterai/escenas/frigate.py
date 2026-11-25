@@ -25,7 +25,7 @@ from typing import Any
 
 from homeassistant.core import Event, HomeAssistant, callback
 from homeassistant.helpers.event import async_call_later, async_track_state_change_event
-from homeassistant.util import dt as dt_util
+from homeassistant.util import dt as dt_util, slugify
 
 from .notify import Notifier
 
@@ -255,6 +255,13 @@ class _Base:
     def _snapshot(self, event_id: str | None) -> str | None:
         return f"/api/frigate/notifications/{event_id}/snapshot.jpg" if event_id else None
 
+    def _foto(self, event_id: str | None, camera: str | None) -> dict[str, Any]:
+        """De dónde sale la foto que queda con el aviso (nada si la regla es «sin foto»)."""
+        if self.u.get("foto") is False:
+            return {}
+        eid = camera if str(camera or "").startswith("camera.") else f"camera.{slugify(str(camera))}" if camera else None
+        return {"image": self._snapshot(event_id), "event": event_id, "camera": eid if eid and self.hass.states.get(eid) else None}
+
     def _links(self, event_id: str | None) -> list[tuple[str, str]]:
         return [("📹 Ver clip", f"/api/frigate/notifications/{event_id}/clip.mp4")] if event_id else []
 
@@ -379,7 +386,7 @@ class FDetectController(_Base):
         actions.append(("snooze", "🔕 Silenciar 1 h"))
         self.hass.async_create_task(self.notifier.send(
             f"📹 {self.rule.get('name') or 'Cámaras'}", message, tag=f"ev{event_id[-6:]}",
-            actions=actions[:2], links=self._links(event_id), image=self._snapshot(event_id),
+            actions=actions[:2], links=self._links(event_id), **self._foto(event_id, camera),
             critical=bool(self.u.get("critical")) and not silent, silent=silent))
         if not silent:
             if self.u.get("lights_auto", True) and self.u.get("lights"):
@@ -494,7 +501,7 @@ class FFaceController(_Base):
         local = dt_util.as_local(dt_util.utcnow())
         plate = f" (patente {car['plate']})" if car.get("plate") else ""
         msg = f"Llegó un auto que no reconozco{plate} ({local.hour:02d}:{local.minute:02d})."
-        self.hass.async_create_task(self.notifier.send("🚗 Auto en la entrada", msg, tag="unknown_car", image=self._snapshot(car["id"]), links=self._links(car["id"])))
+        self.hass.async_create_task(self.notifier.send("🚗 Auto en la entrada", msg, tag="unknown_car", **self._foto(car["id"], car["camera"]), links=self._links(car["id"])))
         self._record({"at": dt_util.utcnow().isoformat(), "who": "Auto desconocido", "kind": "car", "camera": car["camera"], "id": car["id"]})
 
     def _arrived_phone(self, people: list[str], car: dict[str, Any]) -> None:
@@ -594,7 +601,7 @@ class FFaceController(_Base):
             actions = [("open", f"🔓 {self.u.get('unlock_name') or 'Abrir'}")] if unlock and mode == "ask" else []
             self.hass.async_create_task(self.notifier.send(
                 f"👤 {self.rule.get('name') or 'Llegó alguien'}", msg, tag="arrive", actions=actions,
-                image=self._snapshot(event_id), silent=bool(self.u.get("silent"))))
+                **self._foto(event_id, camera), silent=bool(self.u.get("silent"))))
         self._record({"at": dt_util.utcnow().isoformat(), "who": who, "kind": kind, "camera": camera, "id": event_id,
                       "opened": bool(unlock and mode == "auto")})
 

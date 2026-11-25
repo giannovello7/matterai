@@ -76,6 +76,8 @@ async def async_forget(hass: HomeAssistant, user_id: str) -> bool:
     if rt is None or not await rt["house"].async_revoke(user_id):
         return False
     audit_log(hass, "access", "equipo desvinculado", name)
+    if rt.get("avisos") is not None:
+        rt["avisos"].olvidar(user_id)
     ad = rt.get("app_devices")
     if rt.get("views") is not None:
         rt["views"].seen.pop(user_id, None)
@@ -101,6 +103,8 @@ async def async_replace_twins(hass: HomeAssistant, user_id: str) -> int:
     house, views = rt["house"], rt.get("views")
     n = 0
     for old in house.twins(user_id):
+        if rt.get("avisos") is not None:
+            rt["avisos"].olvidar(old, user_id)
         if views is not None and views.users.get(old) and not views.users.get(user_id):
             views.set_user(user_id, views.users[old])
         for e in app_entries(hass):

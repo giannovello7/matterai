@@ -54,6 +54,51 @@ def parse_action(value: str) -> tuple[str, str] | None:
     return None
 
 
+def avisos_de(hass: HomeAssistant):
+    """La campanita de la app MatterAI (en la integración de automatizaciones sola no hay)."""
+    return (hass.data.get("matterai") or {}).get("avisos")
+
+
+def sensores_de(rule: dict[str, Any]) -> list[str]:
+    """Los equipos que disparan una regla, en orden."""
+    out: list[str] = []
+    for t in rule.get("triggers") or []:
+        ids = t.get("entity_id") if isinstance(t, dict) else None
+        out += [i for i in (ids if isinstance(ids, list) else [ids]) if isinstance(i, str)]
+    return out
+
+
+_TRIGGER = "{{ trigger.entity_id if trigger is defined and trigger and trigger.entity_id is defined and trigger.entity_id else '%s' }}"
+
+
+def con_campanita(hass: HomeAssistant, rule: dict[str, Any], seq: Any) -> Any:
+    """Las notificaciones de una regla armada a mano (o por Matte) pasan por la campanita: se anotan, llevan la foto de la
+    cámara si corresponde y salen al celular como siempre. La regla guardada no cambia (vale también para las de antes)."""
+    if avisos_de(hass) is None:
+        return seq
+    sens = sensores_de(rule)
+
+    def walk(node: Any) -> Any:
+        if isinstance(node, list):
+            return [walk(x) for x in node]
+        if not isinstance(node, dict):
+            return node
+        key = next((k for k in ("service", "action") if isinstance(node.get(k), str)), None)
+        svc, data = (node[key] if key else ""), node.get("data")
+        if (svc.startswith("notify.mobile_app_") or svc == "persistent_notification.create") and isinstance(data, dict):
+            text = str(data.get("message") or "")
+            extra = data.get("data") or {}
+            # las órdenes para el celular (borrar un aviso, hablar…) y lo que es todo plantilla quedan como están
+            orden = not text or text.startswith("command_") or text in ("clear_notification", "request_location_update", "remove_channel", "TTS")
+            if not orden and isinstance(extra, dict):
+                return {**node, key: "matterai.aviso", "data": {
+                    **{k: data[k] for k in ("message", "title") if k in data}, "notify": svc, "data": {k: v for k, v in extra.items() if k != "foto"},
+                    "foto": str(extra.get("foto") or ""), "rule_id": rule["id"], "rule": rule.get("name") or "", "sensor": _TRIGGER % (sens[0] if sens else "")}}
+        return {k: (walk(v) if isinstance(v, (dict, list)) else v) for k, v in node.items()}
+
+    return walk(seq)
+
+
 class Notifier:
     """Manda, actualiza y borra un aviso (siempre con el mismo «tag» por regla)."""
 
@@ -77,9 +122,20 @@ class Notifier:
         image: str | None = None,
         links: list[tuple[str, str]] | None = None,
         silent: bool = False,
+        camera: str | None = None,
+        event: str | None = None,
     ) -> None:
+        """`camera` (entidad) y `event` (de Frigate): de dónde sale la foto que queda guardada con el aviso."""
         full_tag = f"{DOMAIN}_{self.rule_id}_{tag}"
         targets = self._valid_targets()
+        av = avisos_de(self.hass)
+        aviso = None
+        if av is not None:
+            # sin celulares elegidos es para todos los de la casa
+            propios = [t for t in targets if t in self.targets]
+            aviso = av.anotar(title, message, targets=propios or None, rule_id=self.rule_id, camara=camera, evento=event, repite=True)
+            if camera or event:
+                image = f"/api/matterai/aviso/{aviso['id']}.jpg"
         if not targets:
             await self.hass.services.async_call(
                 "persistent_notification",
@@ -110,10 +166,13 @@ class Notifier:
         else:
             data["push"] = {"interruption-level": "time-sensitive"}
             data.update({"ttl": 0, "priority": "high"})
+        propia = app_targets(self.hass) if aviso else []
         for target in targets:
+            # en la app MatterAI, tocar el aviso lo abre en la campanita
+            body = {**data, "clickAction": f"/avisos?id={aviso['id']}"} if target in propia else data
             try:
                 await self.hass.services.async_call(
-                    "notify", target, {"title": title, "message": message, "data": data}, blocking=False
+                    "notify", target, {"title": title, "message": message, "data": body}, blocking=False
                 )
             except Exception:  # noqa: BLE001 - un celular caído no frena a los demás
                 _LOGGER.warning("No se pudo avisar a %s", target, exc_info=True)

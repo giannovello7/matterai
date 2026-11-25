@@ -555,10 +555,11 @@
     function load(k, d) { try { const v = localStorage.getItem(k); return v == null ? d : JSON.parse(v); } catch (_) { return d; } }
     function save(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); } catch (_) { /* sin almacenamiento */ } }
 
+    const PRIV = /^\/api\/matterai\/(media|aviso)\//;
     // imágenes privadas de la casa: link firmado (se renueva solo)
     function img(path) {
       if (!path) return '';
-      if (!path.startsWith('/api/matterai/media/')) return url(path);
+      if (!PRIV.test(path)) return url(path);
       const c = X.signed[path];
       if (c && c.until > Date.now()) return c.url;
       if (!c || !c.pending) {
@@ -993,7 +994,7 @@
         case 'clock': {
           const d = new Date(), w = m.weather;
           if (c.style === 'panel') {
-            const cf = card() && card()._config, brand = b.title || (cf && cf.installer) || 'MatterAI', ns = notes(m).length;
+            const cf = card() && card()._config, brand = b.title || (cf && cf.installer) || 'MatterAI', ns = nAvisos(m);
             const own = (c.items || []).filter((x) => x && (x.kind !== 'entity' || st(x.entity))).slice(0, 6);
             const items = !c.auto && own.length ? own : [{ kind: 'lights' }, { kind: 'acs' }, m.power ? { kind: 'power' } : { kind: 'temp' }];
             X.kpiItems = X.kpiItems || {}; X.kpiItems[b.id] = items; X.shown[b.id] = items;
@@ -1234,12 +1235,46 @@
       });
       return out.filter((n) => !X.dismissed.has(n.key));
     }
+    /* ───────── avisos recibidos: los que mandaron las automatizaciones, guardados en la casa (con su foto) ───────── */
+    const avisos = () => X.av || [];
+    const nAvisos = (m) => notes(m).length + avisos().filter((a) => a.nuevo).length;
+    /** Queda escuchando los avisos de esta persona (una vez por conexión). Con una integración vieja no hay: queda como antes. */
+    function subAvisos() {
+      const h = hass(), conn = h && h.connection;
+      if (editing() || !conn || !conn.subscribeMessage || X.avConn === conn) return;
+      X.avConn = conn;
+      Promise.resolve(conn.subscribeMessage((ev) => { if (X.destroyed || X.avConn !== conn) return; X.av = (ev && ev.items) || []; avisosVistos(); render(); }, { type: 'matterai/avisos/subscribe' }))
+        .then((un) => { if (X.destroyed && typeof un === 'function') un(); else X.avUn = un; }).catch(() => { X.av = []; });
+    }
+    function avisosVistos() {
+      const h = hass();
+      if (X.sheet === 'avisos' && h && h.callWS && avisos().some((a) => a.nuevo)) Promise.resolve(h.callWS({ type: 'matterai/avisos/vistos' })).catch(() => { /* se marca la próxima vez */ });
+    }
+    /** Se borra en la casa; desaparece de la lista cuando la casa lo confirma. */
+    function borrarAvisos(ids) {
+      const h = hass(); if (!h || !h.callWS) return;
+      Promise.resolve(h.callWS({ type: 'matterai/avisos/borrar', ids })).catch(() => toast('No se pudo borrar. Probá de nuevo.'));
+    }
+    function avWhen(t) {
+      const d = new Date(t * 1000), n = new Date(), hm = d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false });
+      const day = (x) => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(), df = Math.round((day(n) - day(d)) / 864e5);
+      return `${df <= 0 ? 'Hoy' : df === 1 ? 'Ayer' : d.toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'numeric' })} ${hm}`;
+    }
+    function avisosHTML() {
+      const L = avisos(), max = X.avMax || 20;
+      if (!L.length) return '';
+      return `<h4 class="v-avh">Avisos recibidos</h4><div class="v-list">${L.slice(0, max).map((a) => {
+        const u = a.foto ? img(a.foto) : '';
+        return `<div class="v-ntf av${a.nuevo ? ' nw' : ''}"><button class="v-avb" data-av="${esc(a.id)}">${a.foto ? `<span class="v-avf"${u ? ` style="background-image:url('${esc(u)}')"` : ''}></span>` : `<span class="v-nic">${ic('bell')}</span>`}<span class="v-tx"><b>${esc(a.titulo)}</b><span>${esc(a.texto)}</span><small>${esc(avWhen(a.t))}${a.veces > 1 ? ` · ${a.veces} veces` : ''}</small></span></button><button class="v-dx" data-avd="${esc(a.id)}" aria-label="Borrar aviso">${ic('x')}</button></div>`; }).join('')}</div>
+        ${L.length > max ? '<button class="v-allb" data-avmas>Ver anteriores</button>' : ''}<button class="v-allb" data-avall>Borrar los avisos recibidos</button>
+        <p class="v-note">Se guardan 30 días en tu casa. Lo que borres se borra en todos tus equipos.</p>`;
+    }
     function dismiss(n) { if (n.sug) card().dismissSuggestion(n.sug); X.dismissed.add(n.key); save('matterai.vista.dismissed', [...X.dismissed].slice(-200)); }
 
     /* ───────── dibujo ───────── */
     function set(sel, html) { if (X.cache[sel] === html) return; X.cache[sel] = html; const e = X.el.querySelector(sel); if (e) e.innerHTML = html; }
     function greetHTML(m, name) {
-      const hr = new Date().getHours(), hi = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches', ns = notes(m).length;
+      const hr = new Date().getHours(), hi = hr < 5 ? 'Buenas noches' : hr < 13 ? 'Buen día' : hr < 20 ? 'Buenas tardes' : 'Buenas noches', ns = nAvisos(m);
       const S = (hass() || {}).states || {}, ae = (card() && card()._config && card()._config.app_entities) || null;
       const lit = Object.keys(S).filter((x) => x.startsWith('light.') && S[x].state === 'on' && (!ae || ae.includes(x))).length;
       const how = ns ? `${ns} aviso${ns === 1 ? '' : 's'} para revisar` : 'Todo funcionando bien';
@@ -1247,9 +1282,9 @@
     }
     function whenHTML() { const d = new Date(); return `<button class="v-when" data-scr="agenda"><b>${esc(d.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false }))}</b><span>${esc(d.toLocaleDateString('es-AR', { weekday: 'long', day: 'numeric', month: 'long' }))}</span></button>`; }
     function wxChip(m, compact) { const w = m.weather; if (!w) return ''; return `<button class="v-chip" data-scr="clima">${ic(WX[w.state] || (isNight() ? 'moon' : 'sun'))}${esc(Math.round(Number(w.attributes.temperature)))}°${compact ? '' : `<small>${esc(WX_TXT[w.state] || '')}</small>`}</button>`; }
-    function bellHTML(m) { const ns = notes(m).length; return `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>`; }
+    function bellHTML(m) { const ns = nAvisos(m); return `<button class="v-sq" data-scr="avisos" aria-label="Avisos">${ic('bell')}${ns ? `<span class="v-badge">${ns > 9 ? '9+' : ns}</span>` : ''}</button>`; }
     function head(m, compact) {
-      const d = new Date(), w = m.weather, ns = notes(m).length, H = (X.layout && X.layout.header) || {};
+      const d = new Date(), w = m.weather, ns = nAvisos(m), H = (X.layout && X.layout.header) || {};
       const on = (k) => H[k] !== false;
       // sin nada arriba: en la app no se ve; en el editor queda una barrita para volver a mostrarla
       if (!H.greet && ['clock', 'weather', 'bell', 'menu'].every((k) => H[k] === false)) return editing() ? '<span class="v-hoff">Parte de arriba oculta · tocá acá para volver a mostrarla</span>' : '';
@@ -1386,6 +1421,7 @@
       // cerró con el dedo apoyado), a los 3 s se destraba: si no, la pantalla quedaba congelada hasta cerrar la app
       if (X.sliding && Date.now() - (X.slideAt || 0) > 3000) X.sliding = false;
       if (X.xtra && X.el && X.el.hidden && !X.sliding && !X.dnd) refreshXtra(); // el inicio tapado por el ambiente: el ambiente igual se actualiza
+      subAvisos();
       if (!X.el || X.el.hidden || X.sliding || X.dnd) return;
       const m0 = M();
       // la app espera el dashboard de la casa antes de dibujar (si no, se veía un momento el prearmado o el de la vez anterior)
@@ -1503,6 +1539,7 @@
       editMarks();
       spreadPins();
       refreshXtra();
+      if (X.avAbrir) { const id = X.avAbrir; X.avAbrir = null; openSheet('avisos', id === true ? null : id); }
       if (!ctx.embed && X.el.querySelector && X.el.insertAdjacentHTML) {
         const fm = X.el.querySelector('.v-fmenu'), need = !editing() && !!ctx.openMenu && !X.el.querySelector('[data-scr="menu"]:not(.v-fmenu)');
         if (need && !fm) X.el.insertAdjacentHTML('beforeend', `<button class="v-fmenu" data-scr="menu" aria-label="Menú">${ic('menu')}</button>`);
@@ -1673,12 +1710,17 @@
       const hd = (t, s) => `<div class="v-grab"></div><div class="v-sh"><div><h2>${esc(t)}</h2>${s ? `<small>${esc(s)}</small>` : ''}</div><button class="v-x" data-close aria-label="Cerrar">${ic('x')}</button></div>`;
       let h = '';
       if (X.sheet === 'avisos') {
-        const ns = notes(m);
-        h = hd('Avisos', ns.length ? `${ns.length} de tu casa` : '') + (ns.length
+        const ns = notes(m), a = X.sheetArg && avisos().find((x) => x.id === X.sheetArg);
+        if (a) { // un aviso en grande, con su foto
+          const u = a.foto ? img(a.foto) : '';
+          h = hd(a.titulo, avWhen(a.t)) + (a.foto ? `<div class="v-avg">${u ? `<img src="${esc(u)}" alt="Foto del aviso">` : ''}</div>` : '') + `<p class="v-avt">${esc(a.texto)}</p>
+            <button class="v-allb" data-avback>Ver todos los avisos</button><button class="v-allb" data-avd="${esc(a.id)}">Borrar este aviso</button>`;
+        } else h = hd('Avisos', ns.length ? `${ns.length} de tu casa` : '') + (ns.length
           ? `<div class="v-list">${ns.map((n, i) => `<div class="v-ntf ${n.lvl}"><span class="v-nic">${ic(n.ic)}</span><span class="v-tx"><b>${esc(n.t)}</b><span>${esc(n.d || '')}</span></span>${n.a ? `<button class="v-btn1 ${n.lvl ? 'w' : ''}" data-na="${i}">${esc(n.a)}</button>` : ''}<button class="v-dx" data-nd="${i}" aria-label="Descartar">${ic('x')}</button></div>`).join('')}</div>
             <button class="v-allb" data-ndall>Descartar todos</button>`
-          : `<div class="v-empty big">${ic('bell')}<p>No hay avisos. Todo en orden en tu casa.</p></div>`);
+          : avisos().length ? '' : `<div class="v-empty big">${ic('bell')}<p>No hay avisos. Todo en orden en tu casa.</p></div>`) + avisosHTML();
       }
+      { const ws = X.el.querySelector('#v-sheet'); if (ws && ws.classList) ws.classList.toggle('foto', X.sheet === 'avisos' && !!X.sheetArg); }
       if (X.sheet === 'casa') {
         const pins = (X.roomNames || []).map((n) => (roomByName(m, n) || {}).id);
         h = hd('Toda la casa', `${m.rooms.length} ambientes`) + `<div class="v-rooms">${m.rooms.map((r) => roomRow(r, pins.includes(r.id))).join('')}</div>
@@ -1735,7 +1777,7 @@
     }
     function openSheet(k, arg) {
       const was = !!X.sheet;
-      X.sheet = k; X.sheetArg = arg || null; X.el.querySelector('#v-sheet').classList.add('show'); renderSheet();
+      X.sheet = k; X.sheetArg = arg || null; X.el.querySelector('#v-sheet').classList.add('show'); renderSheet(); avisosVistos();
       const M = window.MaeMotion, sin = X.el.querySelector('#v-sheet .v-sin');
       if (M && sin && !was && !editing()) { M.open(sin); M.dragClose(sin, '.v-grab,.v-sh', () => { if (!editing()) closeSheet(); }); } // nace de lo que tocaste; se baja con el dedo
     }
@@ -1805,6 +1847,11 @@
       const na = t.closest('[data-na]'); if (na) { const n = notes(m)[+na.dataset.na]; if (n) { if (n.sug) c.runSuggestion(n.sug); else if (n.run) n.run(); dismiss(n); } return render(); }
       const nd = t.closest('[data-nd]'); if (nd) { const n = notes(m)[+nd.dataset.nd]; if (n) dismiss(n); return render(); }
       if (t.closest('[data-ndall]')) { notes(m).forEach(dismiss); return render(); }
+      const avd = t.closest('[data-avd]'); if (avd) { borrarAvisos([avd.dataset.avd]); if (X.sheetArg === avd.dataset.avd) { X.sheetArg = null; renderSheet(); } return; }
+      const avi = t.closest('[data-av]'); if (avi) { X.sheetArg = avi.dataset.av; return renderSheet(); }
+      if (t.closest('[data-avback]')) { X.sheetArg = null; return renderSheet(); }
+      if (t.closest('[data-avmas]')) { X.avMax = (X.avMax || 20) + 30; return renderSheet(); }
+      if (t.closest('[data-avall]')) { if (typeof confirm !== 'function' || confirm('¿Borrar todos los avisos recibidos?')) borrarAvisos('todos'); return; }
       const al = t.closest('[data-al]'); if (al) { const a = st(X.sheetArg) || m.alarm; c.alarm(al.dataset.al, a && a.entity_id); closeSheet(); return; }
       const sc = t.closest('[data-scene]'); if (sc) { vib(); const id = sc.dataset.scene, dm = id.split('.')[0]; c.call(dm, dm === 'button' ? 'press' : 'turn_on', { entity_id: id }); sc.classList.add('act'); setTimeout(() => sc.classList.remove('act'), 1200); toast(`Escena «${fname(id)}»`); return; }
       const kt = t.closest('[data-kt]'); if (kt) { const b = blockOf(kt), items = X.kpiItems && b && X.kpiItems[b.id], it = items && items[+kt.dataset.kt]; if (it) { const a = it.tap || (it.kind === 'alarm' ? { type: 'toggle', entity: m.alarm && m.alarm.entity_id } : it.kind === 'lights' ? { type: 'screen', screen: 'luces' } : it.entity ? { type: 'toggle', entity: it.entity } : null); run(a, it); } return; }
@@ -2275,7 +2322,9 @@
       dragging: () => !!(dnd && dnd.on),
       /** Un solo visor a la vez: mientras la app muestra el visor grande, el del inicio se saca (y vuelve al cerrarlo). */
       pauseLive(on) { if (!!X.livePaused === !!on) return; X.livePaused = !!on; X.cache = {}; X.partCache = {}; render(); },
-      destroy() { X.destroyed = true; closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
+      /** Tocaron la notificación: la campanita, en ese aviso. Si el inicio está tapado, se abre apenas vuelva a verse. */
+      openAvisos(id) { if (!X.el || X.el.hidden || !X.el.querySelector('#v-sheet')) { X.avAbrir = id || true; return; } X.avAbrir = null; openSheet('avisos', id || null); },
+      destroy() { X.destroyed = true; if (typeof X.avUn === 'function') X.avUn(); closeXtra(); clearInterval(X.camT); clearInterval(X.fastT); clearInterval(X.clockT); if (typeof removeEventListener === 'function') removeEventListener('resize', onResize); el.removeEventListener('click', onClick); el.innerHTML = ''; },
       _test: { notes, X, run },
     };
   }

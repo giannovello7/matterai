@@ -446,7 +446,7 @@ function compileAction(h, a) {
       return [{ service: `${D}.set_enabled`, data: { rule_id: a.rule_id, enabled: a.op === 'enable' } }];
     case 'notify':
       if (a.target === 'persistent') return [{ service: 'persistent_notification.create', data: { title: a.title || 'Aviso', message: a.message } }];
-      return [{ service: `notify.${a.target}`, data: { message: a.message, ...(a.title ? { title: a.title } : {}) } }];
+      return [{ service: `notify.${a.target}`, data: { message: a.message, ...(a.title ? { title: a.title } : {}), ...(a.foto ? { data: { foto: a.foto } } : {}) } }];
     case 'speak': return [{ service: 'tts.speak', target: { entity_id: a.tts }, data: { media_player_entity_id: a.player, message: a.message } }];
     case 'delay': return [{ delay: { hours: +a.h || 0, minutes: +a.m || 0, seconds: +a.s || 0 } }];
     case 'wait': {
@@ -2367,6 +2367,7 @@ class MatterAIEscenasCard extends HTMLElement {
       ${sec(++n, 'Qué hacer')}
       <div class="field">${this._recipients('ui.recipients', u.recipients)}
         <div style="margin-top:12px">${this._sw('critical', 'Aviso urgente (suena aunque esté en silencio)', u.critical)}</div>
+        <div style="margin-top:12px">${this._sw('foto', '📷 Con foto de la cámara', u.foto !== false)}</div>
         <div class="hint">El aviso trae la foto y botones: Ver clip, Prender luces / Sirena, Silenciar 1 h.</div>
         <div class="lbl" style="margin-top:14px">No repetir avisos de la misma cámara durante</div>${this._chips('d', 'ui.cooldown_min', u.cooldown_min, [[1, '1 min'], [3, '3 min'], [5, '5 min'], [10, '10 min'], [30, '30 min']])}
         <div class="lbl" style="margin-top:14px">💡 Luces (opcional)</div>${this._entBtn('d', 'ui.lights', u.lights, ['light', 'switch'], 'Sin luces', true)}
@@ -2421,6 +2422,7 @@ class MatterAIEscenasCard extends HTMLElement {
       ${sec(++n, 'Qué hacer')}
       <div class="field">${this._sw('notify', '📲 Avisar quién llegó', u.notify)}
         ${u.notify ? `<div style="margin-top:8px">${this._recipients('ui.recipients', u.recipients)}</div><input type="text" style="margin-top:8px" value="${esc(u.message)}" data-o="d" data-k="ui.message" placeholder="Llegó {nombre}">
+          <div style="margin-top:8px">${this._sw('foto', '📷 Con foto de la cámara', u.foto !== false)}</div>
           <div style="margin-top:8px">${this._sw('silent', 'Sin sonido (sólo registro)', u.silent)}</div>` : ''}
         <div class="lbl" style="margin-top:14px">🔓 Abrir (opcional)</div>${this._entBtn('d', 'ui.unlock', u.unlock, ['lock', 'button', 'input_button', 'switch', 'script', 'cover'], 'No abrir')}
         ${u.unlock ? `<button class="chip" style="margin-top:6px" data-a="set" data-o="d" data-k="ui.unlock" data-v="" data-t="null">Quitar</button>
@@ -3465,7 +3467,9 @@ class MatterAIEscenasCard extends HTMLElement {
     return `<div class="field"><div class="lbl">A quién</div>${this._chips('s', 'target', a.target, [['persistent', 'En Home Assistant', 'mdi:bell'], ...svcs.map((s) => [s, notifyLabel(s), s.startsWith('mobile_app_') ? 'mdi:cellphone' : 'mdi:message'])])}
       ${svcs.length ? '' : '<div class="hint">Para recibir avisos en el celular instalá la app de Home Assistant e iniciá sesión.</div>'}</div>
       <div class="field"><div class="lbl">Título (opcional)</div><input type="text" value="${esc(a.title)}" data-o="s" data-k="title"></div>
-      <div class="field"><div class="lbl">Mensaje</div><textarea data-o="s" data-k="message">${esc(a.message)}</textarea></div>`;
+      <div class="field"><div class="lbl">Mensaje</div><textarea data-o="s" data-k="message">${esc(a.message)}</textarea></div>
+      ${has(h, 'camera') && a.target !== 'persistent' ? `<div class="field"><div class="lbl">Foto</div>${this._chips('s', 'foto', a.foto || '', [['', 'Automática', 'mdi:auto-fix'], ['no', 'Sin foto', 'mdi:image-off-outline'], ...listOf(h, 'camera').map((e) => [e, fname(h, e), 'mdi:cctv'])])}
+      <div class="hint">Automática: la de la cámara del mismo aparato que el sensor (auto, persona, movimiento, timbre). El aviso queda en la campanita de la app MatterAI con la foto del momento.</div></div>` : ''}`;
   }
   _f_actions_speak(a) {
     const h = this._hass;

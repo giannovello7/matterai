@@ -20,7 +20,7 @@ from homeassistant.util import dt as dt_util
 
 from .const import DOMAIN
 from ..app_devices import fire_command
-from .notify import action_id, targets_for
+from .notify import action_id, avisos_de, targets_for
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -210,6 +210,10 @@ class DoorbellController:
                 message = f"Tocó el timbre: {st.state}."
         if self._nobody_home():
             message += " No hay nadie en casa."
+        av = avisos_de(self.hass)
+        if av is not None:  # queda en la campanita con la foto de quien tocó (la notificación sigue con la cámara en vivo)
+            elegidos = [t for t in targets if t in (self.u.get("recipients") or [])]
+            av.anotar(title, message, targets=elegidos or None, rule_id=self.rule_id, camara=self.camera)
         if not targets:
             self._call("persistent_notification.create", {"title": title, "message": message, "notification_id": f"{DOMAIN}_{self.rule_id}_ring"})
             return

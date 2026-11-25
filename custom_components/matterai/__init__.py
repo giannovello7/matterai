@@ -72,6 +72,9 @@ async def async_setup(hass: HomeAssistant, config: ConfigType) -> bool:
     from .media import async_register_views as async_register_media_views  # noqa: PLC0415
 
     async_register_media_views(hass)
+    from .avisos import async_register_view as async_register_avisos_view  # noqa: PLC0415
+
+    async_register_avisos_view(hass)
     # Si en esta casa sigue instalada la integración aparte «MatterAI Escenas», las automatizaciones
     # las maneja ella: correr las dos haría que cada automatización se ejecute dos veces.
     if not _escenas_aparte(hass):
@@ -123,6 +126,12 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     selection.start()
     entry.async_on_unload(selection.stop)
     rt.update(entry=entry, house=house, dashboard=dashboard, app_devices=app_devices, audit=audit, privacy=privacy, views=views, selection=selection)
+    # los avisos de las automatizaciones quedan en la campanita (con la foto del momento)
+    from .avisos import Avisos  # noqa: PLC0415
+
+    rt["avisos"] = Avisos(hass)
+    await rt["avisos"].async_load()
+    rt["avisos"].start()
     async_register_service(hass)
     from datetime import timedelta  # noqa: PLC0415
 
@@ -277,6 +286,8 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     rt = hass.data.get(DOMAIN, {})
     if rt.get("app_devices"):
         rt["app_devices"].stop()
+    if rt.get("avisos"):
+        await rt["avisos"].async_stop()
     hass.services.async_remove(DOMAIN, "app_command")
     if rt.get("card_url"):
         try:
@@ -287,7 +298,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         for unsub in rt["views"].preview_timers.values():
             unsub()
         rt["views"].preview_timers.clear()
-    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "asistente", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy", "views", "alta", "matte", "descubrimientos"):
+    for key in ("entry", "house", "dashboard", "heartbeat", "card_url", "voice", "asistente", "escenas_on", "escenas_conflict", "watchdog", "app_devices", "audit", "privacy", "views", "alta", "matte", "descubrimientos", "avisos"):
         rt.pop(key, None)
     return True
 

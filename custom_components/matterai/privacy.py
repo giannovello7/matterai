@@ -227,6 +227,7 @@ async def ws_app_export(hass: HomeAssistant, connection: websocket_api.ActiveCon
         "registro_de_auditoria": [e for e in (audit.entries if audit else []) if e.get("who") == f"app · {name}"],
         "pedidos_arco": [r for r in pv.arco if r["user_id"] == uid],
         "lo_que_matte_sabe": (_rt(hass).get("asistente").memoria.exportar(uid) if _rt(hass).get("asistente") else {}),
+        "avisos_de_la_campanita": (rt["avisos"].listar(uid) if rt.get("avisos") else []),
         "nota": "Incluye todo lo que la casa guarda de este equipo. No incluye claves ni accesos. Las cámaras graban en la casa (Frigate) y no se asocian a este equipo.",
     }
     from .audit import log as audit_log  # noqa: PLC0415

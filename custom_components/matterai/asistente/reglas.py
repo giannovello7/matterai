@@ -20,7 +20,7 @@ FFACE_BASE = {
     "any_known": False, "people": [], "plates": [], "cameras": [], "zones": [], "when": "always", "from": "07:00", "to": "23:00", "cooldown_min": 30,
     "notify": True, "recipients": [], "message": "Llegó {nombre}", "silent": False, "unlock": None, "unlock_mode": "ask", "unlock_name": "Abrir", "code": "",
     "disarm": False, "alarm": None, "lights": [], "lights_dark": True, "speakers": [], "tts": None, "welcome": "Bienvenido, {nombre}", "rules_run": [],
-    "phones": False, "phone_people": [], "unknown_cars": False, "window_min": 3,
+    "foto": True, "phones": False, "phone_people": [], "unknown_cars": False, "window_min": 3,
 }
 ALL_DAYS = ["mon", "tue", "wed", "thu", "fri", "sat", "sun"]
 AREA_SVC = {"on": "turn_on", "off": "turn_off", "open": "open_cover", "close": "close_cover", "pause": "media_pause"}
@@ -183,7 +183,11 @@ def compile_action(a: dict[str, Any]) -> list[dict[str, Any]]:
         target = str(a.get("target") or "")
         if not target or not re.match(r"^[a-z0-9_]+$", target):
             raise ReglaError("Aviso: falta a qué celular (notify)")
-        return [{"service": f"notify.{target}", "data": {"message": str(a.get("message") or ""), **({"title": str(a["title"])} if a.get("title") else {})}}]
+        foto = str(a.get("foto") or "")
+        if foto and foto != "no" and not re.match(r"^camera\.[a-z0-9_]+$", foto):
+            raise ReglaError("Aviso: foto va como el id de una cámara (camera.x), «no» (sin foto) o sin poner nada (automática)")
+        return [{"service": f"notify.{target}", "data": {"message": str(a.get("message") or ""), **({"title": str(a["title"])} if a.get("title") else {}),
+                                                         **({"data": {"foto": foto}} if foto else {})}}]
     if typ == "delay":
         return [{"delay": {"hours": int(a.get("h") or 0), "minutes": int(a.get("m") or 0), "seconds": int(a.get("s") or 0)}}]
     raise ReglaError(f"Acción desconocida: {typ}")
